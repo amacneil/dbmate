@@ -1,0 +1,8 @@
+postgres:
+  image: postgres:9.4
+dbmate:
+  build: .
+  volumes:
+    - .:/go/src/github.com/adrianmacneil/dbmate
+  links:
+    - postgres
