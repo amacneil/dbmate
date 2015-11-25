@@ -25,16 +25,10 @@ func main() {
 
 	app.Commands = []cli.Command{
 		{
-			Name:  "up",
+			Name:  "migrate",
 			Usage: "Migrate to the latest version",
 			Action: func(ctx *cli.Context) {
-				runCommand(UpCommand, ctx)
-			},
-			Flags: []cli.Flag{
-				cli.BoolFlag{
-					Name:  "pretend, p",
-					Usage: "don't do anything; print migrations to apply",
-				},
+				runCommand(MigrateCommand, ctx)
 			},
 		},
 		{

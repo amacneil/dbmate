@@ -104,8 +104,8 @@ func doTransaction(db *sql.DB, txFunc func(shared.Transaction) error) error {
 	return tx.Commit()
 }
 
-// UpCommand migrates database to the latest version
-func UpCommand(ctx *cli.Context) error {
+// MigrateCommand migrates database to the latest version
+func MigrateCommand(ctx *cli.Context) error {
 	migrationsDir := ctx.GlobalString("migrations-dir")
 	available, err := findAvailableMigrations(migrationsDir)
 	if err != nil {
