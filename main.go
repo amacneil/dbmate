@@ -43,6 +43,13 @@ func NewApp() *cli.App {
 			},
 		},
 		{
+			Name:  "rollback",
+			Usage: "Rollback the most recent migration",
+			Action: func(ctx *cli.Context) {
+				runCommand(RollbackCommand, ctx)
+			},
+		},
+		{
 			Name:  "new",
 			Usage: "Generate a new migration file",
 			Action: func(ctx *cli.Context) {

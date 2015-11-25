@@ -67,8 +67,13 @@ func (postgres Driver) CreateMigrationsTable(db *sql.DB) error {
 }
 
 // SelectMigrations returns a list of applied migrations
-func (postgres Driver) SelectMigrations(db *sql.DB) (map[string]struct{}, error) {
-	rows, err := db.Query("SELECT version FROM schema_migrations")
+// with an optional limit (in descending order)
+func (postgres Driver) SelectMigrations(db *sql.DB, limit int) (map[string]struct{}, error) {
+	query := "SELECT version FROM schema_migrations ORDER BY version DESC"
+	if limit >= 0 {
+		query = fmt.Sprintf("%s LIMIT %d", query, limit)
+	}
+	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
 	}
