@@ -16,7 +16,7 @@ import (
 
 // CreateCommand creates the current database
 func CreateCommand(ctx *cli.Context) error {
-	u, err := GetDatabaseURL()
+	u, err := GetDatabaseURL(ctx)
 	if err != nil {
 		return err
 	}
@@ -31,7 +31,7 @@ func CreateCommand(ctx *cli.Context) error {
 
 // DropCommand drops the current database (if it exists)
 func DropCommand(ctx *cli.Context) error {
-	u, err := GetDatabaseURL()
+	u, err := GetDatabaseURL(ctx)
 	if err != nil {
 		return err
 	}
@@ -86,8 +86,11 @@ func NewCommand(ctx *cli.Context) error {
 }
 
 // GetDatabaseURL returns the current environment database url
-func GetDatabaseURL() (u *url.URL, err error) {
-	return url.Parse(os.Getenv("DATABASE_URL"))
+func GetDatabaseURL(ctx *cli.Context) (u *url.URL, err error) {
+	env := ctx.GlobalString("env")
+	value := os.Getenv(env)
+
+	return url.Parse(value)
 }
 
 func doTransaction(db *sql.DB, txFunc func(shared.Transaction) error) error {
@@ -116,7 +119,7 @@ func MigrateCommand(ctx *cli.Context) error {
 		return fmt.Errorf("No migration files found.")
 	}
 
-	u, err := GetDatabaseURL()
+	u, err := GetDatabaseURL(ctx)
 	if err != nil {
 		return err
 	}

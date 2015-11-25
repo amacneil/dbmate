@@ -11,6 +11,12 @@ import (
 func main() {
 	loadDotEnv()
 
+	app := NewApp()
+	app.Run(os.Args)
+}
+
+// NewApp creates a new command line app
+func NewApp() *cli.App {
 	app := cli.NewApp()
 	app.Name = "dbmate"
 	app.Usage = "A lightweight, framework-independent database migration tool."
@@ -20,6 +26,11 @@ func main() {
 			Name:  "migrations-dir, d",
 			Value: "./db/migrations",
 			Usage: "specify the directory containing migration files",
+		},
+		cli.StringFlag{
+			Name:  "env, e",
+			Value: "DATABASE_URL",
+			Usage: "specify an environment variable containing the database URL",
 		},
 	}
 
@@ -54,7 +65,7 @@ func main() {
 		},
 	}
 
-	app.Run(os.Args)
+	return app
 }
 
 type command func(*cli.Context) error

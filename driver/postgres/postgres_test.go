@@ -11,7 +11,7 @@ import (
 
 func testURL(t *testing.T) *url.URL {
 	str := os.Getenv("POSTGRES_PORT")
-	require.NotEmpty(t, str)
+	require.NotEmpty(t, str, "missing POSTGRES_PORT environment variable")
 
 	u, err := url.Parse(str)
 	require.Nil(t, err)
