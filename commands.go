@@ -196,7 +196,7 @@ func MigrateCommand(ctx *cli.Context) error {
 		}
 
 		// begin transaction
-		doTransaction(db, func(tx shared.Transaction) error {
+		err = doTransaction(db, func(tx shared.Transaction) error {
 			// run actual migration
 			if _, err := tx.Exec(migration["up"]); err != nil {
 				return err
@@ -209,6 +209,9 @@ func MigrateCommand(ctx *cli.Context) error {
 
 			return nil
 		})
+		if err != nil {
+			return err
+		}
 
 	}
 
@@ -354,7 +357,7 @@ func RollbackCommand(ctx *cli.Context) error {
 	}
 
 	// begin transaction
-	doTransaction(db, func(tx shared.Transaction) error {
+	err = doTransaction(db, func(tx shared.Transaction) error {
 		// rollback migration
 		if _, err := tx.Exec(migration["down"]); err != nil {
 			return err
@@ -367,6 +370,9 @@ func RollbackCommand(ctx *cli.Context) error {
 
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
