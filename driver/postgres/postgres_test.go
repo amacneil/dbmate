@@ -61,3 +61,36 @@ func TestCreateDropDatabase(t *testing.T) {
 		require.Equal(t, "pq: database \"dbmate\" does not exist", err.Error())
 	}()
 }
+
+func TestDatabaseExists(t *testing.T) {
+	d := postgres.Driver{}
+	u := testURL(t)
+
+	// drop any existing database
+	err := d.DropDatabase(u)
+	require.Nil(t, err)
+
+	// DatabaseExists should return false
+	exists, err := d.DatabaseExists(u)
+	require.Nil(t, err)
+	require.Equal(t, false, exists)
+
+	// create database
+	err = d.CreateDatabase(u)
+	require.Nil(t, err)
+
+	// DatabaseExists should return true
+	exists, err = d.DatabaseExists(u)
+	require.Nil(t, err)
+	require.Equal(t, true, exists)
+}
+
+func TestDatabaseExists_error(t *testing.T) {
+	d := postgres.Driver{}
+	u := testURL(t)
+	u.User = url.User("invalid")
+
+	exists, err := d.DatabaseExists(u)
+	require.Equal(t, "pq: role \"invalid\" does not exist", err.Error())
+	require.Equal(t, false, exists)
+}

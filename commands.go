@@ -14,6 +14,32 @@ import (
 	"time"
 )
 
+// UpCommand creates the database (if necessary) and runs migrations
+func UpCommand(ctx *cli.Context) error {
+	u, err := GetDatabaseURL(ctx)
+	if err != nil {
+		return err
+	}
+
+	drv, err := driver.Get(u.Scheme)
+	if err != nil {
+		return err
+	}
+
+	// create database if it does not already exist
+	// skip this step if we cannot determine status
+	// (e.g. user does not have list database permission)
+	exists, err := drv.DatabaseExists(u)
+	if err == nil && !exists {
+		if err := drv.CreateDatabase(u); err != nil {
+			return err
+		}
+	}
+
+	// migrate
+	return MigrateCommand(ctx)
+}
+
 // CreateCommand creates the current database
 func CreateCommand(ctx *cli.Context) error {
 	u, err := GetDatabaseURL(ctx)

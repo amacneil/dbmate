@@ -36,24 +36,17 @@ func NewApp() *cli.App {
 
 	app.Commands = []cli.Command{
 		{
-			Name:  "migrate",
-			Usage: "Migrate to the latest version",
-			Action: func(ctx *cli.Context) {
-				runCommand(MigrateCommand, ctx)
-			},
-		},
-		{
-			Name:  "rollback",
-			Usage: "Rollback the most recent migration",
-			Action: func(ctx *cli.Context) {
-				runCommand(RollbackCommand, ctx)
-			},
-		},
-		{
 			Name:  "new",
 			Usage: "Generate a new migration file",
 			Action: func(ctx *cli.Context) {
 				runCommand(NewCommand, ctx)
+			},
+		},
+		{
+			Name:  "up",
+			Usage: "Create database (if necessary) and migrate to the latest version",
+			Action: func(ctx *cli.Context) {
+				runCommand(UpCommand, ctx)
 			},
 		},
 		{
@@ -68,6 +61,20 @@ func NewApp() *cli.App {
 			Usage: "Drop database (if it exists)",
 			Action: func(ctx *cli.Context) {
 				runCommand(DropCommand, ctx)
+			},
+		},
+		{
+			Name:  "migrate",
+			Usage: "Migrate to the latest version",
+			Action: func(ctx *cli.Context) {
+				runCommand(MigrateCommand, ctx)
+			},
+		},
+		{
+			Name:  "rollback",
+			Usage: "Rollback the most recent migration",
+			Action: func(ctx *cli.Context) {
+				runCommand(RollbackCommand, ctx)
 			},
 		},
 	}

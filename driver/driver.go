@@ -11,6 +11,7 @@ import (
 // Driver provides top level database functions
 type Driver interface {
 	Open(*url.URL) (*sql.DB, error)
+	DatabaseExists(*url.URL) (bool, error)
 	CreateDatabase(*url.URL) error
 	DropDatabase(*url.URL) error
 	CreateMigrationsTable(*sql.DB) error

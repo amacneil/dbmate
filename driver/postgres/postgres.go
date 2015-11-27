@@ -18,39 +18,66 @@ func (postgres Driver) Open(u *url.URL) (*sql.DB, error) {
 }
 
 // postgresExec runs a sql statement on the "postgres" database
-func (postgres Driver) postgresExec(u *url.URL, statement string) error {
+func (postgres Driver) openPostgresDB(u *url.URL) (*sql.DB, error) {
 	// connect to postgres database
 	postgresURL := *u
 	postgresURL.Path = "postgres"
 
-	db, err := postgres.Open(&postgresURL)
+	return postgres.Open(&postgresURL)
+}
+
+// CreateDatabase creates the specified database
+func (postgres Driver) CreateDatabase(u *url.URL) error {
+	name := shared.DatabaseName(u)
+	fmt.Printf("Creating: %s\n", name)
+
+	db, err := postgres.openPostgresDB(u)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
 
-	// run statement
-	_, err = db.Exec(statement)
+	_, err = db.Exec(fmt.Sprintf("CREATE DATABASE %s",
+		pq.QuoteIdentifier(name)))
 
 	return err
 }
 
-// CreateDatabase creates the specified database
-func (postgres Driver) CreateDatabase(u *url.URL) error {
-	database := shared.DatabaseName(u)
-	fmt.Printf("Creating: %s\n", database)
-
-	return postgres.postgresExec(u, fmt.Sprintf("CREATE DATABASE %s",
-		pq.QuoteIdentifier(database)))
-}
-
 // DropDatabase drops the specified database (if it exists)
 func (postgres Driver) DropDatabase(u *url.URL) error {
-	database := shared.DatabaseName(u)
-	fmt.Printf("Dropping: %s\n", database)
+	name := shared.DatabaseName(u)
+	fmt.Printf("Dropping: %s\n", name)
 
-	return postgres.postgresExec(u, fmt.Sprintf("DROP DATABASE IF EXISTS %s",
-		pq.QuoteIdentifier(database)))
+	db, err := postgres.openPostgresDB(u)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	_, err = db.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS %s",
+		pq.QuoteIdentifier(name)))
+
+	return err
+}
+
+// DatabaseExists determines whether the database exists
+func (postgres Driver) DatabaseExists(u *url.URL) (bool, error) {
+	name := shared.DatabaseName(u)
+
+	db, err := postgres.openPostgresDB(u)
+	if err != nil {
+		return false, err
+	}
+	defer db.Close()
+
+	exists := false
+	err = db.QueryRow("SELECT true FROM pg_database WHERE datname = $1", name).
+		Scan(&exists)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+
+	return exists, err
 }
 
 // HasMigrationsTable returns true if the schema_migrations table exists
