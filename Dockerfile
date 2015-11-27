@@ -4,9 +4,10 @@ ENV GOPATH /go
 ENV PATH /go/bin:$PATH
 
 # install build dependencies
-RUN apk add -U --no-progress go git ca-certificates
+RUN apk add -U --no-progress alpine-sdk go
 RUN go get \
 	github.com/golang/lint/golint \
+	github.com/kisielk/errcheck \
 	golang.org/x/tools/cmd/vet
 
 # copy source files

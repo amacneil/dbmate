@@ -12,7 +12,7 @@ func main() {
 	loadDotEnv()
 
 	app := NewApp()
-	app.Run(os.Args)
+	app.RunAndExitOnError()
 }
 
 // NewApp creates a new command line app

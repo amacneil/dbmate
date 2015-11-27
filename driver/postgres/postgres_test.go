@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"github.com/adrianmacneil/dbmate/driver/postgres"
 	"github.com/stretchr/testify/require"
+	"io"
 	"net/url"
 	"os"
 	"testing"
@@ -24,6 +25,12 @@ func testURL(t *testing.T) *url.URL {
 	return u
 }
 
+func mustClose(c io.Closer) {
+	if err := c.Close(); err != nil {
+		panic(err)
+	}
+}
+
 func TestCreateDropDatabase(t *testing.T) {
 	d := postgres.Driver{}
 	u := testURL(t)
@@ -40,7 +47,7 @@ func TestCreateDropDatabase(t *testing.T) {
 	func() {
 		db, err := sql.Open("postgres", u.String())
 		require.Nil(t, err)
-		defer db.Close()
+		defer mustClose(db)
 
 		err = db.Ping()
 		require.Nil(t, err)
@@ -54,7 +61,7 @@ func TestCreateDropDatabase(t *testing.T) {
 	func() {
 		db, err := sql.Open("postgres", u.String())
 		require.Nil(t, err)
-		defer db.Close()
+		defer mustClose(db)
 
 		err = db.Ping()
 		require.NotNil(t, err)

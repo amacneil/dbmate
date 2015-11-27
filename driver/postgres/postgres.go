@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/adrianmacneil/dbmate/driver/shared"
 	pq "github.com/lib/pq"
+	"io"
 	"net/url"
 )
 
@@ -26,6 +27,12 @@ func (postgres Driver) openPostgresDB(u *url.URL) (*sql.DB, error) {
 	return postgres.Open(&postgresURL)
 }
 
+func mustClose(c io.Closer) {
+	if err := c.Close(); err != nil {
+		panic(err)
+	}
+}
+
 // CreateDatabase creates the specified database
 func (postgres Driver) CreateDatabase(u *url.URL) error {
 	name := shared.DatabaseName(u)
@@ -35,7 +42,7 @@ func (postgres Driver) CreateDatabase(u *url.URL) error {
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer mustClose(db)
 
 	_, err = db.Exec(fmt.Sprintf("CREATE DATABASE %s",
 		pq.QuoteIdentifier(name)))
@@ -52,7 +59,7 @@ func (postgres Driver) DropDatabase(u *url.URL) error {
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer mustClose(db)
 
 	_, err = db.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS %s",
 		pq.QuoteIdentifier(name)))
@@ -68,7 +75,7 @@ func (postgres Driver) DatabaseExists(u *url.URL) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer db.Close()
+	defer mustClose(db)
 
 	exists := false
 	err = db.QueryRow("SELECT true FROM pg_database WHERE datname = $1", name).
@@ -105,7 +112,7 @@ func (postgres Driver) SelectMigrations(db *sql.DB, limit int) (map[string]struc
 		return nil, err
 	}
 
-	defer rows.Close()
+	defer mustClose(rows)
 
 	migrations := map[string]struct{}{}
 	for rows.Next() {

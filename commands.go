@@ -6,6 +6,7 @@ import (
 	"github.com/adrianmacneil/dbmate/driver"
 	"github.com/adrianmacneil/dbmate/driver/shared"
 	"github.com/codegangsta/cli"
+	"io"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -72,6 +73,12 @@ func DropCommand(ctx *cli.Context) error {
 
 const migrationTemplate = "-- migrate:up\n\n\n-- migrate:down\n\n"
 
+func mustClose(c io.Closer) {
+	if err := c.Close(); err != nil {
+		panic(err)
+	}
+}
+
 // NewCommand creates a new migration file
 func NewCommand(ctx *cli.Context) error {
 	// new migration name
@@ -102,7 +109,7 @@ func NewCommand(ctx *cli.Context) error {
 		return err
 	}
 
-	defer file.Close()
+	defer mustClose(file)
 	_, err = file.WriteString(migrationTemplate)
 	if err != nil {
 		return err
@@ -126,7 +133,10 @@ func doTransaction(db *sql.DB, txFunc func(shared.Transaction) error) error {
 	}
 
 	if err := txFunc(tx); err != nil {
-		tx.Rollback()
+		if err1 := tx.Rollback(); err1 != nil {
+			return err1
+		}
+
 		return err
 	}
 
@@ -170,7 +180,7 @@ func MigrateCommand(ctx *cli.Context) error {
 
 	drv, db, err := openDatabaseForMigration(ctx)
 	if db != nil {
-		defer db.Close()
+		defer mustClose(db)
 	}
 	if err != nil {
 		return err
@@ -323,7 +333,7 @@ func parseMigration(path string) (map[string]string, error) {
 func RollbackCommand(ctx *cli.Context) error {
 	drv, db, err := openDatabaseForMigration(ctx)
 	if db != nil {
-		defer db.Close()
+		defer mustClose(db)
 	}
 	if err != nil {
 		return err

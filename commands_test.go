@@ -20,7 +20,8 @@ func newContext() *cli.Context {
 }
 
 func TestGetDatabaseUrl_Default(t *testing.T) {
-	os.Setenv("DATABASE_URL", "postgres://example.org/db")
+	err := os.Setenv("DATABASE_URL", "postgres://example.org/db")
+	require.Nil(t, err)
 
 	ctx := newContext()
 	u, err := main.GetDatabaseURL(ctx)
