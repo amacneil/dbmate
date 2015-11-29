@@ -64,13 +64,15 @@ To write a migration, simply add your SQL to the `migrate:up` section:
 ```sql
 -- migrate:up
 CREATE TABLE users (
-  id INT PRIMARY KEY,
+  id INTEGER,
   name VARCHAR,
   email VARCHAR NOT NULL
 );
 
 -- migrate:down
 ```
+
+> Note: Migration files are named in the format `[version]_[description].sql`. Only the version (defined as all leading numeric characters in the file name) is recorded in the database, so you can safely rename a migration file without having any effect on its current application state.
 
 ### Running Migrations
 
@@ -82,7 +84,7 @@ Creating: myapp_development
 Applying: 20151127184807_create_users_table.sql
 ```
 
-Note: `dbmate up` will create the database if it does not already exist (assuming the current user has permission to create databases). If you want to run migrations without creating the database, run `dbmate migrate`.
+> Note: `dbmate up` will create the database if it does not already exist (assuming the current user has permission to create databases). If you want to run migrations without creating the database, run `dbmate migrate`.
 
 ### Rolling Back Migrations
 
