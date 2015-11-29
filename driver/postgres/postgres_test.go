@@ -31,16 +31,35 @@ func mustClose(c io.Closer) {
 	}
 }
 
-func TestCreateDropDatabase(t *testing.T) {
-	d := postgres.Driver{}
+func prepTestDB(t *testing.T) *sql.DB {
+	drv := postgres.Driver{}
 	u := testURL(t)
 
 	// drop any existing database
-	err := d.DropDatabase(u)
+	err := drv.DropDatabase(u)
 	require.Nil(t, err)
 
 	// create database
-	err = d.CreateDatabase(u)
+	err = drv.CreateDatabase(u)
+	require.Nil(t, err)
+
+	// connect database
+	db, err := sql.Open("postgres", u.String())
+	require.Nil(t, err)
+
+	return db
+}
+
+func TestCreateDropDatabase(t *testing.T) {
+	drv := postgres.Driver{}
+	u := testURL(t)
+
+	// drop any existing database
+	err := drv.DropDatabase(u)
+	require.Nil(t, err)
+
+	// create database
+	err = drv.CreateDatabase(u)
 	require.Nil(t, err)
 
 	// check that database exists and we can connect to it
@@ -54,7 +73,7 @@ func TestCreateDropDatabase(t *testing.T) {
 	}()
 
 	// drop the database
-	err = d.DropDatabase(u)
+	err = drv.DropDatabase(u)
 	require.Nil(t, err)
 
 	// check that database no longer exists
@@ -70,34 +89,127 @@ func TestCreateDropDatabase(t *testing.T) {
 }
 
 func TestDatabaseExists(t *testing.T) {
-	d := postgres.Driver{}
+	drv := postgres.Driver{}
 	u := testURL(t)
 
 	// drop any existing database
-	err := d.DropDatabase(u)
+	err := drv.DropDatabase(u)
 	require.Nil(t, err)
 
 	// DatabaseExists should return false
-	exists, err := d.DatabaseExists(u)
+	exists, err := drv.DatabaseExists(u)
 	require.Nil(t, err)
 	require.Equal(t, false, exists)
 
 	// create database
-	err = d.CreateDatabase(u)
+	err = drv.CreateDatabase(u)
 	require.Nil(t, err)
 
 	// DatabaseExists should return true
-	exists, err = d.DatabaseExists(u)
+	exists, err = drv.DatabaseExists(u)
 	require.Nil(t, err)
 	require.Equal(t, true, exists)
 }
 
-func TestDatabaseExists_error(t *testing.T) {
-	d := postgres.Driver{}
+func TestDatabaseExists_Error(t *testing.T) {
+	drv := postgres.Driver{}
 	u := testURL(t)
 	u.User = url.User("invalid")
 
-	exists, err := d.DatabaseExists(u)
+	exists, err := drv.DatabaseExists(u)
 	require.Equal(t, "pq: role \"invalid\" does not exist", err.Error())
 	require.Equal(t, false, exists)
+}
+
+func TestCreateMigrationsTable(t *testing.T) {
+	drv := postgres.Driver{}
+	db := prepTestDB(t)
+	defer mustClose(db)
+
+	// migrations table should not exist
+	count := 0
+	err := db.QueryRow("select count(*) from schema_migrations").Scan(&count)
+	require.Equal(t, "pq: relation \"schema_migrations\" does not exist", err.Error())
+
+	// create table
+	err = drv.CreateMigrationsTable(db)
+	require.Nil(t, err)
+
+	// migrations table should exist
+	err = db.QueryRow("select count(*) from schema_migrations").Scan(&count)
+	require.Nil(t, err)
+
+	// create table should be idempotent
+	err = drv.CreateMigrationsTable(db)
+	require.Nil(t, err)
+}
+
+func TestSelectMigrations(t *testing.T) {
+	drv := postgres.Driver{}
+	db := prepTestDB(t)
+	defer mustClose(db)
+
+	err := drv.CreateMigrationsTable(db)
+	require.Nil(t, err)
+
+	_, err = db.Exec(`insert into schema_migrations (version)
+		values ('abc2'), ('abc1'), ('abc3')`)
+	require.Nil(t, err)
+
+	migrations, err := drv.SelectMigrations(db, -1)
+	require.Nil(t, err)
+	require.Equal(t, true, migrations["abc1"])
+	require.Equal(t, true, migrations["abc2"])
+	require.Equal(t, true, migrations["abc2"])
+
+	// test limit param
+	migrations, err = drv.SelectMigrations(db, 1)
+	require.Nil(t, err)
+	require.Equal(t, true, migrations["abc3"])
+	require.Equal(t, false, migrations["abc1"])
+	require.Equal(t, false, migrations["abc2"])
+}
+
+func TestInsertMigration(t *testing.T) {
+	drv := postgres.Driver{}
+	db := prepTestDB(t)
+	defer mustClose(db)
+
+	err := drv.CreateMigrationsTable(db)
+	require.Nil(t, err)
+
+	count := 0
+	err = db.QueryRow("select count(*) from schema_migrations").Scan(&count)
+	require.Nil(t, err)
+	require.Equal(t, 0, count)
+
+	// insert migration
+	err = drv.InsertMigration(db, "abc1")
+	require.Nil(t, err)
+
+	err = db.QueryRow("select count(*) from schema_migrations where version = 'abc1'").
+		Scan(&count)
+	require.Nil(t, err)
+	require.Equal(t, 1, count)
+}
+
+func TestDeleteMigration(t *testing.T) {
+	drv := postgres.Driver{}
+	db := prepTestDB(t)
+	defer mustClose(db)
+
+	err := drv.CreateMigrationsTable(db)
+	require.Nil(t, err)
+
+	_, err = db.Exec(`insert into schema_migrations (version)
+		values ('abc1'), ('abc2')`)
+	require.Nil(t, err)
+
+	err = drv.DeleteMigration(db, "abc2")
+	require.Nil(t, err)
+
+	count := 0
+	err = db.QueryRow("select count(*) from schema_migrations").Scan(&count)
+	require.Nil(t, err)
+	require.Equal(t, 1, count)
 }

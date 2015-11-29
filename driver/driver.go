@@ -15,7 +15,7 @@ type Driver interface {
 	CreateDatabase(*url.URL) error
 	DropDatabase(*url.URL) error
 	CreateMigrationsTable(*sql.DB) error
-	SelectMigrations(*sql.DB, int) (map[string]struct{}, error)
+	SelectMigrations(*sql.DB, int) (map[string]bool, error)
 	InsertMigration(shared.Transaction, string) error
 	DeleteMigration(shared.Transaction, string) error
 }

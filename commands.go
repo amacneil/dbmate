@@ -193,7 +193,7 @@ func MigrateCommand(ctx *cli.Context) error {
 
 	for filename := range available {
 		ver := migrationVersion(filename)
-		if _, ok := applied[ver]; ok {
+		if ok := applied[ver]; ok {
 			// migration already applied
 			continue
 		}

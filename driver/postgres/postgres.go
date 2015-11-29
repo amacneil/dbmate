@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/adrianmacneil/dbmate/driver/shared"
-	pq "github.com/lib/pq"
+	"github.com/lib/pq"
 	"io"
 	"net/url"
 )
@@ -14,17 +14,16 @@ type Driver struct {
 }
 
 // Open creates a new database connection
-func (postgres Driver) Open(u *url.URL) (*sql.DB, error) {
+func (drv Driver) Open(u *url.URL) (*sql.DB, error) {
 	return sql.Open("postgres", u.String())
 }
 
-// postgresExec runs a sql statement on the "postgres" database
-func (postgres Driver) openPostgresDB(u *url.URL) (*sql.DB, error) {
+func (drv Driver) openPostgresDB(u *url.URL) (*sql.DB, error) {
 	// connect to postgres database
 	postgresURL := *u
 	postgresURL.Path = "postgres"
 
-	return postgres.Open(&postgresURL)
+	return drv.Open(&postgresURL)
 }
 
 func mustClose(c io.Closer) {
@@ -34,11 +33,11 @@ func mustClose(c io.Closer) {
 }
 
 // CreateDatabase creates the specified database
-func (postgres Driver) CreateDatabase(u *url.URL) error {
+func (drv Driver) CreateDatabase(u *url.URL) error {
 	name := shared.DatabaseName(u)
 	fmt.Printf("Creating: %s\n", name)
 
-	db, err := postgres.openPostgresDB(u)
+	db, err := drv.openPostgresDB(u)
 	if err != nil {
 		return err
 	}
@@ -51,11 +50,11 @@ func (postgres Driver) CreateDatabase(u *url.URL) error {
 }
 
 // DropDatabase drops the specified database (if it exists)
-func (postgres Driver) DropDatabase(u *url.URL) error {
+func (drv Driver) DropDatabase(u *url.URL) error {
 	name := shared.DatabaseName(u)
 	fmt.Printf("Dropping: %s\n", name)
 
-	db, err := postgres.openPostgresDB(u)
+	db, err := drv.openPostgresDB(u)
 	if err != nil {
 		return err
 	}
@@ -68,10 +67,10 @@ func (postgres Driver) DropDatabase(u *url.URL) error {
 }
 
 // DatabaseExists determines whether the database exists
-func (postgres Driver) DatabaseExists(u *url.URL) (bool, error) {
+func (drv Driver) DatabaseExists(u *url.URL) (bool, error) {
 	name := shared.DatabaseName(u)
 
-	db, err := postgres.openPostgresDB(u)
+	db, err := drv.openPostgresDB(u)
 	if err != nil {
 		return false, err
 	}
@@ -87,13 +86,8 @@ func (postgres Driver) DatabaseExists(u *url.URL) (bool, error) {
 	return exists, err
 }
 
-// HasMigrationsTable returns true if the schema_migrations table exists
-func (postgres Driver) HasMigrationsTable(db *sql.DB) (bool, error) {
-	return false, fmt.Errorf("not implemented")
-}
-
 // CreateMigrationsTable creates the schema_migrations table
-func (postgres Driver) CreateMigrationsTable(db *sql.DB) error {
+func (drv Driver) CreateMigrationsTable(db *sql.DB) error {
 	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
 		version varchar(255) PRIMARY KEY)`)
 
@@ -102,7 +96,7 @@ func (postgres Driver) CreateMigrationsTable(db *sql.DB) error {
 
 // SelectMigrations returns a list of applied migrations
 // with an optional limit (in descending order)
-func (postgres Driver) SelectMigrations(db *sql.DB, limit int) (map[string]struct{}, error) {
+func (drv Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
 	query := "SELECT version FROM schema_migrations ORDER BY version DESC"
 	if limit >= 0 {
 		query = fmt.Sprintf("%s LIMIT %d", query, limit)
@@ -114,28 +108,28 @@ func (postgres Driver) SelectMigrations(db *sql.DB, limit int) (map[string]struc
 
 	defer mustClose(rows)
 
-	migrations := map[string]struct{}{}
+	migrations := map[string]bool{}
 	for rows.Next() {
 		var version string
 		if err := rows.Scan(&version); err != nil {
 			return nil, err
 		}
 
-		migrations[version] = struct{}{}
+		migrations[version] = true
 	}
 
 	return migrations, nil
 }
 
 // InsertMigration adds a new migration record
-func (postgres Driver) InsertMigration(db shared.Transaction, version string) error {
+func (drv Driver) InsertMigration(db shared.Transaction, version string) error {
 	_, err := db.Exec("INSERT INTO schema_migrations (version) VALUES ($1)", version)
 
 	return err
 }
 
 // DeleteMigration removes a migration record
-func (postgres Driver) DeleteMigration(db shared.Transaction, version string) error {
+func (drv Driver) DeleteMigration(db shared.Transaction, version string) error {
 	_, err := db.Exec("DELETE FROM schema_migrations WHERE version = $1", version)
 
 	return err
