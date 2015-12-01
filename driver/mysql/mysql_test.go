@@ -1,10 +1,8 @@
-package mysql_test
+package mysql
 
 import (
 	"database/sql"
-	"github.com/adrianmacneil/dbmate/driver/mysql"
 	"github.com/stretchr/testify/require"
-	"io"
 	"net/url"
 	"os"
 	"testing"
@@ -24,14 +22,8 @@ func testURL(t *testing.T) *url.URL {
 	return u
 }
 
-func mustClose(c io.Closer) {
-	if err := c.Close(); err != nil {
-		panic(err)
-	}
-}
-
 func prepTestDB(t *testing.T) *sql.DB {
-	drv := mysql.Driver{}
+	drv := Driver{}
 	u := testURL(t)
 
 	// drop any existing database
@@ -50,7 +42,7 @@ func prepTestDB(t *testing.T) *sql.DB {
 }
 
 func TestCreateDropDatabase(t *testing.T) {
-	drv := mysql.Driver{}
+	drv := Driver{}
 	u := testURL(t)
 
 	// drop any existing database
@@ -88,7 +80,7 @@ func TestCreateDropDatabase(t *testing.T) {
 }
 
 func TestDatabaseExists(t *testing.T) {
-	drv := mysql.Driver{}
+	drv := Driver{}
 	u := testURL(t)
 
 	// drop any existing database
@@ -111,7 +103,7 @@ func TestDatabaseExists(t *testing.T) {
 }
 
 func TestDatabaseExists_Error(t *testing.T) {
-	drv := mysql.Driver{}
+	drv := Driver{}
 	u := testURL(t)
 	u.User = url.User("invalid")
 
@@ -121,7 +113,7 @@ func TestDatabaseExists_Error(t *testing.T) {
 }
 
 func TestCreateMigrationsTable(t *testing.T) {
-	drv := mysql.Driver{}
+	drv := Driver{}
 	db := prepTestDB(t)
 	defer mustClose(db)
 
@@ -144,7 +136,7 @@ func TestCreateMigrationsTable(t *testing.T) {
 }
 
 func TestSelectMigrations(t *testing.T) {
-	drv := mysql.Driver{}
+	drv := Driver{}
 	db := prepTestDB(t)
 	defer mustClose(db)
 
@@ -170,7 +162,7 @@ func TestSelectMigrations(t *testing.T) {
 }
 
 func TestInsertMigration(t *testing.T) {
-	drv := mysql.Driver{}
+	drv := Driver{}
 	db := prepTestDB(t)
 	defer mustClose(db)
 
@@ -193,7 +185,7 @@ func TestInsertMigration(t *testing.T) {
 }
 
 func TestDeleteMigration(t *testing.T) {
-	drv := mysql.Driver{}
+	drv := Driver{}
 	db := prepTestDB(t)
 	defer mustClose(db)
 

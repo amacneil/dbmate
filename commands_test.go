@@ -1,12 +1,10 @@
-package main_test
+package main
 
 import (
 	"flag"
-	"github.com/adrianmacneil/dbmate"
 	"github.com/adrianmacneil/dbmate/driver"
 	"github.com/codegangsta/cli"
 	"github.com/stretchr/testify/require"
-	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -28,7 +26,7 @@ func testContext(t *testing.T, u *url.URL) *cli.Context {
 	err = os.Setenv("DATABASE_URL", u.String())
 	require.Nil(t, err)
 
-	app := main.NewApp()
+	app := NewApp()
 	flagset := flag.NewFlagSet(app.Name, flag.ContinueOnError)
 	for _, f := range app.Flags {
 		f.Apply(flagset)
@@ -73,18 +71,12 @@ func testURLs(t *testing.T) []*url.URL {
 	}
 }
 
-func mustClose(c io.Closer) {
-	if err := c.Close(); err != nil {
-		panic(err)
-	}
-}
-
 func TestGetDatabaseUrl(t *testing.T) {
 	envURL, err := url.Parse("foo://example.org/db")
 	require.Nil(t, err)
 	ctx := testContext(t, envURL)
 
-	u, err := main.GetDatabaseURL(ctx)
+	u, err := GetDatabaseURL(ctx)
 	require.Nil(t, err)
 
 	require.Equal(t, "foo", u.Scheme)
@@ -96,13 +88,13 @@ func testMigrateCommandURL(t *testing.T, u *url.URL) {
 	ctx := testContext(t, u)
 
 	// drop and recreate database
-	err := main.DropCommand(ctx)
+	err := DropCommand(ctx)
 	require.Nil(t, err)
-	err = main.CreateCommand(ctx)
+	err = CreateCommand(ctx)
 	require.Nil(t, err)
 
 	// migrate
-	err = main.MigrateCommand(ctx)
+	err = MigrateCommand(ctx)
 	require.Nil(t, err)
 
 	// verify results
@@ -131,11 +123,11 @@ func testUpCommandURL(t *testing.T, u *url.URL) {
 	ctx := testContext(t, u)
 
 	// drop database
-	err := main.DropCommand(ctx)
+	err := DropCommand(ctx)
 	require.Nil(t, err)
 
 	// create and migrate
-	err = main.UpCommand(ctx)
+	err = UpCommand(ctx)
 	require.Nil(t, err)
 
 	// verify results
@@ -164,11 +156,11 @@ func testRollbackCommandURL(t *testing.T, u *url.URL) {
 	ctx := testContext(t, u)
 
 	// drop, recreate, and migrate database
-	err := main.DropCommand(ctx)
+	err := DropCommand(ctx)
 	require.Nil(t, err)
-	err = main.CreateCommand(ctx)
+	err = CreateCommand(ctx)
 	require.Nil(t, err)
-	err = main.MigrateCommand(ctx)
+	err = MigrateCommand(ctx)
 	require.Nil(t, err)
 
 	// verify migration
@@ -183,7 +175,7 @@ func testRollbackCommandURL(t *testing.T, u *url.URL) {
 	require.Equal(t, 1, count)
 
 	// rollback
-	err = main.RollbackCommand(ctx)
+	err = RollbackCommand(ctx)
 	require.Nil(t, err)
 
 	// verify rollback
