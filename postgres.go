@@ -1,24 +1,22 @@
-package postgres
+package main
 
 import (
 	"database/sql"
 	"fmt"
-	"github.com/adrianmacneil/dbmate/driver/shared"
 	"github.com/lib/pq"
-	"io"
 	"net/url"
 )
 
-// Driver provides top level database functions
-type Driver struct {
+// PostgresDriver provides top level database functions
+type PostgresDriver struct {
 }
 
 // Open creates a new database connection
-func (drv Driver) Open(u *url.URL) (*sql.DB, error) {
+func (drv PostgresDriver) Open(u *url.URL) (*sql.DB, error) {
 	return sql.Open("postgres", u.String())
 }
 
-func (drv Driver) openPostgresDB(u *url.URL) (*sql.DB, error) {
+func (drv PostgresDriver) openPostgresDB(u *url.URL) (*sql.DB, error) {
 	// connect to postgres database
 	postgresURL := *u
 	postgresURL.Path = "postgres"
@@ -26,15 +24,9 @@ func (drv Driver) openPostgresDB(u *url.URL) (*sql.DB, error) {
 	return drv.Open(&postgresURL)
 }
 
-func mustClose(c io.Closer) {
-	if err := c.Close(); err != nil {
-		panic(err)
-	}
-}
-
 // CreateDatabase creates the specified database
-func (drv Driver) CreateDatabase(u *url.URL) error {
-	name := shared.DatabaseName(u)
+func (drv PostgresDriver) CreateDatabase(u *url.URL) error {
+	name := databaseName(u)
 	fmt.Printf("Creating: %s\n", name)
 
 	db, err := drv.openPostgresDB(u)
@@ -50,8 +42,8 @@ func (drv Driver) CreateDatabase(u *url.URL) error {
 }
 
 // DropDatabase drops the specified database (if it exists)
-func (drv Driver) DropDatabase(u *url.URL) error {
-	name := shared.DatabaseName(u)
+func (drv PostgresDriver) DropDatabase(u *url.URL) error {
+	name := databaseName(u)
 	fmt.Printf("Dropping: %s\n", name)
 
 	db, err := drv.openPostgresDB(u)
@@ -67,8 +59,8 @@ func (drv Driver) DropDatabase(u *url.URL) error {
 }
 
 // DatabaseExists determines whether the database exists
-func (drv Driver) DatabaseExists(u *url.URL) (bool, error) {
-	name := shared.DatabaseName(u)
+func (drv PostgresDriver) DatabaseExists(u *url.URL) (bool, error) {
+	name := databaseName(u)
 
 	db, err := drv.openPostgresDB(u)
 	if err != nil {
@@ -87,7 +79,7 @@ func (drv Driver) DatabaseExists(u *url.URL) (bool, error) {
 }
 
 // CreateMigrationsTable creates the schema_migrations table
-func (drv Driver) CreateMigrationsTable(db *sql.DB) error {
+func (drv PostgresDriver) CreateMigrationsTable(db *sql.DB) error {
 	_, err := db.Exec(`create table if not exists schema_migrations (
 		version varchar(255) primary key)`)
 
@@ -96,7 +88,7 @@ func (drv Driver) CreateMigrationsTable(db *sql.DB) error {
 
 // SelectMigrations returns a list of applied migrations
 // with an optional limit (in descending order)
-func (drv Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
+func (drv PostgresDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
 	query := "select version from schema_migrations order by version desc"
 	if limit >= 0 {
 		query = fmt.Sprintf("%s limit %d", query, limit)
@@ -122,14 +114,14 @@ func (drv Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, erro
 }
 
 // InsertMigration adds a new migration record
-func (drv Driver) InsertMigration(db shared.Transaction, version string) error {
+func (drv PostgresDriver) InsertMigration(db Transaction, version string) error {
 	_, err := db.Exec("insert into schema_migrations (version) values ($1)", version)
 
 	return err
 }
 
 // DeleteMigration removes a migration record
-func (drv Driver) DeleteMigration(db shared.Transaction, version string) error {
+func (drv PostgresDriver) DeleteMigration(db Transaction, version string) error {
 	_, err := db.Exec("delete from schema_migrations where version = $1", version)
 
 	return err

@@ -1,4 +1,4 @@
-package postgres
+package main
 
 import (
 	"database/sql"
@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func testURL(t *testing.T) *url.URL {
+func postgresTestURL(t *testing.T) *url.URL {
 	str := os.Getenv("POSTGRES_PORT")
 	require.NotEmpty(t, str, "missing POSTGRES_PORT environment variable")
 
@@ -23,9 +23,9 @@ func testURL(t *testing.T) *url.URL {
 	return u
 }
 
-func prepTestDB(t *testing.T) *sql.DB {
-	drv := Driver{}
-	u := testURL(t)
+func prepTestPostgresDB(t *testing.T) *sql.DB {
+	drv := PostgresDriver{}
+	u := postgresTestURL(t)
 
 	// drop any existing database
 	err := drv.DropDatabase(u)
@@ -42,9 +42,9 @@ func prepTestDB(t *testing.T) *sql.DB {
 	return db
 }
 
-func TestCreateDropDatabase(t *testing.T) {
-	drv := Driver{}
-	u := testURL(t)
+func TestPostgresCreateDropDatabase(t *testing.T) {
+	drv := PostgresDriver{}
+	u := postgresTestURL(t)
 
 	// drop any existing database
 	err := drv.DropDatabase(u)
@@ -80,9 +80,9 @@ func TestCreateDropDatabase(t *testing.T) {
 	}()
 }
 
-func TestDatabaseExists(t *testing.T) {
-	drv := Driver{}
-	u := testURL(t)
+func TestPostgresDatabaseExists(t *testing.T) {
+	drv := PostgresDriver{}
+	u := postgresTestURL(t)
 
 	// drop any existing database
 	err := drv.DropDatabase(u)
@@ -103,9 +103,9 @@ func TestDatabaseExists(t *testing.T) {
 	require.Equal(t, true, exists)
 }
 
-func TestDatabaseExists_Error(t *testing.T) {
-	drv := Driver{}
-	u := testURL(t)
+func TestPostgresDatabaseExists_Error(t *testing.T) {
+	drv := PostgresDriver{}
+	u := postgresTestURL(t)
 	u.User = url.User("invalid")
 
 	exists, err := drv.DatabaseExists(u)
@@ -113,9 +113,9 @@ func TestDatabaseExists_Error(t *testing.T) {
 	require.Equal(t, false, exists)
 }
 
-func TestCreateMigrationsTable(t *testing.T) {
-	drv := Driver{}
-	db := prepTestDB(t)
+func TestPostgresCreateMigrationsTable(t *testing.T) {
+	drv := PostgresDriver{}
+	db := prepTestPostgresDB(t)
 	defer mustClose(db)
 
 	// migrations table should not exist
@@ -136,9 +136,9 @@ func TestCreateMigrationsTable(t *testing.T) {
 	require.Nil(t, err)
 }
 
-func TestSelectMigrations(t *testing.T) {
-	drv := Driver{}
-	db := prepTestDB(t)
+func TestPostgresSelectMigrations(t *testing.T) {
+	drv := PostgresDriver{}
+	db := prepTestPostgresDB(t)
 	defer mustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
@@ -162,9 +162,9 @@ func TestSelectMigrations(t *testing.T) {
 	require.Equal(t, false, migrations["abc2"])
 }
 
-func TestInsertMigration(t *testing.T) {
-	drv := Driver{}
-	db := prepTestDB(t)
+func TestPostgresInsertMigration(t *testing.T) {
+	drv := PostgresDriver{}
+	db := prepTestPostgresDB(t)
 	defer mustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
@@ -185,9 +185,9 @@ func TestInsertMigration(t *testing.T) {
 	require.Equal(t, 1, count)
 }
 
-func TestDeleteMigration(t *testing.T) {
-	drv := Driver{}
-	db := prepTestDB(t)
+func TestPostgresDeleteMigration(t *testing.T) {
+	drv := PostgresDriver{}
+	db := prepTestPostgresDB(t)
 	defer mustClose(db)
 
 	err := drv.CreateMigrationsTable(db)

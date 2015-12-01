@@ -1,20 +1,18 @@
-package mysql
+package main
 
 import (
 	"database/sql"
 	"fmt"
-	"github.com/adrianmacneil/dbmate/driver/shared"
 	_ "github.com/adrianmacneil/go-mysql" // mysql driver
-	"io"
 	"net/url"
 	"strings"
 )
 
-// Driver provides top level database functions
-type Driver struct {
+// MySQLDriver provides top level database functions
+type MySQLDriver struct {
 }
 
-func normalizeURL(u *url.URL) string {
+func normalizeMySQLURL(u *url.URL) string {
 	normalizedURL := *u
 	normalizedURL.Scheme = ""
 	normalizedURL.Host = fmt.Sprintf("tcp(%s)", normalizedURL.Host)
@@ -28,22 +26,16 @@ func normalizeURL(u *url.URL) string {
 }
 
 // Open creates a new database connection
-func (drv Driver) Open(u *url.URL) (*sql.DB, error) {
-	return sql.Open("mysql", normalizeURL(u))
+func (drv MySQLDriver) Open(u *url.URL) (*sql.DB, error) {
+	return sql.Open("mysql", normalizeMySQLURL(u))
 }
 
-func (drv Driver) openRootDB(u *url.URL) (*sql.DB, error) {
+func (drv MySQLDriver) openRootDB(u *url.URL) (*sql.DB, error) {
 	// connect to no particular database
 	rootURL := *u
 	rootURL.Path = "/"
 
 	return drv.Open(&rootURL)
-}
-
-func mustClose(c io.Closer) {
-	if err := c.Close(); err != nil {
-		panic(err)
-	}
 }
 
 func quoteIdentifier(str string) string {
@@ -53,8 +45,8 @@ func quoteIdentifier(str string) string {
 }
 
 // CreateDatabase creates the specified database
-func (drv Driver) CreateDatabase(u *url.URL) error {
-	name := shared.DatabaseName(u)
+func (drv MySQLDriver) CreateDatabase(u *url.URL) error {
+	name := databaseName(u)
 	fmt.Printf("Creating: %s\n", name)
 
 	db, err := drv.openRootDB(u)
@@ -70,8 +62,8 @@ func (drv Driver) CreateDatabase(u *url.URL) error {
 }
 
 // DropDatabase drops the specified database (if it exists)
-func (drv Driver) DropDatabase(u *url.URL) error {
-	name := shared.DatabaseName(u)
+func (drv MySQLDriver) DropDatabase(u *url.URL) error {
+	name := databaseName(u)
 	fmt.Printf("Dropping: %s\n", name)
 
 	db, err := drv.openRootDB(u)
@@ -87,8 +79,8 @@ func (drv Driver) DropDatabase(u *url.URL) error {
 }
 
 // DatabaseExists determines whether the database exists
-func (drv Driver) DatabaseExists(u *url.URL) (bool, error) {
-	name := shared.DatabaseName(u)
+func (drv MySQLDriver) DatabaseExists(u *url.URL) (bool, error) {
+	name := databaseName(u)
 
 	db, err := drv.openRootDB(u)
 	if err != nil {
@@ -107,7 +99,7 @@ func (drv Driver) DatabaseExists(u *url.URL) (bool, error) {
 }
 
 // CreateMigrationsTable creates the schema_migrations table
-func (drv Driver) CreateMigrationsTable(db *sql.DB) error {
+func (drv MySQLDriver) CreateMigrationsTable(db *sql.DB) error {
 	_, err := db.Exec(`create table if not exists schema_migrations (
 		version varchar(255) primary key)`)
 
@@ -116,7 +108,7 @@ func (drv Driver) CreateMigrationsTable(db *sql.DB) error {
 
 // SelectMigrations returns a list of applied migrations
 // with an optional limit (in descending order)
-func (drv Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
+func (drv MySQLDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
 	query := "select version from schema_migrations order by version desc"
 	if limit >= 0 {
 		query = fmt.Sprintf("%s limit %d", query, limit)
@@ -142,14 +134,14 @@ func (drv Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, erro
 }
 
 // InsertMigration adds a new migration record
-func (drv Driver) InsertMigration(db shared.Transaction, version string) error {
+func (drv MySQLDriver) InsertMigration(db Transaction, version string) error {
 	_, err := db.Exec("insert into schema_migrations (version) values (?)", version)
 
 	return err
 }
 
 // DeleteMigration removes a migration record
-func (drv Driver) DeleteMigration(db shared.Transaction, version string) error {
+func (drv MySQLDriver) DeleteMigration(db Transaction, version string) error {
 	_, err := db.Exec("delete from schema_migrations where version = ?", version)
 
 	return err

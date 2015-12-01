@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"github.com/adrianmacneil/dbmate/driver"
 	"github.com/codegangsta/cli"
 	"github.com/stretchr/testify/require"
 	"net/url"
@@ -35,39 +34,10 @@ func testContext(t *testing.T, u *url.URL) *cli.Context {
 	return cli.NewContext(app, flagset, nil)
 }
 
-func postgresTestURL(t *testing.T) *url.URL {
-	str := os.Getenv("POSTGRES_PORT")
-	require.NotEmpty(t, str, "missing POSTGRES_PORT environment variable")
-
-	u, err := url.Parse(str)
-	require.Nil(t, err)
-
-	u.Scheme = "postgres"
-	u.User = url.User("postgres")
-	u.Path = "/dbmate"
-	u.RawQuery = "sslmode=disable"
-
-	return u
-}
-
-func mysqlTestURL(t *testing.T) *url.URL {
-	str := os.Getenv("MYSQL_PORT")
-	require.NotEmpty(t, str, "missing MYSQL_PORT environment variable")
-
-	u, err := url.Parse(str)
-	require.Nil(t, err)
-
-	u.Scheme = "mysql"
-	u.User = url.UserPassword("root", "root")
-	u.Path = "/dbmate"
-
-	return u
-}
-
 func testURLs(t *testing.T) []*url.URL {
 	return []*url.URL{
 		postgresTestURL(t),
-		mysqlTestURL(t),
+		mySQLTestURL(t),
 	}
 }
 
@@ -98,7 +68,7 @@ func testMigrateCommandURL(t *testing.T, u *url.URL) {
 	require.Nil(t, err)
 
 	// verify results
-	db, err := driver.Open(u)
+	db, err := GetDriverOpen(u)
 	require.Nil(t, err)
 	defer mustClose(db)
 
@@ -131,7 +101,7 @@ func testUpCommandURL(t *testing.T, u *url.URL) {
 	require.Nil(t, err)
 
 	// verify results
-	db, err := driver.Open(u)
+	db, err := GetDriverOpen(u)
 	require.Nil(t, err)
 	defer mustClose(db)
 
@@ -164,7 +134,7 @@ func testRollbackCommandURL(t *testing.T, u *url.URL) {
 	require.Nil(t, err)
 
 	// verify migration
-	db, err := driver.Open(u)
+	db, err := GetDriverOpen(u)
 	require.Nil(t, err)
 	defer mustClose(db)
 

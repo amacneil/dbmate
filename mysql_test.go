@@ -1,4 +1,4 @@
-package mysql
+package main
 
 import (
 	"database/sql"
@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func testURL(t *testing.T) *url.URL {
+func mySQLTestURL(t *testing.T) *url.URL {
 	str := os.Getenv("MYSQL_PORT")
 	require.NotEmpty(t, str, "missing MYSQL_PORT environment variable")
 
@@ -22,9 +22,9 @@ func testURL(t *testing.T) *url.URL {
 	return u
 }
 
-func prepTestDB(t *testing.T) *sql.DB {
-	drv := Driver{}
-	u := testURL(t)
+func prepTestMySQLDB(t *testing.T) *sql.DB {
+	drv := MySQLDriver{}
+	u := mySQLTestURL(t)
 
 	// drop any existing database
 	err := drv.DropDatabase(u)
@@ -41,9 +41,9 @@ func prepTestDB(t *testing.T) *sql.DB {
 	return db
 }
 
-func TestCreateDropDatabase(t *testing.T) {
-	drv := Driver{}
-	u := testURL(t)
+func TestMySQLCreateDropDatabase(t *testing.T) {
+	drv := MySQLDriver{}
+	u := mySQLTestURL(t)
 
 	// drop any existing database
 	err := drv.DropDatabase(u)
@@ -79,9 +79,9 @@ func TestCreateDropDatabase(t *testing.T) {
 	}()
 }
 
-func TestDatabaseExists(t *testing.T) {
-	drv := Driver{}
-	u := testURL(t)
+func TestMySQLDatabaseExists(t *testing.T) {
+	drv := MySQLDriver{}
+	u := mySQLTestURL(t)
 
 	// drop any existing database
 	err := drv.DropDatabase(u)
@@ -102,9 +102,9 @@ func TestDatabaseExists(t *testing.T) {
 	require.Equal(t, true, exists)
 }
 
-func TestDatabaseExists_Error(t *testing.T) {
-	drv := Driver{}
-	u := testURL(t)
+func TestMySQLDatabaseExists_Error(t *testing.T) {
+	drv := MySQLDriver{}
+	u := mySQLTestURL(t)
 	u.User = url.User("invalid")
 
 	exists, err := drv.DatabaseExists(u)
@@ -112,9 +112,9 @@ func TestDatabaseExists_Error(t *testing.T) {
 	require.Equal(t, false, exists)
 }
 
-func TestCreateMigrationsTable(t *testing.T) {
-	drv := Driver{}
-	db := prepTestDB(t)
+func TestMySQLCreateMigrationsTable(t *testing.T) {
+	drv := MySQLDriver{}
+	db := prepTestMySQLDB(t)
 	defer mustClose(db)
 
 	// migrations table should not exist
@@ -135,9 +135,9 @@ func TestCreateMigrationsTable(t *testing.T) {
 	require.Nil(t, err)
 }
 
-func TestSelectMigrations(t *testing.T) {
-	drv := Driver{}
-	db := prepTestDB(t)
+func TestMySQLSelectMigrations(t *testing.T) {
+	drv := MySQLDriver{}
+	db := prepTestMySQLDB(t)
 	defer mustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
@@ -161,9 +161,9 @@ func TestSelectMigrations(t *testing.T) {
 	require.Equal(t, false, migrations["abc2"])
 }
 
-func TestInsertMigration(t *testing.T) {
-	drv := Driver{}
-	db := prepTestDB(t)
+func TestMySQLInsertMigration(t *testing.T) {
+	drv := MySQLDriver{}
+	db := prepTestMySQLDB(t)
 	defer mustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
@@ -184,9 +184,9 @@ func TestInsertMigration(t *testing.T) {
 	require.Equal(t, 1, count)
 }
 
-func TestDeleteMigration(t *testing.T) {
-	drv := Driver{}
-	db := prepTestDB(t)
+func TestMySQLDeleteMigration(t *testing.T) {
+	drv := MySQLDriver{}
+	db := prepTestMySQLDB(t)
 	defer mustClose(db)
 
 	err := drv.CreateMigrationsTable(db)

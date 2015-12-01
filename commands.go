@@ -3,10 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"github.com/adrianmacneil/dbmate/driver"
-	"github.com/adrianmacneil/dbmate/driver/shared"
 	"github.com/codegangsta/cli"
-	"io"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -22,7 +19,7 @@ func UpCommand(ctx *cli.Context) error {
 		return err
 	}
 
-	drv, err := driver.Get(u.Scheme)
+	drv, err := GetDriver(u.Scheme)
 	if err != nil {
 		return err
 	}
@@ -48,7 +45,7 @@ func CreateCommand(ctx *cli.Context) error {
 		return err
 	}
 
-	drv, err := driver.Get(u.Scheme)
+	drv, err := GetDriver(u.Scheme)
 	if err != nil {
 		return err
 	}
@@ -63,7 +60,7 @@ func DropCommand(ctx *cli.Context) error {
 		return err
 	}
 
-	drv, err := driver.Get(u.Scheme)
+	drv, err := GetDriver(u.Scheme)
 	if err != nil {
 		return err
 	}
@@ -72,12 +69,6 @@ func DropCommand(ctx *cli.Context) error {
 }
 
 const migrationTemplate = "-- migrate:up\n\n\n-- migrate:down\n\n"
-
-func mustClose(c io.Closer) {
-	if err := c.Close(); err != nil {
-		panic(err)
-	}
-}
 
 // NewCommand creates a new migration file
 func NewCommand(ctx *cli.Context) error {
@@ -126,7 +117,7 @@ func GetDatabaseURL(ctx *cli.Context) (u *url.URL, err error) {
 	return url.Parse(value)
 }
 
-func doTransaction(db *sql.DB, txFunc func(shared.Transaction) error) error {
+func doTransaction(db *sql.DB, txFunc func(Transaction) error) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -143,13 +134,13 @@ func doTransaction(db *sql.DB, txFunc func(shared.Transaction) error) error {
 	return tx.Commit()
 }
 
-func openDatabaseForMigration(ctx *cli.Context) (driver.Driver, *sql.DB, error) {
+func openDatabaseForMigration(ctx *cli.Context) (Driver, *sql.DB, error) {
 	u, err := GetDatabaseURL(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	drv, err := driver.Get(u.Scheme)
+	drv, err := GetDriver(u.Scheme)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -205,7 +196,7 @@ func MigrateCommand(ctx *cli.Context) error {
 		}
 
 		// begin transaction
-		err = doTransaction(db, func(tx shared.Transaction) error {
+		err = doTransaction(db, func(tx Transaction) error {
 			// run actual migration
 			if _, err := tx.Exec(migration["up"]); err != nil {
 				return err
@@ -364,7 +355,7 @@ func RollbackCommand(ctx *cli.Context) error {
 	}
 
 	// begin transaction
-	err = doTransaction(db, func(tx shared.Transaction) error {
+	err = doTransaction(db, func(tx Transaction) error {
 		// rollback migration
 		if _, err := tx.Exec(migration["down"]); err != nil {
 			return err
