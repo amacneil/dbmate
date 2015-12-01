@@ -160,6 +160,7 @@ func openDatabaseForMigration(ctx *cli.Context) (driver.Driver, *sql.DB, error) 
 	}
 
 	if err := drv.CreateMigrationsTable(db); err != nil {
+		mustClose(db)
 		return nil, nil, err
 	}
 
@@ -179,12 +180,10 @@ func MigrateCommand(ctx *cli.Context) error {
 	}
 
 	drv, db, err := openDatabaseForMigration(ctx)
-	if db != nil {
-		defer mustClose(db)
-	}
 	if err != nil {
 		return err
 	}
+	defer mustClose(db)
 
 	applied, err := drv.SelectMigrations(db, -1)
 	if err != nil {
@@ -332,12 +331,10 @@ func parseMigration(path string) (map[string]string, error) {
 // RollbackCommand rolls back the most recent migration
 func RollbackCommand(ctx *cli.Context) error {
 	drv, db, err := openDatabaseForMigration(ctx)
-	if db != nil {
-		defer mustClose(db)
-	}
 	if err != nil {
 		return err
 	}
+	defer mustClose(db)
 
 	applied, err := drv.SelectMigrations(db, 1)
 	if err != nil {
