@@ -29,3 +29,13 @@ func Get(name string) (Driver, error) {
 		return nil, fmt.Errorf("Unknown driver: %s", name)
 	}
 }
+
+// Open is a shortcut for driver.Get(u.Scheme).Open(u)
+func Open(u *url.URL) (*sql.DB, error) {
+	drv, err := Get(u.Scheme)
+	if err != nil {
+		return nil, err
+	}
+
+	return drv.Open(u)
+}

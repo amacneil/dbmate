@@ -1,9 +1,9 @@
 package main_test
 
 import (
-	"database/sql"
 	"flag"
 	"github.com/adrianmacneil/dbmate"
+	"github.com/adrianmacneil/dbmate/driver"
 	"github.com/codegangsta/cli"
 	"github.com/stretchr/testify/require"
 	"io"
@@ -92,7 +92,7 @@ func testMigrateCommandURL(t *testing.T, u *url.URL) {
 	require.Nil(t, err)
 
 	// verify results
-	db, err := sql.Open(u.Scheme, u.String())
+	db, err := driver.Open(u)
 	require.Nil(t, err)
 	defer mustClose(db)
 
@@ -125,7 +125,7 @@ func testUpCommandURL(t *testing.T, u *url.URL) {
 	require.Nil(t, err)
 
 	// verify results
-	db, err := sql.Open(u.Scheme, u.String())
+	db, err := driver.Open(u)
 	require.Nil(t, err)
 	defer mustClose(db)
 
@@ -158,7 +158,7 @@ func testRollbackCommandURL(t *testing.T, u *url.URL) {
 	require.Nil(t, err)
 
 	// verify migration
-	db, err := sql.Open(u.Scheme, u.String())
+	db, err := driver.Open(u)
 	require.Nil(t, err)
 	defer mustClose(db)
 
