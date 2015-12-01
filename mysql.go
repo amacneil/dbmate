@@ -3,7 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	_ "github.com/adrianmacneil/go-mysql" // mysql driver
+	_ "github.com/adrianmacneil/go-mysql"
 	"net/url"
 	"strings"
 )
