@@ -54,10 +54,36 @@ protocol://username:password@host:port/database_name?options
 ```
 
 * `protocol` must be one of `mysql`, `postgres`, `postgresql`, `sqlite`, `sqlite3`
-* `host` can be specified either as a hostname or IP address
+* `host` can be either a hostname or IP address
 * `options` are driver-specific (refer to the underlying Go SQL drivers if you wish to use these)
 
-> Note: When connecting to Postgres, you may need to add the `sslmode=disable` option to your connection string, as dbmate by default requires an SSL/TLS connection (some other frameworks/languages allow unencrypted connections by default).
+**MySQL**
+
+```sh
+DATABASE_URL="mysql://username:password@127.0.0.1:3306/database_name"
+```
+
+**PostgreSQL**
+
+When connecting to Postgres, you may need to add the `sslmode=disable` option to your connection string, as dbmate by default requires a TLS connection (some other frameworks/languages allow unencrypted connections by default).
+
+```sh
+DATABASE_URL="postgres://username:password@127.0.0.1:5432/database_name?sslmode=disable"
+```
+
+**SQLite**
+
+SQLite databases are stored on the filesystem, so you do not need to specify a host. By default, files are relative to the current directory. For example, the following will create a database at `./db/database_name.sqlite3`:
+
+```sh
+DATABASE_URL="sqlite:///db/database_name.sqlite3"
+```
+
+To specify an absolute path, add an additional forward slash to the path. The following will create a database at `/tmp/database_name.sqlite3`:
+
+```sh
+DATABASE_URL="sqlite:////tmp/database_name.sqlite3"
+```
 
 ### Creating Migrations
 
