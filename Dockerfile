@@ -2,11 +2,10 @@ FROM alpine:edge
 
 ENV GOPATH /go
 ENV PATH /go/bin:$PATH
-ENV CGO_ENABLED 0
 
 # install build dependencies
 RUN echo "http://dl-4.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories && \
-	apk add -U --no-progress go go-tools git ca-certificates
+	apk add -U --no-progress alpine-sdk go go-tools
 RUN go get \
 	github.com/golang/lint/golint \
 	github.com/kisielk/errcheck \

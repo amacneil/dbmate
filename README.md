@@ -6,7 +6,7 @@ Dbmate is a database migration tool, to keep your database schema in sync across
 
 ## Features
 
-* Supports PostgreSQL and MySQL.
+* Supports MySQL, PostgreSQL, and SQLite.
 * Powerful, [purpose-built DSL](https://en.wikipedia.org/wiki/SQL#Data_definition) for writing schema migrations.
 * Migrations are timestamp-versioned, to avoid version number conflicts with multiple developers.
 * Supports creating and dropping databases (handy in development/test).
@@ -53,7 +53,7 @@ DATABASE_URL="postgres://postgres@127.0.0.1:5432/myapp_development?sslmode=disab
 protocol://username:password@host:port/database_name?options
 ```
 
-* `protocol` must be either `mysql` or `postgres`
+* `protocol` must be one of `mysql`, `postgres`, `postgresql`, `sqlite`, `sqlite3`
 * `host` can be specified either as a hostname or IP address
 * `options` are driver-specific (refer to the underlying Go SQL drivers if you wish to use these)
 

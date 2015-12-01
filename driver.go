@@ -28,8 +28,10 @@ func GetDriver(name string) (Driver, error) {
 	switch name {
 	case "mysql":
 		return MySQLDriver{}, nil
-	case "postgres":
+	case "postgres", "postgresql":
 		return PostgresDriver{}, nil
+	case "sqlite", "sqlite3":
+		return SQLiteDriver{}, nil
 	default:
 		return nil, fmt.Errorf("Unknown driver: %s", name)
 	}

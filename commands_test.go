@@ -38,6 +38,7 @@ func testURLs(t *testing.T) []*url.URL {
 	return []*url.URL{
 		postgresTestURL(t),
 		mySQLTestURL(t),
+		sqliteTestURL(t),
 	}
 }
 
@@ -155,7 +156,7 @@ func testRollbackCommandURL(t *testing.T, u *url.URL) {
 
 	err = db.QueryRow("select count(*) from users").Scan(&count)
 	require.NotNil(t, err)
-	require.Regexp(t, "(does not exist|doesn't exist)", err.Error())
+	require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
 }
 
 func TestRollbackCommand(t *testing.T) {
