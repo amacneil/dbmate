@@ -47,9 +47,17 @@ $ cat .env
 DATABASE_URL="postgres://postgres@127.0.0.1:5432/myapp_development?sslmode=disable"
 ```
 
-It is [generally recommended](https://github.com/bkeepers/dotenv#should-i-commit-my-env-file) to commit this file to source control, to make it easier for other developers to get up and running with your project. However, this is completely up to your personal preference.
+`DATABASE_URL` should be specified in the following format:
 
-> Note: When connecting to Postgres, you may need to add the `sslmode=disable` flag to your connection URL, as dbmate by default requires an SSL/TLS connection (some other frameworks/languages use unencrypted connections by default).
+```
+protocol://username:password@host:port/database_name?options
+```
+
+* `protocol` must be either `mysql` or `postgres`
+* `host` can be specified either as a hostname or IP address
+* `options` are driver-specific (refer to the underlying Go SQL drivers if you wish to use these)
+
+> Note: When connecting to Postgres, you may need to add the `sslmode=disable` option to your connection string, as dbmate by default requires an SSL/TLS connection (some other frameworks/languages allow unencrypted connections by default).
 
 ### Creating Migrations
 
