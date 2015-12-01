@@ -3,6 +3,7 @@ package driver
 import (
 	"database/sql"
 	"fmt"
+	"github.com/adrianmacneil/dbmate/driver/mysql"
 	"github.com/adrianmacneil/dbmate/driver/postgres"
 	"github.com/adrianmacneil/dbmate/driver/shared"
 	"net/url"
@@ -23,6 +24,8 @@ type Driver interface {
 // Get loads a database driver by name
 func Get(name string) (Driver, error) {
 	switch name {
+	case "mysql":
+		return mysql.Driver{}, nil
 	case "postgres":
 		return postgres.Driver{}, nil
 	default:

@@ -52,11 +52,25 @@ func postgresTestURL(t *testing.T) *url.URL {
 	return u
 }
 
+func mysqlTestURL(t *testing.T) *url.URL {
+	str := os.Getenv("MYSQL_PORT")
+	require.NotEmpty(t, str, "missing MYSQL_PORT environment variable")
+
+	u, err := url.Parse(str)
+	require.Nil(t, err)
+
+	u.Scheme = "mysql"
+	u.User = url.UserPassword("root", "root")
+	u.Path = "/dbmate"
+
+	return u
+}
+
 func testURLs(t *testing.T) []*url.URL {
 	return []*url.URL{
 		postgresTestURL(t),
+		mysqlTestURL(t),
 	}
-
 }
 
 func mustClose(c io.Closer) {
@@ -178,7 +192,8 @@ func testRollbackCommandURL(t *testing.T, u *url.URL) {
 	require.Equal(t, 0, count)
 
 	err = db.QueryRow("select count(*) from users").Scan(&count)
-	require.Equal(t, "pq: relation \"users\" does not exist", err.Error())
+	require.NotNil(t, err)
+	require.Regexp(t, "(does not exist|doesn't exist)", err.Error())
 }
 
 func TestRollbackCommand(t *testing.T) {

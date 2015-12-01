@@ -1,8 +1,13 @@
-postgres:
-  image: postgres:9.4
 dbmate:
   build: .
   volumes:
     - .:/go/src/github.com/adrianmacneil/dbmate
   links:
+    - mysql
     - postgres
+mysql:
+  image: mysql:5.7
+  environment:
+    MYSQL_ROOT_PASSWORD: root
+postgres:
+  image: postgres:9.4

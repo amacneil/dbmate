@@ -6,7 +6,7 @@ Dbmate is a database migration tool, to keep your database schema in sync across
 
 ## Features
 
-* Currently supports PostgreSQL only.
+* Supports PostgreSQL and MySQL.
 * Powerful, [purpose-built DSL](https://en.wikipedia.org/wiki/SQL#Data_definition) for writing schema migrations.
 * Migrations are timestamp-versioned, to avoid version number conflicts with multiple developers.
 * Supports creating and dropping databases (handy in development/test).
