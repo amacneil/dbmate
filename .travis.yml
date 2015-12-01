@@ -1,0 +1,9 @@
+sudo: required
+services:
+  - docker
+install:
+  - docker-compose up -d
+  - docker-compose run dbmate go version
+script:
+  - make lint
+  - make test
