@@ -65,10 +65,10 @@ To write a migration, simply add your SQL to the `migrate:up` section:
 
 ```sql
 -- migrate:up
-CREATE TABLE users (
-  id INTEGER,
-  name VARCHAR,
-  email VARCHAR NOT NULL
+create table users (
+  id integer,
+  name varchar(255),
+  email varchar(255) not null
 );
 
 -- migrate:down
@@ -94,14 +94,14 @@ By default, dbmate doesn't know how to roll back a migration. In development, it
 
 ```sql
 -- migrate:up
-CREATE TABLE users (
-  id INT PRIMARY KEY,
-  name VARCHAR,
-  email VARCHAR NOT NULL
+create table users (
+  id integer,
+  name varchar(255),
+  email varchar(255) not null
 );
 
 -- migrate:down
-DROP TABLE users;
+drop table users;
 ```
 
 Run `dbmate rollback` to roll back the most recent migration:

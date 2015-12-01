@@ -1,9 +1,9 @@
 -- migrate:up
-CREATE TABLE users (
+create table users (
   id integer,
-  name varchar
+  name varchar(255)
 );
-INSERT INTO users (id, name) VALUES (1, 'alice');
+insert into users (id, name) values (1, 'alice');
 
 -- migrate:down
-DROP TABLE users;
+drop table users;

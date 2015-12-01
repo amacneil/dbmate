@@ -43,7 +43,7 @@ func (drv Driver) CreateDatabase(u *url.URL) error {
 	}
 	defer mustClose(db)
 
-	_, err = db.Exec(fmt.Sprintf("CREATE DATABASE %s",
+	_, err = db.Exec(fmt.Sprintf("create database %s",
 		pq.QuoteIdentifier(name)))
 
 	return err
@@ -60,7 +60,7 @@ func (drv Driver) DropDatabase(u *url.URL) error {
 	}
 	defer mustClose(db)
 
-	_, err = db.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS %s",
+	_, err = db.Exec(fmt.Sprintf("drop database if exists %s",
 		pq.QuoteIdentifier(name)))
 
 	return err
@@ -77,7 +77,7 @@ func (drv Driver) DatabaseExists(u *url.URL) (bool, error) {
 	defer mustClose(db)
 
 	exists := false
-	err = db.QueryRow("SELECT true FROM pg_database WHERE datname = $1", name).
+	err = db.QueryRow("select true from pg_database where datname = $1", name).
 		Scan(&exists)
 	if err == sql.ErrNoRows {
 		return false, nil
@@ -88,8 +88,8 @@ func (drv Driver) DatabaseExists(u *url.URL) (bool, error) {
 
 // CreateMigrationsTable creates the schema_migrations table
 func (drv Driver) CreateMigrationsTable(db *sql.DB) error {
-	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
-		version varchar(255) PRIMARY KEY)`)
+	_, err := db.Exec(`create table if not exists schema_migrations (
+		version varchar(255) primary key)`)
 
 	return err
 }
@@ -97,9 +97,9 @@ func (drv Driver) CreateMigrationsTable(db *sql.DB) error {
 // SelectMigrations returns a list of applied migrations
 // with an optional limit (in descending order)
 func (drv Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
-	query := "SELECT version FROM schema_migrations ORDER BY version DESC"
+	query := "select version from schema_migrations order by version desc"
 	if limit >= 0 {
-		query = fmt.Sprintf("%s LIMIT %d", query, limit)
+		query = fmt.Sprintf("%s limit %d", query, limit)
 	}
 	rows, err := db.Query(query)
 	if err != nil {
@@ -123,14 +123,14 @@ func (drv Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, erro
 
 // InsertMigration adds a new migration record
 func (drv Driver) InsertMigration(db shared.Transaction, version string) error {
-	_, err := db.Exec("INSERT INTO schema_migrations (version) VALUES ($1)", version)
+	_, err := db.Exec("insert into schema_migrations (version) values ($1)", version)
 
 	return err
 }
 
 // DeleteMigration removes a migration record
 func (drv Driver) DeleteMigration(db shared.Transaction, version string) error {
-	_, err := db.Exec("DELETE FROM schema_migrations WHERE version = $1", version)
+	_, err := db.Exec("delete from schema_migrations where version = $1", version)
 
 	return err
 }
