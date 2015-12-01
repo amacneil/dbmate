@@ -6,9 +6,9 @@ build:
 	docker-compose build
 
 lint:
-	$(DOCKER) golint ./...
-	$(DOCKER) go vet ./...
-	$(DOCKER) errcheck ./...
+	$(DOCKER) golint
+	$(DOCKER) go vet
+	$(DOCKER) errcheck
 
 test:
-	$(DOCKER) go test -p 1 -v ./...
+	$(DOCKER) go test -v
