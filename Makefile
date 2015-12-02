@@ -1,8 +1,8 @@
 DOCKER := docker-compose run dbmate
 
-all: build lint test
+all: container lint test build
 
-build:
+container:
 	docker-compose build
 
 lint:
@@ -12,3 +12,6 @@ lint:
 
 test:
 	$(DOCKER) go test -v
+
+build:
+	docker-compose run dbmate ./build.sh
