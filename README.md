@@ -16,7 +16,47 @@ Dbmate is a database migration tool, to keep your database schema in sync across
 
 ## Installation
 
-Dbmate is currently under development. To install the latest build, run:
+**OSX**
+
+Install using Homebrew:
+
+```sh
+$ brew tap adrianmacneil/dbmate
+$ brew install dbmate
+```
+
+**Linux**
+
+Download the binary directly:
+
+```sh
+$ curl -sSL -o dbmate https://github.com/adrianmacneil/dbmate/releases/download/v0.1/dbmate-linux-amd64
+$ chmod +x dbmate
+$ mv dbmate /usr/local/bin
+```
+
+**Heroku**
+
+To use dbmate on Heroku, the easiest method is to store the linux binary in your git repository:
+
+```sh
+$ mkdir -p bin
+$ curl -sSL -o bin/dbmate-heroku https://github.com/adrianmacneil/dbmate/releases/download/v0.1/dbmate-linux-amd64
+$ chmod +x bin/dbmate-heroku
+$ git add bin/dbmate-heroku
+$ git commit -m "Add dbmate binary"
+$ git push heroku master
+```
+
+You can now run dbmate on heroku:
+
+```sh
+$ heroku run bin/dbmate-heroku up
+```
+
+**Other**
+
+Dbmate can be installed directly using `go get`:
 
 ```sh
 $ go get -u github.com/adrianmacneil/dbmate
