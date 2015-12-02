@@ -20,6 +20,7 @@ func NewApp() *cli.App {
 	app := cli.NewApp()
 	app.Name = "dbmate"
 	app.Usage = "A lightweight, framework-independent database migration tool."
+	app.Version = Version
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
