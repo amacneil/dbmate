@@ -6,8 +6,6 @@ set -ex
 
 BUILD_FLAGS="-ldflags -s"
 
-rm -rf dist
-
 GOOS=linux GOARCH=386 go build $BUILD_FLAGS \
   -o dist/dbmate-linux-i386
 GOOS=linux GOARCH=amd64 go build $BUILD_FLAGS \

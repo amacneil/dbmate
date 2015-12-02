@@ -1,6 +1,9 @@
 DOCKER := docker-compose run dbmate
 
-all: container lint test build
+all: clean container lint test build
+
+clean:
+	rm -rf dist
 
 container:
 	docker-compose build
