@@ -1,6 +1,6 @@
 # Dbmate
 
-[![Build Status](https://travis-ci.org/adrianmacneil/dbmate.svg?branch=master)](https://travis-ci.org/adrianmacneil/dbmate)
+[![Build Status](https://travis-ci.org/amacneil/dbmate.svg?branch=master)](https://travis-ci.org/amacneil/dbmate)
 
 Dbmate is a database migration tool, to keep your database schema in sync across multiple developers and your production servers. It is a standalone command line tool, which can be used with any language or framework. This is especially helpful if you are writing many services in different languages, and want to maintain some sanity with consistent development tools.
 
@@ -21,7 +21,7 @@ Dbmate is a database migration tool, to keep your database schema in sync across
 Install using Homebrew:
 
 ```sh
-$ brew tap adrianmacneil/dbmate
+$ brew tap amacneil/dbmate
 $ brew install dbmate
 ```
 
@@ -30,7 +30,7 @@ $ brew install dbmate
 Download the binary directly:
 
 ```sh
-$ curl -sSL -o dbmate https://github.com/adrianmacneil/dbmate/releases/download/v0.1/dbmate-linux-amd64
+$ curl -sSL -o dbmate https://github.com/amacneil/dbmate/releases/download/v0.1/dbmate-linux-amd64
 $ chmod +x dbmate
 $ mv dbmate /usr/local/bin
 ```
@@ -41,7 +41,7 @@ To use dbmate on Heroku, the easiest method is to store the linux binary in your
 
 ```sh
 $ mkdir -p bin
-$ curl -sSL -o bin/dbmate-heroku https://github.com/adrianmacneil/dbmate/releases/download/v0.1/dbmate-linux-amd64
+$ curl -sSL -o bin/dbmate-heroku https://github.com/amacneil/dbmate/releases/download/v0.1/dbmate-linux-amd64
 $ chmod +x bin/dbmate-heroku
 $ git add bin/dbmate-heroku
 $ git commit -m "Add dbmate binary"
@@ -59,7 +59,7 @@ $ heroku run bin/dbmate-heroku up
 Dbmate can be installed directly using `go get`:
 
 ```sh
-$ go get -u github.com/adrianmacneil/dbmate
+$ go get -u github.com/amacneil/dbmate
 ```
 
 ## Commands

@@ -25,8 +25,8 @@ RUN cd /opt && \
 ENV PATH /opt/osxcross/target/bin:$PATH
 
 # copy source files
-COPY . $GOPATH/src/github.com/adrianmacneil/dbmate
-WORKDIR $GOPATH/src/github.com/adrianmacneil/dbmate
+COPY . $GOPATH/src/github.com/amacneil/dbmate
+WORKDIR $GOPATH/src/github.com/amacneil/dbmate
 
 # fetch dependencies
 RUN go get -d -t -v

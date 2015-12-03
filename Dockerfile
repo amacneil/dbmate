@@ -32,8 +32,8 @@ RUN go get \
 	golang.org/x/tools/cmd/vet
 
 # copy source files
-COPY . $GOPATH/src/github.com/adrianmacneil/dbmate
-WORKDIR $GOPATH/src/github.com/adrianmacneil/dbmate
+COPY . $GOPATH/src/github.com/amacneil/dbmate
+WORKDIR $GOPATH/src/github.com/amacneil/dbmate
 
 # build
 RUN go get -d -t -v

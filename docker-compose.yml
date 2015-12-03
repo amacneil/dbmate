@@ -1,7 +1,7 @@
 dbmate:
   build: .
   volumes:
-    - .:/go/src/github.com/adrianmacneil/dbmate
+    - .:/go/src/github.com/amacneil/dbmate
   links:
     - mysql
     - postgres
