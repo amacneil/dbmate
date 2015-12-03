@@ -1,4 +1,4 @@
-DOCKER := docker-compose run dbmate
+DC := docker-compose
 
 all: clean container lint test build
 
@@ -6,15 +6,16 @@ clean:
 	rm -rf dist
 
 container:
-	docker-compose build
+	$(DC) build
 
 lint:
-	$(DOCKER) golint
-	$(DOCKER) go vet
-	$(DOCKER) errcheck
+	$(DC) run dbmate golint
+	$(DC) run dbmate go vet
+	$(DC) run dbmate errcheck
 
 test:
-	$(DOCKER) go test -v
+	$(DC) run dbmate go test -v
 
-build:
-	docker-compose run dbmate ./build.sh
+build: clean
+	$(DC) run -e GOARCH=386   dbmate go build -o dist/dbmate-linux-i386
+	$(DC) run -e GOARCH=amd64 dbmate go build -o dist/dbmate-linux-amd64
