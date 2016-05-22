@@ -12,7 +12,8 @@ func main() {
 	loadDotEnv()
 
 	app := NewApp()
-	app.RunAndExitOnError()
+	err := app.Run(os.Args)
+	checkErr(err)
 }
 
 // NewApp creates a new command line app
@@ -87,10 +88,7 @@ type command func(*cli.Context) error
 
 func runCommand(cmd command, ctx *cli.Context) {
 	err := cmd(ctx)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
-		os.Exit(1)
-	}
+	checkErr(err)
 }
 
 func loadDotEnv() {
@@ -100,5 +98,12 @@ func loadDotEnv() {
 
 	if err := godotenv.Load(); err != nil {
 		log.Fatal("Error loading .env file")
+	}
+}
+
+func checkErr(err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
+		os.Exit(1)
 	}
 }
