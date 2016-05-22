@@ -11,8 +11,7 @@ RUN dpkg --add-architecture i386 && \
 # development dependencies
 RUN go get \
 	github.com/golang/lint/golint \
-	github.com/kisielk/errcheck \
-	golang.org/x/tools/cmd/vet
+	github.com/kisielk/errcheck
 
 # copy source files
 COPY . $GOPATH/src/github.com/amacneil/dbmate
