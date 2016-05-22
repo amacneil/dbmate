@@ -1,4 +1,5 @@
 DC := docker-compose
+BUILD_FLAGS := -ldflags '-s'
 
 all: clean container lint test build
 
@@ -17,5 +18,5 @@ test:
 	$(DC) run dbmate go test -v
 
 build: clean
-	$(DC) run -e GOARCH=386   dbmate go build -o dist/dbmate-linux-i386
-	$(DC) run -e GOARCH=amd64 dbmate go build -o dist/dbmate-linux-amd64
+	$(DC) run -e GOARCH=386   dbmate go build $(BUILD_FLAGS) -o dist/dbmate-linux-i386
+	$(DC) run -e GOARCH=amd64 dbmate go build $(BUILD_FLAGS) -o dist/dbmate-linux-amd64
