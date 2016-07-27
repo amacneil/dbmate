@@ -66,9 +66,10 @@ func NewApp() *cli.App {
 			Action: MigrateCommand,
 		},
 		{
-			Name:   "rollback",
-			Usage:  "Rollback the most recent migration",
-			Action: RollbackCommand,
+			Name:    "rollback",
+			Aliases: []string{"down"},
+			Usage:   "Rollback the most recent migration",
+			Action:  RollbackCommand,
 		},
 	}
 
