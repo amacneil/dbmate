@@ -18,7 +18,6 @@ COPY . $GOPATH/src/github.com/amacneil/dbmate
 WORKDIR $GOPATH/src/github.com/amacneil/dbmate
 
 # build
-RUN go get -d -t -v
 RUN go install -v
 
 CMD dbmate
