@@ -13,7 +13,10 @@ func main() {
 
 	app := NewApp()
 	err := app.Run(os.Args)
-	checkErr(err)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
+		os.Exit(1)
+	}
 }
 
 // NewApp creates a new command line app
@@ -38,46 +41,34 @@ func NewApp() *cli.App {
 
 	app.Commands = []cli.Command{
 		{
-			Name:  "new",
-			Usage: "Generate a new migration file",
-			Action: func(ctx *cli.Context) {
-				runCommand(NewCommand, ctx)
-			},
+			Name:   "new",
+			Usage:  "Generate a new migration file",
+			Action: NewCommand,
 		},
 		{
-			Name:  "up",
-			Usage: "Create database (if necessary) and migrate to the latest version",
-			Action: func(ctx *cli.Context) {
-				runCommand(UpCommand, ctx)
-			},
+			Name:   "up",
+			Usage:  "Create database (if necessary) and migrate to the latest version",
+			Action: UpCommand,
 		},
 		{
-			Name:  "create",
-			Usage: "Create database",
-			Action: func(ctx *cli.Context) {
-				runCommand(CreateCommand, ctx)
-			},
+			Name:   "create",
+			Usage:  "Create database",
+			Action: CreateCommand,
 		},
 		{
-			Name:  "drop",
-			Usage: "Drop database (if it exists)",
-			Action: func(ctx *cli.Context) {
-				runCommand(DropCommand, ctx)
-			},
+			Name:   "drop",
+			Usage:  "Drop database (if it exists)",
+			Action: DropCommand,
 		},
 		{
-			Name:  "migrate",
-			Usage: "Migrate to the latest version",
-			Action: func(ctx *cli.Context) {
-				runCommand(MigrateCommand, ctx)
-			},
+			Name:   "migrate",
+			Usage:  "Migrate to the latest version",
+			Action: MigrateCommand,
 		},
 		{
-			Name:  "rollback",
-			Usage: "Rollback the most recent migration",
-			Action: func(ctx *cli.Context) {
-				runCommand(RollbackCommand, ctx)
-			},
+			Name:   "rollback",
+			Usage:  "Rollback the most recent migration",
+			Action: RollbackCommand,
 		},
 	}
 
@@ -86,11 +77,6 @@ func NewApp() *cli.App {
 
 type command func(*cli.Context) error
 
-func runCommand(cmd command, ctx *cli.Context) {
-	err := cmd(ctx)
-	checkErr(err)
-}
-
 func loadDotEnv() {
 	if _, err := os.Stat(".env"); err != nil {
 		return
@@ -98,12 +84,5 @@ func loadDotEnv() {
 
 	if err := godotenv.Load(); err != nil {
 		log.Fatal("Error loading .env file")
-	}
-}
-
-func checkErr(err error) {
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
-		os.Exit(1)
 	}
 }
