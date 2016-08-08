@@ -41,9 +41,10 @@ func NewApp() *cli.App {
 
 	app.Commands = []cli.Command{
 		{
-			Name:   "new",
-			Usage:  "Generate a new migration file",
-			Action: NewCommand,
+			Name:    "new",
+			Aliases: []string{"n"},
+			Usage:   "Generate a new migration file",
+			Action:  NewCommand,
 		},
 		{
 			Name:   "up",
