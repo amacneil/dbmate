@@ -66,13 +66,14 @@ $ go get -u github.com/amacneil/dbmate
 ## Commands
 
 ```sh
-dbmate          # print help
-dbmate new      # generate a new migration file
-dbmate up       # create the database (if it does not already exist) and run any pending migrations
-dbmate create   # create the database
-dbmate drop     # drop the database
-dbmate migrate  # run any pending migrations
-dbmate rollback # roll back the most recent migration
+dbmate           # print help
+dbmate new       # generate a new migration file
+dbmate up        # create the database (if it does not already exist) and run any pending migrations
+dbmate create    # create the database
+dbmate drop      # drop the database
+dbmate migrate   # run any pending migrations
+dbmate rollback  # roll back the most recent migration
+dbmate down      # alias for rollback
 ```
 
 ## Usage
