@@ -2,8 +2,8 @@ package main
 
 import (
 	"flag"
-	"github.com/codegangsta/cli"
 	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli"
 	"net/url"
 	"os"
 	"path/filepath"

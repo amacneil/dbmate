@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/codegangsta/cli"
 	"github.com/joho/godotenv"
+	"github.com/urfave/cli"
 	"log"
 	"os"
 )
