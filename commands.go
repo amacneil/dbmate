@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"time"
 )
 
@@ -161,12 +162,13 @@ func openDatabaseForMigration(ctx *cli.Context) (Driver, *sql.DB, error) {
 // MigrateCommand migrates database to the latest version
 func MigrateCommand(ctx *cli.Context) error {
 	migrationsDir := ctx.GlobalString("migrations-dir")
-	available, err := findAvailableMigrations(migrationsDir)
+	re := regexp.MustCompile(`^\d.*\.sql$`)
+	files, err := findMigrationFiles(migrationsDir, re)
 	if err != nil {
 		return err
 	}
 
-	if len(available) == 0 {
+	if len(files) == 0 {
 		return fmt.Errorf("No migration files found.")
 	}
 
@@ -181,7 +183,7 @@ func MigrateCommand(ctx *cli.Context) error {
 		return err
 	}
 
-	for filename := range available {
+	for _, filename := range files {
 		ver := migrationVersion(filename)
 		if ok := applied[ver]; ok {
 			// migration already applied
@@ -238,24 +240,9 @@ func findMigrationFiles(dir string, re *regexp.Regexp) ([]string, error) {
 		matches = append(matches, name)
 	}
 
+	sort.Strings(matches)
+
 	return matches, nil
-}
-
-func findAvailableMigrations(dir string) (map[string]struct{}, error) {
-	re := regexp.MustCompile(`^\d.*\.sql$`)
-	files, err := findMigrationFiles(dir, re)
-	if err != nil {
-		return nil, err
-	}
-
-	// why does go not have Set?
-	// convert into map for easier lookups
-	migrations := map[string]struct{}{}
-	for _, name := range files {
-		migrations[name] = struct{}{}
-	}
-
-	return migrations, nil
 }
 
 func findMigrationFile(dir string, ver string) (string, error) {
