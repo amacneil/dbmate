@@ -10,17 +10,19 @@ import (
 	"testing"
 )
 
-var stubsDir string
+var testdataDir string
 
 func testContext(t *testing.T, u *url.URL) *cli.Context {
 	var err error
-	if stubsDir == "" {
-		stubsDir, err = filepath.Abs("./stubs")
+
+	// only chdir once, because testdata is relative to current directory
+	if testdataDir == "" {
+		testdataDir, err = filepath.Abs("./testdata")
+		require.Nil(t, err)
+
+		err = os.Chdir(testdataDir)
 		require.Nil(t, err)
 	}
-
-	err = os.Chdir(stubsDir)
-	require.Nil(t, err)
 
 	err = os.Setenv("DATABASE_URL", u.String())
 	require.Nil(t, err)
