@@ -3,10 +3,11 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	_ "github.com/mattn/go-sqlite3"
 	"net/url"
 	"os"
 	"regexp"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 // SQLiteDriver provides top level database functions

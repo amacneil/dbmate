@@ -3,8 +3,9 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"github.com/lib/pq"
 	"net/url"
+
+	"github.com/lib/pq"
 )
 
 // PostgresDriver provides top level database functions

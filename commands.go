@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"github.com/urfave/cli"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -11,6 +10,8 @@ import (
 	"regexp"
 	"sort"
 	"time"
+
+	"github.com/urfave/cli"
 )
 
 // UpCommand creates the database (if necessary) and runs migrations

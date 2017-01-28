@@ -2,12 +2,13 @@ package main
 
 import (
 	"flag"
-	"github.com/stretchr/testify/require"
-	"github.com/urfave/cli"
 	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli"
 )
 
 var testdataDir string

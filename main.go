@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/joho/godotenv"
-	"github.com/urfave/cli"
 	"log"
 	"os"
+
+	"github.com/joho/godotenv"
+	"github.com/urfave/cli"
 )
 
 func main() {
