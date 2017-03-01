@@ -1,4 +1,4 @@
-FROM golang:1.7.0
+FROM golang:1.8.0
 
 # required to force cgo (for sqlite driver) with cross compile
 ENV CGO_ENABLED 1
