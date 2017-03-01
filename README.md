@@ -211,6 +211,12 @@ Creating: myapp_test
 Applying: 20151127184807_create_users_table.sql
 ```
 
+## FAQ
+
+**How do I use dbmate under Alpine linux?**
+
+Alpine linux uses [musl libc](https://www.musl-libc.org/), which is incompatible with how we build SQLite support (using [cgo](https://golang.org/cmd/cgo/)). If you want Alpine linux support, and don't mind sacrificing SQLite support, please use the `dbmate-linux-musl-amd64` build found on the [releases page](https://github.com/amacneil/dbmate/releases).
+
 ## Contributing
 
 Dbmate is written in Go, pull requests are welcome.
