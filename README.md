@@ -32,9 +32,8 @@ $ brew install dbmate
 Download the binary directly:
 
 ```sh
-$ curl -fsSL -o dbmate https://github.com/amacneil/dbmate/releases/download/v1.2.1/dbmate-linux-amd64
-$ chmod +x dbmate
-$ mv dbmate /usr/local/bin
+$ sudo curl -fsSL -o /usr/local/bin/dbmate https://github.com/amacneil/dbmate/releases/download/v1.2.1/dbmate-linux-amd64
+$ sudo chmod +x /usr/local/bin/dbmate
 ```
 
 **Heroku**
