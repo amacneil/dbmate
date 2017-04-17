@@ -15,10 +15,10 @@ RUN go get \
 	github.com/kisielk/errcheck
 
 # copy source files
-COPY . $GOPATH/src/github.com/amacneil/dbmate
-WORKDIR $GOPATH/src/github.com/amacneil/dbmate
+COPY . $GOPATH/src/github.com/flowhamster/dbmate
+WORKDIR $GOPATH/src/github.com/flowhamster/dbmate
 
 # build
-RUN go install -v
+RUN go install -v ./cmd/dbmate
 
 CMD dbmate

@@ -1,4 +1,4 @@
-package main
+package commands
 
 import (
 	"database/sql"
@@ -11,6 +11,9 @@ import (
 	"sort"
 	"time"
 
+	"github.com/flowhamster/dbmate/pkg/driver"
+	"github.com/flowhamster/dbmate/pkg/utils"
+	"github.com/flowhamster/dbmate/pkg/version"
 	"github.com/urfave/cli"
 )
 
@@ -21,7 +24,7 @@ func UpCommand(ctx *cli.Context) error {
 		return err
 	}
 
-	drv, err := GetDriver(u.Scheme)
+	drv, err := driver.GetDriver(u.Scheme)
 	if err != nil {
 		return err
 	}
@@ -47,7 +50,7 @@ func CreateCommand(ctx *cli.Context) error {
 		return err
 	}
 
-	drv, err := GetDriver(u.Scheme)
+	drv, err := driver.GetDriver(u.Scheme)
 	if err != nil {
 		return err
 	}
@@ -62,7 +65,7 @@ func DropCommand(ctx *cli.Context) error {
 		return err
 	}
 
-	drv, err := GetDriver(u.Scheme)
+	drv, err := driver.GetDriver(u.Scheme)
 	if err != nil {
 		return err
 	}
@@ -102,7 +105,7 @@ func NewCommand(ctx *cli.Context) error {
 		return err
 	}
 
-	defer mustClose(file)
+	defer utils.MustClose(file)
 	_, err = file.WriteString(migrationTemplate)
 	if err != nil {
 		return err
@@ -119,7 +122,7 @@ func GetDatabaseURL(ctx *cli.Context) (u *url.URL, err error) {
 	return url.Parse(value)
 }
 
-func doTransaction(db *sql.DB, txFunc func(Transaction) error) error {
+func doTransaction(db *sql.DB, txFunc func(driver.Transaction) error) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -136,13 +139,13 @@ func doTransaction(db *sql.DB, txFunc func(Transaction) error) error {
 	return tx.Commit()
 }
 
-func openDatabaseForMigration(ctx *cli.Context) (Driver, *sql.DB, error) {
+func openDatabaseForMigration(ctx *cli.Context) (driver.Driver, *sql.DB, error) {
 	u, err := GetDatabaseURL(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	drv, err := GetDriver(u.Scheme)
+	drv, err := driver.GetDriver(u.Scheme)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -153,7 +156,7 @@ func openDatabaseForMigration(ctx *cli.Context) (Driver, *sql.DB, error) {
 	}
 
 	if err := drv.CreateMigrationsTable(db); err != nil {
-		mustClose(db)
+		utils.MustClose(db)
 		return nil, nil, err
 	}
 
@@ -177,7 +180,7 @@ func MigrateCommand(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	defer mustClose(db)
+	defer utils.MustClose(db)
 
 	applied, err := drv.SelectMigrations(db, -1)
 	if err != nil {
@@ -199,7 +202,7 @@ func MigrateCommand(ctx *cli.Context) error {
 		}
 
 		// begin transaction
-		err = doTransaction(db, func(tx Transaction) error {
+		err = doTransaction(db, func(tx driver.Transaction) error {
 			// run actual migration
 			if _, err := tx.Exec(migration["up"]); err != nil {
 				return err
@@ -313,7 +316,7 @@ func RollbackCommand(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	defer mustClose(db)
+	defer utils.MustClose(db)
 
 	applied, err := drv.SelectMigrations(db, 1)
 	if err != nil {
@@ -343,7 +346,7 @@ func RollbackCommand(ctx *cli.Context) error {
 	}
 
 	// begin transaction
-	err = doTransaction(db, func(tx Transaction) error {
+	err = doTransaction(db, func(tx driver.Transaction) error {
 		// rollback migration
 		if _, err := tx.Exec(migration["down"]); err != nil {
 			return err
@@ -361,4 +364,62 @@ func RollbackCommand(ctx *cli.Context) error {
 	}
 
 	return nil
+}
+
+// NewApp creates a new command line app
+func NewApp() *cli.App {
+	app := cli.NewApp()
+	app.Name = "dbmate"
+	app.Usage = "A lightweight, framework-independent database migration tool."
+	app.Version = version.Version
+
+	app.Flags = []cli.Flag{
+		cli.StringFlag{
+			Name:  "migrations-dir, d",
+			Value: "./db/migrations",
+			Usage: "specify the directory containing migration files",
+		},
+		cli.StringFlag{
+			Name:  "env, e",
+			Value: "DATABASE_URL",
+			Usage: "specify an environment variable containing the database URL",
+		},
+	}
+
+	app.Commands = []cli.Command{
+		{
+			Name:    "new",
+			Aliases: []string{"n"},
+			Usage:   "Generate a new migration file",
+			Action:  NewCommand,
+		},
+		{
+			Name:   "up",
+			Usage:  "Create database (if necessary) and migrate to the latest version",
+			Action: UpCommand,
+		},
+		{
+			Name:   "create",
+			Usage:  "Create database",
+			Action: CreateCommand,
+		},
+		{
+			Name:   "drop",
+			Usage:  "Drop database (if it exists)",
+			Action: DropCommand,
+		},
+		{
+			Name:   "migrate",
+			Usage:  "Migrate to the latest version",
+			Action: MigrateCommand,
+		},
+		{
+			Name:    "rollback",
+			Aliases: []string{"down"},
+			Usage:   "Rollback the most recent migration",
+			Action:  RollbackCommand,
+		},
+	}
+
+	return app
 }

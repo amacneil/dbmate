@@ -1,4 +1,4 @@
-package main
+package sqlite
 
 import (
 	"database/sql"
@@ -6,9 +6,24 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"testing"
 
+	"github.com/flowhamster/dbmate/pkg/driver"
+	"github.com/flowhamster/dbmate/pkg/utils"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/stretchr/testify/require"
 )
+
+func SQLiteTestURL(t *testing.T) *url.URL {
+	u, err := url.Parse("sqlite3:////tmp/dbmate.sqlite3")
+	require.Nil(t, err)
+
+	return u
+}
+
+func init() {
+	driver.Register("sqlite3", SQLiteDriver{})
+}
 
 // SQLiteDriver provides top level database functions
 type SQLiteDriver struct {
@@ -35,7 +50,7 @@ func (drv SQLiteDriver) CreateDatabase(u *url.URL) error {
 	if err != nil {
 		return err
 	}
-	defer mustClose(db)
+	defer utils.MustClose(db)
 
 	return db.Ping()
 }
@@ -89,7 +104,7 @@ func (drv SQLiteDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool
 		return nil, err
 	}
 
-	defer mustClose(rows)
+	defer utils.MustClose(rows)
 
 	migrations := map[string]bool{}
 	for rows.Next() {
@@ -105,14 +120,14 @@ func (drv SQLiteDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool
 }
 
 // InsertMigration adds a new migration record
-func (drv SQLiteDriver) InsertMigration(db Transaction, version string) error {
+func (drv SQLiteDriver) InsertMigration(db driver.Transaction, version string) error {
 	_, err := db.Exec("insert into schema_migrations (version) values (?)", version)
 
 	return err
 }
 
 // DeleteMigration removes a migration record
-func (drv SQLiteDriver) DeleteMigration(db Transaction, version string) error {
+func (drv SQLiteDriver) DeleteMigration(db driver.Transaction, version string) error {
 	_, err := db.Exec("delete from schema_migrations where version = ?", version)
 
 	return err

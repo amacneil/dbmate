@@ -1,4 +1,4 @@
-package main
+package driver
 
 import (
 	"database/sql"
@@ -23,18 +23,23 @@ type Transaction interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
 }
 
+var Drivers map[string]Driver
+
+func init() {
+	Drivers = make(map[string]Driver)
+}
+
+func Register(name string, driver Driver) {
+	Drivers[name] = driver
+}
+
 // GetDriver loads a database driver by name
 func GetDriver(name string) (Driver, error) {
-	switch name {
-	case "mysql":
-		return MySQLDriver{}, nil
-	case "postgres", "postgresql":
-		return PostgresDriver{}, nil
-	case "sqlite", "sqlite3":
-		return SQLiteDriver{}, nil
-	default:
+	driver, ok := Drivers[name]
+	if !ok {
 		return nil, fmt.Errorf("Unknown driver: %s", name)
 	}
+	return driver, nil
 }
 
 // GetDriverOpen is a shortcut for GetDriver(u.Scheme).Open(u)
