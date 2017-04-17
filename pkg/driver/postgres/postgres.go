@@ -1,14 +1,38 @@
-package main
+package postgres
 
 import (
 	"database/sql"
 	"fmt"
 	"net/url"
+	"os"
+	"testing"
 
+	"github.com/flowhamster/dbmate/pkg/driver"
+	"github.com/flowhamster/dbmate/pkg/utils"
 	"github.com/lib/pq"
+	"github.com/stretchr/testify/require"
 )
 
+func init() {
+	driver.Register("postgres", PostgresDriver{})
+}
+
 // PostgresDriver provides top level database functions
+func PostgresTestURL(t *testing.T) *url.URL {
+	str := os.Getenv("POSTGRES_PORT")
+	require.NotEmpty(t, str, "missing POSTGRES_PORT environment variable")
+
+	u, err := url.Parse(str)
+	require.Nil(t, err)
+
+	u.Scheme = "postgres"
+	u.User = url.User("postgres")
+	u.Path = "/dbmate"
+	u.RawQuery = "sslmode=disable"
+
+	return u
+}
+
 type PostgresDriver struct {
 }
 
@@ -27,14 +51,14 @@ func (drv PostgresDriver) openPostgresDB(u *url.URL) (*sql.DB, error) {
 
 // CreateDatabase creates the specified database
 func (drv PostgresDriver) CreateDatabase(u *url.URL) error {
-	name := databaseName(u)
+	name := utils.DatabaseName(u)
 	fmt.Printf("Creating: %s\n", name)
 
 	db, err := drv.openPostgresDB(u)
 	if err != nil {
 		return err
 	}
-	defer mustClose(db)
+	defer utils.MustClose(db)
 
 	_, err = db.Exec(fmt.Sprintf("create database %s",
 		pq.QuoteIdentifier(name)))
@@ -44,14 +68,14 @@ func (drv PostgresDriver) CreateDatabase(u *url.URL) error {
 
 // DropDatabase drops the specified database (if it exists)
 func (drv PostgresDriver) DropDatabase(u *url.URL) error {
-	name := databaseName(u)
+	name := utils.DatabaseName(u)
 	fmt.Printf("Dropping: %s\n", name)
 
 	db, err := drv.openPostgresDB(u)
 	if err != nil {
 		return err
 	}
-	defer mustClose(db)
+	defer utils.MustClose(db)
 
 	_, err = db.Exec(fmt.Sprintf("drop database if exists %s",
 		pq.QuoteIdentifier(name)))
@@ -61,13 +85,13 @@ func (drv PostgresDriver) DropDatabase(u *url.URL) error {
 
 // DatabaseExists determines whether the database exists
 func (drv PostgresDriver) DatabaseExists(u *url.URL) (bool, error) {
-	name := databaseName(u)
+	name := utils.DatabaseName(u)
 
 	db, err := drv.openPostgresDB(u)
 	if err != nil {
 		return false, err
 	}
-	defer mustClose(db)
+	defer utils.MustClose(db)
 
 	exists := false
 	err = db.QueryRow("select true from pg_database where datname = $1", name).
@@ -99,7 +123,7 @@ func (drv PostgresDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bo
 		return nil, err
 	}
 
-	defer mustClose(rows)
+	defer utils.MustClose(rows)
 
 	migrations := map[string]bool{}
 	for rows.Next() {
@@ -115,14 +139,14 @@ func (drv PostgresDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bo
 }
 
 // InsertMigration adds a new migration record
-func (drv PostgresDriver) InsertMigration(db Transaction, version string) error {
+func (drv PostgresDriver) InsertMigration(db driver.Transaction, version string) error {
 	_, err := db.Exec("insert into schema_migrations (version) values ($1)", version)
 
 	return err
 }
 
 // DeleteMigration removes a migration record
-func (drv PostgresDriver) DeleteMigration(db Transaction, version string) error {
+func (drv PostgresDriver) DeleteMigration(db driver.Transaction, version string) error {
 	_, err := db.Exec("delete from schema_migrations where version = $1", version)
 
 	return err

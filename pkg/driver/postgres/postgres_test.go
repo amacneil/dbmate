@@ -1,24 +1,17 @@
-package main
+package postgres
 
 import (
 	"database/sql"
 	"net/url"
-	"os"
 	"testing"
 
+	"github.com/flowhamster/dbmate/pkg/utils"
 	"github.com/stretchr/testify/require"
 )
 
-func sqliteTestURL(t *testing.T) *url.URL {
-	u, err := url.Parse("sqlite3:////tmp/dbmate.sqlite3")
-	require.Nil(t, err)
-
-	return u
-}
-
-func prepTestSQLiteDB(t *testing.T) *sql.DB {
-	drv := SQLiteDriver{}
-	u := sqliteTestURL(t)
+func prepTestPostgresDB(t *testing.T) *sql.DB {
+	drv := PostgresDriver{}
+	u := PostgresTestURL(t)
 
 	// drop any existing database
 	err := drv.DropDatabase(u)
@@ -29,15 +22,15 @@ func prepTestSQLiteDB(t *testing.T) *sql.DB {
 	require.Nil(t, err)
 
 	// connect database
-	db, err := drv.Open(u)
+	db, err := sql.Open("postgres", u.String())
 	require.Nil(t, err)
 
 	return db
 }
 
-func TestSQLiteCreateDropDatabase(t *testing.T) {
-	drv := SQLiteDriver{}
-	u := sqliteTestURL(t)
+func TestPostgresCreateDropDatabase(t *testing.T) {
+	drv := PostgresDriver{}
+	u := PostgresTestURL(t)
 
 	// drop any existing database
 	err := drv.DropDatabase(u)
@@ -47,23 +40,35 @@ func TestSQLiteCreateDropDatabase(t *testing.T) {
 	err = drv.CreateDatabase(u)
 	require.Nil(t, err)
 
-	// check that database exists
-	_, err = os.Stat(sqlitePath(u))
-	require.Nil(t, err)
+	// check that database exists and we can connect to it
+	func() {
+		db, err := sql.Open("postgres", u.String())
+		require.Nil(t, err)
+		defer utils.MustClose(db)
+
+		err = db.Ping()
+		require.Nil(t, err)
+	}()
 
 	// drop the database
 	err = drv.DropDatabase(u)
 	require.Nil(t, err)
 
 	// check that database no longer exists
-	_, err = os.Stat(sqlitePath(u))
-	require.NotNil(t, err)
-	require.Equal(t, true, os.IsNotExist(err))
+	func() {
+		db, err := sql.Open("postgres", u.String())
+		require.Nil(t, err)
+		defer utils.MustClose(db)
+
+		err = db.Ping()
+		require.NotNil(t, err)
+		require.Equal(t, "pq: database \"dbmate\" does not exist", err.Error())
+	}()
 }
 
-func TestSQLiteDatabaseExists(t *testing.T) {
-	drv := SQLiteDriver{}
-	u := sqliteTestURL(t)
+func TestPostgresDatabaseExists(t *testing.T) {
+	drv := PostgresDriver{}
+	u := PostgresTestURL(t)
 
 	// drop any existing database
 	err := drv.DropDatabase(u)
@@ -84,15 +89,25 @@ func TestSQLiteDatabaseExists(t *testing.T) {
 	require.Equal(t, true, exists)
 }
 
-func TestSQLiteCreateMigrationsTable(t *testing.T) {
-	drv := SQLiteDriver{}
-	db := prepTestSQLiteDB(t)
-	defer mustClose(db)
+func TestPostgresDatabaseExists_Error(t *testing.T) {
+	drv := PostgresDriver{}
+	u := PostgresTestURL(t)
+	u.User = url.User("invalid")
+
+	exists, err := drv.DatabaseExists(u)
+	require.Equal(t, "pq: role \"invalid\" does not exist", err.Error())
+	require.Equal(t, false, exists)
+}
+
+func TestPostgresCreateMigrationsTable(t *testing.T) {
+	drv := PostgresDriver{}
+	db := prepTestPostgresDB(t)
+	defer utils.MustClose(db)
 
 	// migrations table should not exist
 	count := 0
 	err := db.QueryRow("select count(*) from schema_migrations").Scan(&count)
-	require.Regexp(t, "no such table: schema_migrations", err.Error())
+	require.Equal(t, "pq: relation \"schema_migrations\" does not exist", err.Error())
 
 	// create table
 	err = drv.CreateMigrationsTable(db)
@@ -107,10 +122,10 @@ func TestSQLiteCreateMigrationsTable(t *testing.T) {
 	require.Nil(t, err)
 }
 
-func TestSQLiteSelectMigrations(t *testing.T) {
-	drv := SQLiteDriver{}
-	db := prepTestSQLiteDB(t)
-	defer mustClose(db)
+func TestPostgresSelectMigrations(t *testing.T) {
+	drv := PostgresDriver{}
+	db := prepTestPostgresDB(t)
+	defer utils.MustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
 	require.Nil(t, err)
@@ -133,10 +148,10 @@ func TestSQLiteSelectMigrations(t *testing.T) {
 	require.Equal(t, false, migrations["abc2"])
 }
 
-func TestSQLiteInsertMigration(t *testing.T) {
-	drv := SQLiteDriver{}
-	db := prepTestSQLiteDB(t)
-	defer mustClose(db)
+func TestPostgresInsertMigration(t *testing.T) {
+	drv := PostgresDriver{}
+	db := prepTestPostgresDB(t)
+	defer utils.MustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
 	require.Nil(t, err)
@@ -156,10 +171,10 @@ func TestSQLiteInsertMigration(t *testing.T) {
 	require.Equal(t, 1, count)
 }
 
-func TestSQLiteDeleteMigration(t *testing.T) {
-	drv := SQLiteDriver{}
-	db := prepTestSQLiteDB(t)
-	defer mustClose(db)
+func TestPostgresDeleteMigration(t *testing.T) {
+	drv := PostgresDriver{}
+	db := prepTestPostgresDB(t)
+	defer utils.MustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
 	require.Nil(t, err)

@@ -1,4 +1,4 @@
-package main
+package commands
 
 import (
 	"flag"
@@ -7,8 +7,14 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/flowhamster/dbmate/pkg/driver"
+	"github.com/flowhamster/dbmate/pkg/utils"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli"
+
+	"github.com/flowhamster/dbmate/pkg/driver/mysql"
+	"github.com/flowhamster/dbmate/pkg/driver/postgres"
+	"github.com/flowhamster/dbmate/pkg/driver/sqlite"
 )
 
 var testdataDir string
@@ -18,7 +24,7 @@ func testContext(t *testing.T, u *url.URL) *cli.Context {
 
 	// only chdir once, because testdata is relative to current directory
 	if testdataDir == "" {
-		testdataDir, err = filepath.Abs("./testdata")
+		testdataDir, err = filepath.Abs("../../testdata")
 		require.Nil(t, err)
 
 		err = os.Chdir(testdataDir)
@@ -39,9 +45,9 @@ func testContext(t *testing.T, u *url.URL) *cli.Context {
 
 func testURLs(t *testing.T) []*url.URL {
 	return []*url.URL{
-		postgresTestURL(t),
-		mySQLTestURL(t),
-		sqliteTestURL(t),
+		postgres.PostgresTestURL(t),
+		mysql.MySQLTestURL(t),
+		sqlite.SQLiteTestURL(t),
 	}
 }
 
@@ -72,9 +78,9 @@ func testMigrateCommandURL(t *testing.T, u *url.URL) {
 	require.Nil(t, err)
 
 	// verify results
-	db, err := GetDriverOpen(u)
+	db, err := driver.GetDriverOpen(u)
 	require.Nil(t, err)
-	defer mustClose(db)
+	defer utils.MustClose(db)
 
 	count := 0
 	err = db.QueryRow(`select count(*) from schema_migrations
@@ -105,9 +111,9 @@ func testUpCommandURL(t *testing.T, u *url.URL) {
 	require.Nil(t, err)
 
 	// verify results
-	db, err := GetDriverOpen(u)
+	db, err := driver.GetDriverOpen(u)
 	require.Nil(t, err)
-	defer mustClose(db)
+	defer utils.MustClose(db)
 
 	count := 0
 	err = db.QueryRow(`select count(*) from schema_migrations
@@ -138,9 +144,9 @@ func testRollbackCommandURL(t *testing.T, u *url.URL) {
 	require.Nil(t, err)
 
 	// verify migration
-	db, err := GetDriverOpen(u)
+	db, err := driver.GetDriverOpen(u)
 	require.Nil(t, err)
-	defer mustClose(db)
+	defer utils.MustClose(db)
 
 	count := 0
 	err = db.QueryRow(`select count(*) from schema_migrations

@@ -1,13 +1,36 @@
-package main
+package mysql
 
 import (
 	"database/sql"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
+	"testing"
 
+	"github.com/flowhamster/dbmate/pkg/driver"
+	"github.com/flowhamster/dbmate/pkg/utils"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/stretchr/testify/require"
 )
+
+func init() {
+	driver.Register("mysql", MySQLDriver{})
+}
+
+func MySQLTestURL(t *testing.T) *url.URL {
+	str := os.Getenv("MYSQL_PORT")
+	require.NotEmpty(t, str, "missing MYSQL_PORT environment variable")
+
+	u, err := url.Parse(str)
+	require.Nil(t, err)
+
+	u.Scheme = "mysql"
+	u.User = url.UserPassword("root", "root")
+	u.Path = "/dbmate"
+
+	return u
+}
 
 // MySQLDriver provides top level database functions
 type MySQLDriver struct {
@@ -47,14 +70,14 @@ func quoteIdentifier(str string) string {
 
 // CreateDatabase creates the specified database
 func (drv MySQLDriver) CreateDatabase(u *url.URL) error {
-	name := databaseName(u)
+	name := utils.DatabaseName(u)
 	fmt.Printf("Creating: %s\n", name)
 
 	db, err := drv.openRootDB(u)
 	if err != nil {
 		return err
 	}
-	defer mustClose(db)
+	defer utils.MustClose(db)
 
 	_, err = db.Exec(fmt.Sprintf("create database %s",
 		quoteIdentifier(name)))
@@ -64,14 +87,14 @@ func (drv MySQLDriver) CreateDatabase(u *url.URL) error {
 
 // DropDatabase drops the specified database (if it exists)
 func (drv MySQLDriver) DropDatabase(u *url.URL) error {
-	name := databaseName(u)
+	name := utils.DatabaseName(u)
 	fmt.Printf("Dropping: %s\n", name)
 
 	db, err := drv.openRootDB(u)
 	if err != nil {
 		return err
 	}
-	defer mustClose(db)
+	defer utils.MustClose(db)
 
 	_, err = db.Exec(fmt.Sprintf("drop database if exists %s",
 		quoteIdentifier(name)))
@@ -81,13 +104,13 @@ func (drv MySQLDriver) DropDatabase(u *url.URL) error {
 
 // DatabaseExists determines whether the database exists
 func (drv MySQLDriver) DatabaseExists(u *url.URL) (bool, error) {
-	name := databaseName(u)
+	name := utils.DatabaseName(u)
 
 	db, err := drv.openRootDB(u)
 	if err != nil {
 		return false, err
 	}
-	defer mustClose(db)
+	defer utils.MustClose(db)
 
 	exists := false
 	err = db.QueryRow(`select true from information_schema.schemata
@@ -119,7 +142,7 @@ func (drv MySQLDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool,
 		return nil, err
 	}
 
-	defer mustClose(rows)
+	defer utils.MustClose(rows)
 
 	migrations := map[string]bool{}
 	for rows.Next() {
@@ -135,14 +158,14 @@ func (drv MySQLDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool,
 }
 
 // InsertMigration adds a new migration record
-func (drv MySQLDriver) InsertMigration(db Transaction, version string) error {
+func (drv MySQLDriver) InsertMigration(db driver.Transaction, version string) error {
 	_, err := db.Exec("insert into schema_migrations (version) values (?)", version)
 
 	return err
 }
 
 // DeleteMigration removes a migration record
-func (drv MySQLDriver) DeleteMigration(db Transaction, version string) error {
+func (drv MySQLDriver) DeleteMigration(db driver.Transaction, version string) error {
 	_, err := db.Exec("delete from schema_migrations where version = ?", version)
 
 	return err
