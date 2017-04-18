@@ -1,4 +1,4 @@
-package main
+package pkg
 
 import (
 	"database/sql"
@@ -9,23 +9,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func mySQLTestURL(t *testing.T) *url.URL {
-	str := os.Getenv("MYSQL_PORT")
-	require.NotEmpty(t, str, "missing MYSQL_PORT environment variable")
-
-	u, err := url.Parse(str)
+func sqliteTestURL(t *testing.T) *url.URL {
+	u, err := url.Parse("sqlite3:////tmp/dbmate.sqlite3")
 	require.Nil(t, err)
-
-	u.Scheme = "mysql"
-	u.User = url.UserPassword("root", "root")
-	u.Path = "/dbmate"
 
 	return u
 }
 
-func prepTestMySQLDB(t *testing.T) *sql.DB {
-	drv := MySQLDriver{}
-	u := mySQLTestURL(t)
+func prepTestSQLiteDB(t *testing.T) *sql.DB {
+	drv := SQLiteDriver{}
+	u := sqliteTestURL(t)
 
 	// drop any existing database
 	err := drv.DropDatabase(u)
@@ -42,9 +35,9 @@ func prepTestMySQLDB(t *testing.T) *sql.DB {
 	return db
 }
 
-func TestMySQLCreateDropDatabase(t *testing.T) {
-	drv := MySQLDriver{}
-	u := mySQLTestURL(t)
+func TestSQLiteCreateDropDatabase(t *testing.T) {
+	drv := SQLiteDriver{}
+	u := sqliteTestURL(t)
 
 	// drop any existing database
 	err := drv.DropDatabase(u)
@@ -54,35 +47,23 @@ func TestMySQLCreateDropDatabase(t *testing.T) {
 	err = drv.CreateDatabase(u)
 	require.Nil(t, err)
 
-	// check that database exists and we can connect to it
-	func() {
-		db, err := drv.Open(u)
-		require.Nil(t, err)
-		defer mustClose(db)
-
-		err = db.Ping()
-		require.Nil(t, err)
-	}()
+	// check that database exists
+	_, err = os.Stat(sqlitePath(u))
+	require.Nil(t, err)
 
 	// drop the database
 	err = drv.DropDatabase(u)
 	require.Nil(t, err)
 
 	// check that database no longer exists
-	func() {
-		db, err := drv.Open(u)
-		require.Nil(t, err)
-		defer mustClose(db)
-
-		err = db.Ping()
-		require.NotNil(t, err)
-		require.Regexp(t, "Unknown database 'dbmate'", err.Error())
-	}()
+	_, err = os.Stat(sqlitePath(u))
+	require.NotNil(t, err)
+	require.Equal(t, true, os.IsNotExist(err))
 }
 
-func TestMySQLDatabaseExists(t *testing.T) {
-	drv := MySQLDriver{}
-	u := mySQLTestURL(t)
+func TestSQLiteDatabaseExists(t *testing.T) {
+	drv := SQLiteDriver{}
+	u := sqliteTestURL(t)
 
 	// drop any existing database
 	err := drv.DropDatabase(u)
@@ -103,25 +84,15 @@ func TestMySQLDatabaseExists(t *testing.T) {
 	require.Equal(t, true, exists)
 }
 
-func TestMySQLDatabaseExists_Error(t *testing.T) {
-	drv := MySQLDriver{}
-	u := mySQLTestURL(t)
-	u.User = url.User("invalid")
-
-	exists, err := drv.DatabaseExists(u)
-	require.Regexp(t, "Access denied for user 'invalid'@", err.Error())
-	require.Equal(t, false, exists)
-}
-
-func TestMySQLCreateMigrationsTable(t *testing.T) {
-	drv := MySQLDriver{}
-	db := prepTestMySQLDB(t)
+func TestSQLiteCreateMigrationsTable(t *testing.T) {
+	drv := SQLiteDriver{}
+	db := prepTestSQLiteDB(t)
 	defer mustClose(db)
 
 	// migrations table should not exist
 	count := 0
 	err := db.QueryRow("select count(*) from schema_migrations").Scan(&count)
-	require.Regexp(t, "Table 'dbmate.schema_migrations' doesn't exist", err.Error())
+	require.Regexp(t, "no such table: schema_migrations", err.Error())
 
 	// create table
 	err = drv.CreateMigrationsTable(db)
@@ -136,9 +107,9 @@ func TestMySQLCreateMigrationsTable(t *testing.T) {
 	require.Nil(t, err)
 }
 
-func TestMySQLSelectMigrations(t *testing.T) {
-	drv := MySQLDriver{}
-	db := prepTestMySQLDB(t)
+func TestSQLiteSelectMigrations(t *testing.T) {
+	drv := SQLiteDriver{}
+	db := prepTestSQLiteDB(t)
 	defer mustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
@@ -162,9 +133,9 @@ func TestMySQLSelectMigrations(t *testing.T) {
 	require.Equal(t, false, migrations["abc2"])
 }
 
-func TestMySQLInsertMigration(t *testing.T) {
-	drv := MySQLDriver{}
-	db := prepTestMySQLDB(t)
+func TestSQLiteInsertMigration(t *testing.T) {
+	drv := SQLiteDriver{}
+	db := prepTestSQLiteDB(t)
 	defer mustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
@@ -185,9 +156,9 @@ func TestMySQLInsertMigration(t *testing.T) {
 	require.Equal(t, 1, count)
 }
 
-func TestMySQLDeleteMigration(t *testing.T) {
-	drv := MySQLDriver{}
-	db := prepTestMySQLDB(t)
+func TestSQLiteDeleteMigration(t *testing.T) {
+	drv := SQLiteDriver{}
+	db := prepTestSQLiteDB(t)
 	defer mustClose(db)
 
 	err := drv.CreateMigrationsTable(db)

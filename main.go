@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/amacneil/dbmate/pkg"
 	"github.com/joho/godotenv"
 	"github.com/urfave/cli"
 )
@@ -25,7 +26,7 @@ func NewApp() *cli.App {
 	app := cli.NewApp()
 	app.Name = "dbmate"
 	app.Usage = "A lightweight, framework-independent database migration tool."
-	app.Version = Version
+	app.Version = pkg.Version
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
@@ -45,33 +46,33 @@ func NewApp() *cli.App {
 			Name:    "new",
 			Aliases: []string{"n"},
 			Usage:   "Generate a new migration file",
-			Action:  NewCommand,
+			Action:  pkg.NewCommand,
 		},
 		{
 			Name:   "up",
 			Usage:  "Create database (if necessary) and migrate to the latest version",
-			Action: UpCommand,
+			Action: pkg.UpCommand,
 		},
 		{
 			Name:   "create",
 			Usage:  "Create database",
-			Action: CreateCommand,
+			Action: pkg.CreateCommand,
 		},
 		{
 			Name:   "drop",
 			Usage:  "Drop database (if it exists)",
-			Action: DropCommand,
+			Action: pkg.DropCommand,
 		},
 		{
 			Name:   "migrate",
 			Usage:  "Migrate to the latest version",
-			Action: MigrateCommand,
+			Action: pkg.MigrateCommand,
 		},
 		{
 			Name:    "rollback",
 			Aliases: []string{"down"},
 			Usage:   "Rollback the most recent migration",
-			Action:  RollbackCommand,
+			Action:  pkg.RollbackCommand,
 		},
 	}
 

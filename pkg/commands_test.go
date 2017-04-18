@@ -1,4 +1,4 @@
-package main
+package pkg
 
 import (
 	"flag"
@@ -18,7 +18,7 @@ func testContext(t *testing.T, u *url.URL) *cli.Context {
 
 	// only chdir once, because testdata is relative to current directory
 	if testdataDir == "" {
-		testdataDir, err = filepath.Abs("./testdata")
+		testdataDir, err = filepath.Abs("../testdata")
 		require.Nil(t, err)
 
 		err = os.Chdir(testdataDir)
