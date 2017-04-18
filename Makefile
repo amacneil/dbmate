@@ -15,7 +15,7 @@ lint:
 	$(DC) run dbmate errcheck
 
 test:
-	$(DC) run dbmate go test -v
+	$(DC) run dbmate go test -v ./pkg/...
 
 build: clean
 	$(DC) run -e GOARCH=386   dbmate go build $(BUILD_FLAGS) -o dist/dbmate-linux-i386
