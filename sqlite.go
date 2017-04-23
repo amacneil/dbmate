@@ -1,4 +1,4 @@
-package main
+package dbmate
 
 import (
 	"database/sql"
@@ -7,7 +7,7 @@ import (
 	"os"
 	"regexp"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/mattn/go-sqlite3" // sqlite driver for database/sql
 )
 
 // SQLiteDriver provides top level database functions

@@ -1,4 +1,4 @@
-package main
+package dbmate
 
 import (
 	"database/sql"
@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strings"
 
-	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/go-sql-driver/mysql" // mysql driver for database/sql
 )
 
 // MySQLDriver provides top level database functions

@@ -1,4 +1,4 @@
-package main
+package dbmate
 
 import (
 	"database/sql"
@@ -10,18 +10,33 @@ import (
 	"regexp"
 	"sort"
 	"time"
-
-	"github.com/urfave/cli"
 )
 
-// UpCommand creates the database (if necessary) and runs migrations
-func UpCommand(ctx *cli.Context) error {
-	u, err := GetDatabaseURL(ctx)
-	if err != nil {
-		return err
-	}
+// DefaultMigrationsDir specifies default directory to find migration files
+var DefaultMigrationsDir = "./db/migrations"
 
-	drv, err := GetDriver(u.Scheme)
+// DB allows dbmate actions to be performed on a specified database
+type DB struct {
+	DatabaseURL   *url.URL
+	MigrationsDir string
+}
+
+// NewDB initializes a new dbmate database
+func NewDB(databaseURL *url.URL) *DB {
+	return &DB{
+		DatabaseURL:   databaseURL,
+		MigrationsDir: DefaultMigrationsDir,
+	}
+}
+
+// GetDriver loads the required database driver
+func (db *DB) GetDriver() (Driver, error) {
+	return GetDriver(db.DatabaseURL.Scheme)
+}
+
+// Up creates the database (if necessary) and runs migrations
+func (db *DB) Up() error {
+	drv, err := db.GetDriver()
 	if err != nil {
 		return err
 	}
@@ -29,71 +44,59 @@ func UpCommand(ctx *cli.Context) error {
 	// create database if it does not already exist
 	// skip this step if we cannot determine status
 	// (e.g. user does not have list database permission)
-	exists, err := drv.DatabaseExists(u)
+	exists, err := drv.DatabaseExists(db.DatabaseURL)
 	if err == nil && !exists {
-		if err := drv.CreateDatabase(u); err != nil {
+		if err := drv.CreateDatabase(db.DatabaseURL); err != nil {
 			return err
 		}
 	}
 
 	// migrate
-	return MigrateCommand(ctx)
+	return db.Migrate()
 }
 
-// CreateCommand creates the current database
-func CreateCommand(ctx *cli.Context) error {
-	u, err := GetDatabaseURL(ctx)
+// Create creates the current database
+func (db *DB) Create() error {
+	drv, err := db.GetDriver()
 	if err != nil {
 		return err
 	}
 
-	drv, err := GetDriver(u.Scheme)
-	if err != nil {
-		return err
-	}
-
-	return drv.CreateDatabase(u)
+	return drv.CreateDatabase(db.DatabaseURL)
 }
 
-// DropCommand drops the current database (if it exists)
-func DropCommand(ctx *cli.Context) error {
-	u, err := GetDatabaseURL(ctx)
+// Drop drops the current database (if it exists)
+func (db *DB) Drop() error {
+	drv, err := db.GetDriver()
 	if err != nil {
 		return err
 	}
 
-	drv, err := GetDriver(u.Scheme)
-	if err != nil {
-		return err
-	}
-
-	return drv.DropDatabase(u)
+	return drv.DropDatabase(db.DatabaseURL)
 }
 
 const migrationTemplate = "-- migrate:up\n\n\n-- migrate:down\n\n"
 
-// NewCommand creates a new migration file
-func NewCommand(ctx *cli.Context) error {
+// New creates a new migration file
+func (db *DB) New(name string) error {
 	// new migration name
 	timestamp := time.Now().UTC().Format("20060102150405")
-	name := ctx.Args().First()
 	if name == "" {
-		return fmt.Errorf("Please specify a name for the new migration.")
+		return fmt.Errorf("please specify a name for the new migration")
 	}
 	name = fmt.Sprintf("%s_%s.sql", timestamp, name)
 
 	// create migrations dir if missing
-	migrationsDir := ctx.GlobalString("migrations-dir")
-	if err := os.MkdirAll(migrationsDir, 0755); err != nil {
-		return fmt.Errorf("Unable to create directory `%s`.", migrationsDir)
+	if err := os.MkdirAll(db.MigrationsDir, 0755); err != nil {
+		return fmt.Errorf("unable to create directory `%s`", db.MigrationsDir)
 	}
 
 	// check file does not already exist
-	path := filepath.Join(migrationsDir, name)
+	path := filepath.Join(db.MigrationsDir, name)
 	fmt.Printf("Creating migration: %s\n", path)
 
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		return fmt.Errorf("File already exists")
+		return fmt.Errorf("file already exists")
 	}
 
 	// write new migration
@@ -109,14 +112,6 @@ func NewCommand(ctx *cli.Context) error {
 	}
 
 	return nil
-}
-
-// GetDatabaseURL returns the current environment database url
-func GetDatabaseURL(ctx *cli.Context) (u *url.URL, err error) {
-	env := ctx.GlobalString("env")
-	value := os.Getenv(env)
-
-	return url.Parse(value)
 }
 
 func doTransaction(db *sql.DB, txFunc func(Transaction) error) error {
@@ -136,50 +131,44 @@ func doTransaction(db *sql.DB, txFunc func(Transaction) error) error {
 	return tx.Commit()
 }
 
-func openDatabaseForMigration(ctx *cli.Context) (Driver, *sql.DB, error) {
-	u, err := GetDatabaseURL(ctx)
+func (db *DB) openDatabaseForMigration() (Driver, *sql.DB, error) {
+	drv, err := db.GetDriver()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	drv, err := GetDriver(u.Scheme)
+	sqlDB, err := drv.Open(db.DatabaseURL)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	db, err := drv.Open(u)
-	if err != nil {
+	if err := drv.CreateMigrationsTable(sqlDB); err != nil {
+		mustClose(sqlDB)
 		return nil, nil, err
 	}
 
-	if err := drv.CreateMigrationsTable(db); err != nil {
-		mustClose(db)
-		return nil, nil, err
-	}
-
-	return drv, db, nil
+	return drv, sqlDB, nil
 }
 
-// MigrateCommand migrates database to the latest version
-func MigrateCommand(ctx *cli.Context) error {
-	migrationsDir := ctx.GlobalString("migrations-dir")
+// Migrate migrates database to the latest version
+func (db *DB) Migrate() error {
 	re := regexp.MustCompile(`^\d.*\.sql$`)
-	files, err := findMigrationFiles(migrationsDir, re)
+	files, err := findMigrationFiles(db.MigrationsDir, re)
 	if err != nil {
 		return err
 	}
 
 	if len(files) == 0 {
-		return fmt.Errorf("No migration files found.")
+		return fmt.Errorf("no migration files found")
 	}
 
-	drv, db, err := openDatabaseForMigration(ctx)
+	drv, sqlDB, err := db.openDatabaseForMigration()
 	if err != nil {
 		return err
 	}
-	defer mustClose(db)
+	defer mustClose(sqlDB)
 
-	applied, err := drv.SelectMigrations(db, -1)
+	applied, err := drv.SelectMigrations(sqlDB, -1)
 	if err != nil {
 		return err
 	}
@@ -193,13 +182,13 @@ func MigrateCommand(ctx *cli.Context) error {
 
 		fmt.Printf("Applying: %s\n", filename)
 
-		migration, err := parseMigration(filepath.Join(migrationsDir, filename))
+		migration, err := parseMigration(filepath.Join(db.MigrationsDir, filename))
 		if err != nil {
 			return err
 		}
 
 		// begin transaction
-		err = doTransaction(db, func(tx Transaction) error {
+		err = doTransaction(sqlDB, func(tx Transaction) error {
 			// run actual migration
 			if _, err := tx.Exec(migration["up"]); err != nil {
 				return err
@@ -224,7 +213,7 @@ func MigrateCommand(ctx *cli.Context) error {
 func findMigrationFiles(dir string, re *regexp.Regexp) ([]string, error) {
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
-		return nil, fmt.Errorf("Could not find migrations directory `%s`.", dir)
+		return nil, fmt.Errorf("could not find migrations directory `%s`", dir)
 	}
 
 	matches := []string{}
@@ -260,7 +249,7 @@ func findMigrationFile(dir string, ver string) (string, error) {
 	}
 
 	if len(files) == 0 {
-		return "", fmt.Errorf("Can't find migration file: %s*.sql", ver)
+		return "", fmt.Errorf("can't find migration file: %s*.sql", ver)
 	}
 
 	return files[0], nil
@@ -307,15 +296,15 @@ func parseMigration(path string) (map[string]string, error) {
 	return migrations, nil
 }
 
-// RollbackCommand rolls back the most recent migration
-func RollbackCommand(ctx *cli.Context) error {
-	drv, db, err := openDatabaseForMigration(ctx)
+// Rollback rolls back the most recent migration
+func (db *DB) Rollback() error {
+	drv, sqlDB, err := db.openDatabaseForMigration()
 	if err != nil {
 		return err
 	}
-	defer mustClose(db)
+	defer mustClose(sqlDB)
 
-	applied, err := drv.SelectMigrations(db, 1)
+	applied, err := drv.SelectMigrations(sqlDB, 1)
 	if err != nil {
 		return err
 	}
@@ -326,24 +315,23 @@ func RollbackCommand(ctx *cli.Context) error {
 		latest = ver
 	}
 	if latest == "" {
-		return fmt.Errorf("Can't rollback: no migrations have been applied.")
+		return fmt.Errorf("can't rollback: no migrations have been applied")
 	}
 
-	migrationsDir := ctx.GlobalString("migrations-dir")
-	filename, err := findMigrationFile(migrationsDir, latest)
+	filename, err := findMigrationFile(db.MigrationsDir, latest)
 	if err != nil {
 		return err
 	}
 
 	fmt.Printf("Rolling back: %s\n", filename)
 
-	migration, err := parseMigration(filepath.Join(migrationsDir, filename))
+	migration, err := parseMigration(filepath.Join(db.MigrationsDir, filename))
 	if err != nil {
 		return err
 	}
 
 	// begin transaction
-	err = doTransaction(db, func(tx Transaction) error {
+	err = doTransaction(sqlDB, func(tx Transaction) error {
 		// rollback migration
 		if _, err := tx.Exec(migration["down"]); err != nil {
 			return err

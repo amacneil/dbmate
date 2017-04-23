@@ -1,4 +1,4 @@
-package main
+package dbmate
 
 import (
 	"database/sql"
@@ -33,7 +33,7 @@ func GetDriver(name string) (Driver, error) {
 	case "sqlite", "sqlite3":
 		return SQLiteDriver{}, nil
 	default:
-		return nil, fmt.Errorf("Unknown driver: %s", name)
+		return nil, fmt.Errorf("unknown driver: %s", name)
 	}
 }
 
