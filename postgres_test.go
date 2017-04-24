@@ -3,23 +3,14 @@ package main
 import (
 	"database/sql"
 	"net/url"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
 func postgresTestURL(t *testing.T) *url.URL {
-	str := os.Getenv("POSTGRES_PORT")
-	require.NotEmpty(t, str, "missing POSTGRES_PORT environment variable")
-
-	u, err := url.Parse(str)
+	u, err := url.Parse("postgres://postgres:postgres@postgres/dbmate?sslmode=disable")
 	require.Nil(t, err)
-
-	u.Scheme = "postgres"
-	u.User = url.User("postgres")
-	u.Path = "/dbmate"
-	u.RawQuery = "sslmode=disable"
 
 	return u
 }

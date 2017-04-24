@@ -7,7 +7,9 @@ clean:
 	rm -rf dist
 
 container:
+	$(DC) pull
 	$(DC) build
+	$(DC) up -d
 
 lint:
 	$(DC) run dbmate golint

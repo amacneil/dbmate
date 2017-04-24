@@ -1,13 +1,23 @@
-dbmate:
-  build: .
-  volumes:
-    - .:/go/src/github.com/amacneil/dbmate
-  links:
-    - mysql
-    - postgres
-mysql:
-  image: mysql:5.7
-  environment:
-    MYSQL_ROOT_PASSWORD: root
-postgres:
-  image: postgres:9.4
+version: '2.1'
+services:
+  dbmate:
+    build: .
+    volumes:
+      - .:/go/src/github.com/amacneil/dbmate
+    depends_on:
+      mysql:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  mysql:
+    image: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    healthcheck:
+      test: ["CMD", "mysqladmin", "status", "-proot"]
+
+  postgres:
+    image: postgres
+    healthcheck:
+      test: ["CMD", "pg_isready"]
