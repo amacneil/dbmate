@@ -2,6 +2,12 @@ sudo: required
 services:
   - docker
 install:
+  - curl -fsSL https://github.com/docker/compose/releases/download/1.12.0/docker-compose-`uname -s`-`uname -m` > docker-compose
+  - chmod +x docker-compose
+  - sudo mv docker-compose /usr/local/bin/docker-compose
+  - docker-compose version
+  - docker-compose pull
+  - docker-compose build
   - docker-compose up -d
   - docker-compose run dbmate go version
 script:

@@ -3,22 +3,14 @@ package main
 import (
 	"database/sql"
 	"net/url"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
 func mySQLTestURL(t *testing.T) *url.URL {
-	str := os.Getenv("MYSQL_PORT")
-	require.NotEmpty(t, str, "missing MYSQL_PORT environment variable")
-
-	u, err := url.Parse(str)
+	u, err := url.Parse("mysql://root:root@mysql:3306/dbmate")
 	require.Nil(t, err)
-
-	u.Scheme = "mysql"
-	u.User = url.UserPassword("root", "root")
-	u.Path = "/dbmate"
 
 	return u
 }
