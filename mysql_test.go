@@ -9,7 +9,7 @@ import (
 )
 
 func mySQLTestURL(t *testing.T) *url.URL {
-	u, err := url.Parse("mysql://root:root@mysql:3306/dbmate")
+	u, err := url.Parse("mysql://root:root@mysql/dbmate")
 	require.Nil(t, err)
 
 	return u
@@ -32,6 +32,24 @@ func prepTestMySQLDB(t *testing.T) *sql.DB {
 	require.Nil(t, err)
 
 	return db
+}
+
+func TestNormalizeMySQLURLDefaults(t *testing.T) {
+	u, err := url.Parse("mysql://host/foo")
+	require.Nil(t, err)
+	require.Equal(t, "", u.Port())
+
+	s := normalizeMySQLURL(u)
+	require.Equal(t, "tcp(host:3306)/foo?multiStatements=true", s)
+}
+
+func TestNormalizeMySQLURLCustom(t *testing.T) {
+	u, err := url.Parse("mysql://bob:secret@host:123/foo?flag=on")
+	require.Nil(t, err)
+	require.Equal(t, "123", u.Port())
+
+	s := normalizeMySQLURL(u)
+	require.Equal(t, "bob:secret@tcp(host:123)/foo?flag=on&multiStatements=true", s)
 }
 
 func TestMySQLCreateDropDatabase(t *testing.T) {

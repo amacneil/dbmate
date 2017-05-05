@@ -16,6 +16,13 @@ type MySQLDriver struct {
 func normalizeMySQLURL(u *url.URL) string {
 	normalizedURL := *u
 	normalizedURL.Scheme = ""
+
+	// set default port
+	if normalizedURL.Port() == "" {
+		normalizedURL.Host = fmt.Sprintf("%s:3306", normalizedURL.Host)
+	}
+
+	// host format required by go-sql-driver/mysql
 	normalizedURL.Host = fmt.Sprintf("tcp(%s)", normalizedURL.Host)
 
 	query := normalizedURL.Query()
