@@ -1,4 +1,4 @@
-FROM golang:1.8.0
+FROM golang:1.8
 
 # required to force cgo (for sqlite driver) with cross compile
 ENV CGO_ENABLED 1
@@ -19,6 +19,6 @@ COPY . $GOPATH/src/github.com/amacneil/dbmate
 WORKDIR $GOPATH/src/github.com/amacneil/dbmate
 
 # build
-RUN go install -v
+RUN go install -v ./cmd/dbmate
 
 CMD dbmate
