@@ -1,7 +1,8 @@
 # Dbmate
 
 [![Build Status](https://travis-ci.org/amacneil/dbmate.svg?branch=master)](https://travis-ci.org/amacneil/dbmate)
-[![GitHub release](https://img.shields.io/github/release/amacneil/dbmate.svg)](https://github.com/amacneil/dbmate/releases)
+[![Go Report Card](https://goreportcard.com/badge/github.com/amacneil/dbmate)](https://goreportcard.com/report/github.com/amacneil/dbmate)
+[![GitHub Release](https://img.shields.io/github/release/amacneil/dbmate.svg)](https://github.com/amacneil/dbmate/releases)
 [![Documentation](https://readthedocs.org/projects/dbmate/badge/)](http://dbmate.readthedocs.org/)
 
 Dbmate is a database migration tool, to keep your database schema in sync across multiple developers and your production servers.
