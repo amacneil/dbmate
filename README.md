@@ -1,10 +1,15 @@
 # Dbmate
 
 [![Build Status](https://travis-ci.org/amacneil/dbmate.svg?branch=master)](https://travis-ci.org/amacneil/dbmate)
-[![GitHub release](https://img.shields.io/github/release/amacneil/dbmate.svg)](https://github.com/amacneil/dbmate/releases)
+[![Go Report Card](https://goreportcard.com/badge/github.com/amacneil/dbmate)](https://goreportcard.com/report/github.com/amacneil/dbmate)
+[![GitHub Release](https://img.shields.io/github/release/amacneil/dbmate.svg)](https://github.com/amacneil/dbmate/releases)
 [![Documentation](https://readthedocs.org/projects/dbmate/badge/)](http://dbmate.readthedocs.org/)
 
-Dbmate is a database migration tool, to keep your database schema in sync across multiple developers and your production servers. It is a standalone command line tool, which can be used with any language or framework. This is especially helpful if you are writing many services in different languages, and want to maintain some sanity with consistent development tools.
+Dbmate is a database migration tool, to keep your database schema in sync across multiple developers and your production servers.
+
+It is a standalone command line tool, which can be used with Go, Node.js, Python, Ruby, PHP, or any other language or framework you are using to write database-backed applications. This is especially helpful if you are writing many services in different languages, and want to maintain some sanity with consistent development tools.
+
+For a comparison between dbmate and other popular database schema migration tools, please see the [Alternatives](#alternatives) table.
 
 ## Features
 
@@ -216,6 +221,29 @@ Applying: 20151127184807_create_users_table.sql
 **How do I use dbmate under Alpine linux?**
 
 Alpine linux uses [musl libc](https://www.musl-libc.org/), which is incompatible with how we build SQLite support (using [cgo](https://golang.org/cmd/cgo/)). If you want Alpine linux support, and don't mind sacrificing SQLite support, please use the `dbmate-linux-musl-amd64` build found on the [releases page](https://github.com/amacneil/dbmate/releases).
+
+## Alternatives
+
+Why another database schema migration tool? Dbmate was inspired by many other tools, primarily [Rails' ActiveRecord](http://guides.rubyonrails.org/active_record_migrations.html), with the goals of being trivial to configure, and language & framework independent. Here is a comparison between dbmate and other popular migration tools.
+
+| | [goose](https://bitbucket.org/liamstask/goose/) | [sql-migrate](https://github.com/rubenv/sql-migrate) | [mattes/migrate](https://github.com/mattes/migrate) | [activerecord](http://guides.rubyonrails.org/active_record_migrations.html) | [sequelize](http://docs.sequelizejs.com/manual/tutorial/migrations.html) | [dbmate](https://github.com/amacneil/dbmate) |
+| --- |:---:|:---:|:---:|:---:|:---:|:---:|
+| **Features** |||||||
+|Plain SQL migration files|:white_check_mark:|:white_check_mark:|:white_check_mark:|||:white_check_mark:|
+|Support for creating and dropping databases||||:white_check_mark:||:white_check_mark:|
+|Timestamp-versioned migration files|:white_check_mark:|||:white_check_mark:|:white_check_mark:|:white_check_mark:|
+|Database connection string loaded from environment variables||||||:white_check_mark:|
+|Automatically load .env file||||||:white_check_mark:|
+|No separate configuration file||||:white_check_mark:|:white_check_mark:|:white_check_mark:|
+|Language/framework independent|:eight_pointed_black_star:|:eight_pointed_black_star:|:eight_pointed_black_star:|||:white_check_mark:|
+| **Drivers** |||||||
+|PostgreSQL|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
+|MySQL|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
+|SQLite|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
+
+> :eight_pointed_black_star: In theory these tools could be used with other languages, but a Go development environment is required because binary builds are not provided.
+
+*If you notice any inaccuracies in this table, please [propose a change](https://github.com/amacneil/dbmate/edit/master/README.md).*
 
 ## Contributing
 
