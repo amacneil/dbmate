@@ -223,7 +223,7 @@ Alpine linux uses [musl libc](https://www.musl-libc.org/), which is incompatible
 
 ## Alternatives
 
-Why another database schema migration tool? Dbmate was inspired by many other tools, primarily [Rails' ActiveRecord](http://guides.rubyonrails.org/active_record_migrations.html), with the goals of being trivial to configure, and language & framework independent. Here is a comparison between dbmate and other migration tools.
+Why another database schema migration tool? Dbmate was inspired by many other tools, primarily [Rails' ActiveRecord](http://guides.rubyonrails.org/active_record_migrations.html), with the goals of being trivial to configure, and language & framework independent. Here is a comparison between dbmate and other popular migration tools.
 
 | | [goose](https://bitbucket.org/liamstask/goose/) | [sql-migrate](https://github.com/rubenv/sql-migrate) | [mattes/migrate](https://github.com/mattes/migrate) | [activerecord](http://guides.rubyonrails.org/active_record_migrations.html) | [sequelize](http://docs.sequelizejs.com/manual/tutorial/migrations.html) | [dbmate](https://github.com/amacneil/dbmate) |
 | --- |:---:|:---:|:---:|:---:|:---:|:---:|
