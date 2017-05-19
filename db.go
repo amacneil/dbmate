@@ -15,10 +15,14 @@ import (
 // DefaultMigrationsDir specifies default directory to find migration files
 var DefaultMigrationsDir = "./db/migrations"
 
+// DefaultProject specifies the default name to associate with the migrations
+var DefaultProject = "default"
+
 // DB allows dbmate actions to be performed on a specified database
 type DB struct {
 	DatabaseURL   *url.URL
 	MigrationsDir string
+	Project       string
 }
 
 // NewDB initializes a new dbmate database
@@ -26,6 +30,7 @@ func NewDB(databaseURL *url.URL) *DB {
 	return &DB{
 		DatabaseURL:   databaseURL,
 		MigrationsDir: DefaultMigrationsDir,
+		Project:       DefaultProject,
 	}
 }
 
@@ -168,7 +173,7 @@ func (db *DB) Migrate() error {
 	}
 	defer mustClose(sqlDB)
 
-	applied, err := drv.SelectMigrations(sqlDB, -1)
+	applied, err := drv.SelectMigrations(sqlDB, -1, db.Project)
 	if err != nil {
 		return err
 	}
@@ -195,7 +200,7 @@ func (db *DB) Migrate() error {
 			}
 
 			// record migration
-			if err := drv.InsertMigration(tx, ver); err != nil {
+			if err := drv.InsertMigration(tx, ver, db.Project); err != nil {
 				return err
 			}
 
@@ -304,7 +309,7 @@ func (db *DB) Rollback() error {
 	}
 	defer mustClose(sqlDB)
 
-	applied, err := drv.SelectMigrations(sqlDB, 1)
+	applied, err := drv.SelectMigrations(sqlDB, 1, db.Project)
 	if err != nil {
 		return err
 	}

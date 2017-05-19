@@ -73,18 +73,28 @@ func (drv SQLiteDriver) DatabaseExists(u *url.URL) (bool, error) {
 func (drv SQLiteDriver) CreateMigrationsTable(db *sql.DB) error {
 	_, err := db.Exec(`create table if not exists schema_migrations (
 		version varchar(255) primary key)`)
+	if err != nil {
+		return err
+	}
+
+	// Add the project column if it doesn't already exist.
+	_, err = db.Exec(`select project from schema_migrations limit 1`)
+	if err != nil {
+		_, err = db.Exec(`alter table schema_migrations
+			add column project varchar(255) default 'default'`)
+	}
 
 	return err
 }
 
 // SelectMigrations returns a list of applied migrations
 // with an optional limit (in descending order)
-func (drv SQLiteDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
-	query := "select version from schema_migrations order by version desc"
+func (drv SQLiteDriver) SelectMigrations(db *sql.DB, limit int, project string) (map[string]bool, error) {
+	query := "select version from schema_migrations where project = ? order by version desc"
 	if limit >= 0 {
 		query = fmt.Sprintf("%s limit %d", query, limit)
 	}
-	rows, err := db.Query(query)
+	rows, err := db.Query(query, project)
 	if err != nil {
 		return nil, err
 	}
@@ -105,8 +115,8 @@ func (drv SQLiteDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool
 }
 
 // InsertMigration adds a new migration record
-func (drv SQLiteDriver) InsertMigration(db Transaction, version string) error {
-	_, err := db.Exec("insert into schema_migrations (version) values (?)", version)
+func (drv SQLiteDriver) InsertMigration(db Transaction, version string, project string) error {
+	_, err := db.Exec("insert into schema_migrations (version, project) values (?, ?)", version, project)
 
 	return err
 }

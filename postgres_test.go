@@ -140,18 +140,29 @@ func TestPostgresSelectMigrations(t *testing.T) {
 		values ('abc2'), ('abc1'), ('abc3')`)
 	require.Nil(t, err)
 
-	migrations, err := drv.SelectMigrations(db, -1)
+	migrations, err := drv.SelectMigrations(db, -1, "default")
 	require.Nil(t, err)
+	require.Equal(t, true, migrations["abc3"])
 	require.Equal(t, true, migrations["abc1"])
-	require.Equal(t, true, migrations["abc2"])
 	require.Equal(t, true, migrations["abc2"])
 
 	// test limit param
-	migrations, err = drv.SelectMigrations(db, 1)
+	migrations, err = drv.SelectMigrations(db, 1, "default")
 	require.Nil(t, err)
 	require.Equal(t, true, migrations["abc3"])
 	require.Equal(t, false, migrations["abc1"])
 	require.Equal(t, false, migrations["abc2"])
+
+	// test different project
+	_, err = db.Exec(`insert into schema_migrations (version, project)
+		values ('bcd1', 'app2')`)
+	require.Nil(t, err)
+	migrations, err = drv.SelectMigrations(db, -1, "app2")
+	require.Nil(t, err)
+	require.Equal(t, true, migrations["bcd1"])
+	require.Equal(t, false, migrations["abc1"])
+	require.Equal(t, false, migrations["abc2"])
+	require.Equal(t, false, migrations["abc3"])
 }
 
 func TestPostgresInsertMigration(t *testing.T) {
@@ -168,7 +179,7 @@ func TestPostgresInsertMigration(t *testing.T) {
 	require.Equal(t, 0, count)
 
 	// insert migration
-	err = drv.InsertMigration(db, "abc1")
+	err = drv.InsertMigration(db, "abc1", "default")
 	require.Nil(t, err)
 
 	err = db.QueryRow("select count(*) from schema_migrations where version = 'abc1'").

@@ -198,6 +198,7 @@ Rolling back: 20151127184807_create_users_table.sql
 The following command line options are available with all commands. You must use command line arguments in the order `dbmate [global options] command [command options]`.
 
 * `--migrations-dir, -d "./db/migrations"` - where to keep the migration files.
+* `--project, -p "project-name"` - a name under which to associate the set of migrations. defaults to 'default'
 * `--env, -e "DATABASE_URL"` - specify an environment variable to read the database connection URL from.
 
 For example, before running your test suite, you may wish to drop and recreate the test database. One easy way to do this is to store your test database connection URL in the `TEST_DATABASE_URL` environment variable:
