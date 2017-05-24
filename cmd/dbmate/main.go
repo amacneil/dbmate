@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/turnitin/dbmate"
 	"github.com/joho/godotenv"
+	"github.com/turnitin/dbmate"
 	"github.com/urfave/cli"
 )
 
@@ -41,7 +41,7 @@ func NewApp() *cli.App {
 			Usage: "specify an environment variable containing the database URL",
 		},
 		cli.StringFlag{
-			Name: "project, p",
+			Name:  "project, p",
 			Value: "default",
 			Usage: "specify a name to associate with the migration set",
 		},
