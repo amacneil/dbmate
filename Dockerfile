@@ -15,8 +15,8 @@ RUN go get \
 	github.com/kisielk/errcheck
 
 # copy source files
-COPY . $GOPATH/src/github.com/amacneil/dbmate
-WORKDIR $GOPATH/src/github.com/amacneil/dbmate
+COPY . $GOPATH/src/github.com/turnitin/dbmate
+WORKDIR $GOPATH/src/github.com/turnitin/dbmate
 
 # build
 RUN go install -v ./cmd/dbmate

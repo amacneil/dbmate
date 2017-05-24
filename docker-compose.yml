@@ -3,7 +3,7 @@ services:
   dbmate:
     build: .
     volumes:
-      - .:/go/src/github.com/amacneil/dbmate
+      - .:/go/src/github.com/turnitin/dbmate
     depends_on:
       mysql:
         condition: service_healthy
