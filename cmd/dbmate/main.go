@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/amacneil/dbmate"
+	"github.com/turnitin/dbmate"
 	"github.com/joho/godotenv"
 	"github.com/urfave/cli"
 )
