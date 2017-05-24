@@ -13,6 +13,7 @@ container:
 	$(DC) up -d
 
 lint:
+	$(DC) run dbmate python lint-gofmt.py
 	$(DC) run dbmate golint -set_exit_status $(PACKAGES)
 	$(DC) run dbmate go vet $(PACKAGES)
 	$(DC) run dbmate errcheck $(PACKAGES)
