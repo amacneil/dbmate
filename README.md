@@ -1,8 +1,11 @@
 # Dbmate
 
-[![Build Status](https://travis-ci.org/amacneil/dbmate.svg?branch=master)](https://travis-ci.org/amacneil/dbmate)
-[![Go Report Card](https://goreportcard.com/badge/github.com/amacneil/dbmate)](https://goreportcard.com/report/github.com/amacneil/dbmate)
-[![GitHub Release](https://img.shields.io/github/release/amacneil/dbmate.svg)](https://github.com/amacneil/dbmate/releases)
+This project was forked from [amacneil/dbmate](https://github.com/amacneil/dbmate)
+Note that this README still needs to be updated to reflect various changes (especially with regard to homebrew and releases).
+
+[![Build Status](https://travis-ci.org/turnitin/dbmate.svg?branch=master)](https://travis-ci.org/turnitin/dbmate)
+[![Go Report Card](https://goreportcard.com/badge/github.com/turnitin/dbmate)](https://goreportcard.com/report/github.com/turnitin/dbmate)
+[![GitHub Release](https://img.shields.io/github/release/turnitin/dbmate.svg)](https://github.com/turnitin/dbmate/releases)
 [![Documentation](https://readthedocs.org/projects/dbmate/badge/)](http://dbmate.readthedocs.org/)
 
 Dbmate is a database migration tool, to keep your database schema in sync across multiple developers and your production servers.
@@ -66,7 +69,7 @@ $ heroku run bin/dbmate-heroku up
 Dbmate can be installed directly using `go get`:
 
 ```sh
-$ go get -u github.com/amacneil/dbmate
+$ go get -u github.com/turnitin/dbmate
 ```
 
 ## Commands
@@ -198,6 +201,7 @@ Rolling back: 20151127184807_create_users_table.sql
 The following command line options are available with all commands. You must use command line arguments in the order `dbmate [global options] command [command options]`.
 
 * `--migrations-dir, -d "./db/migrations"` - where to keep the migration files.
+* `--project, -p "project-name"` - a name under which to associate the set of migrations. defaults to 'default'
 * `--env, -e "DATABASE_URL"` - specify an environment variable to read the database connection URL from.
 
 For example, before running your test suite, you may wish to drop and recreate the test database. One easy way to do this is to store your test database connection URL in the `TEST_DATABASE_URL` environment variable:
@@ -244,7 +248,7 @@ Why another database schema migration tool? Dbmate was inspired by many other to
 
 > :eight_pointed_black_star: In theory these tools could be used with other languages, but a Go development environment is required because binary builds are not provided.
 
-*If you notice any inaccuracies in this table, please [propose a change](https://github.com/amacneil/dbmate/edit/master/README.md).*
+*If you notice any inaccuracies in this table, please [propose a change](https://github.com/turnitin/dbmate/edit/master/README.md).*
 
 ## Contributing
 

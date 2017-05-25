@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/amacneil/dbmate"
 	"github.com/joho/godotenv"
+	"github.com/turnitin/dbmate"
 	"github.com/urfave/cli"
 )
 
@@ -39,6 +39,11 @@ func NewApp() *cli.App {
 			Name:  "env, e",
 			Value: "DATABASE_URL",
 			Usage: "specify an environment variable containing the database URL",
+		},
+		cli.StringFlag{
+			Name:  "project, p",
+			Value: "default",
+			Usage: "specify a name to associate with the migration set",
 		},
 	}
 
@@ -113,6 +118,7 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 		}
 		db := dbmate.NewDB(u)
 		db.MigrationsDir = c.GlobalString("migrations-dir")
+		db.Project = c.GlobalString("project")
 
 		return f(db, c)
 	}

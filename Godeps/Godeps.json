@@ -1,5 +1,5 @@
 {
-	"ImportPath": "github.com/amacneil/dbmate",
+	"ImportPath": "github.com/turnitin/dbmate",
 	"GoVersion": "go1.6",
 	"GodepVersion": "v74",
 	"Deps": [

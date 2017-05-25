@@ -1,8 +1,5 @@
 FROM golang:1.8
 
-# required to force cgo (for sqlite driver) with cross compile
-ENV CGO_ENABLED 1
-
 # i386 cross compilation
 RUN dpkg --add-architecture i386 && \
 	apt-get update && \
@@ -11,12 +8,13 @@ RUN dpkg --add-architecture i386 && \
 
 # development dependencies
 RUN go get \
+	github.com/mitchellh/gox \
 	github.com/golang/lint/golint \
 	github.com/kisielk/errcheck
 
 # copy source files
-COPY . $GOPATH/src/github.com/amacneil/dbmate
-WORKDIR $GOPATH/src/github.com/amacneil/dbmate
+COPY . $GOPATH/src/github.com/turnitin/dbmate
+WORKDIR $GOPATH/src/github.com/turnitin/dbmate
 
 # build
 RUN go install -v ./cmd/dbmate
