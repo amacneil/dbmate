@@ -22,7 +22,7 @@ test:
 	$(DC) run dbmate go test -v $(PACKAGES)
 
 build: clean
-	$(DC) run -e GOARCH=386   dbmate go build $(BUILD_FLAGS) -o dist/dbmate-linux-i386 ./cmd/dbmate
-	$(DC) run -e GOARCH=amd64 dbmate go build $(BUILD_FLAGS) -o dist/dbmate-linux-amd64 ./cmd/dbmate
-	# musl target does not support sqlite
-	$(DC) run -e GOARCH=amd64 -e CGO_ENABLED=0 dbmate go build $(BUILD_FLAGS) -o dist/dbmate-linux-musl-amd64 ./cmd/dbmate
+	$(DC) run dbmate gox --output "dist/{{.Dir}}-{{.OS}}-{{.Arch}}" -cgo -ldflags="-s" -osarch="linux/386" -osarch="linux/amd64" ./cmd/dbmate
+	# neither musl (alpine) nor darwin support cgo for sqlite driver because they
+	# use different C libraries.
+	$(DC) run dbmate gox --output "dist/{{.Dir}}-{{.OS}}-{{.Arch}}-nocgo" -ldflags="-s" -osarch="linux/amd64" -osarch="darwin/amd64" ./cmd/dbmate
