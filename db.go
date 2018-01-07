@@ -195,11 +195,7 @@ func (db *DB) Migrate() error {
 			}
 
 			// record migration
-			if err := drv.InsertMigration(tx, ver); err != nil {
-				return err
-			}
-
-			return nil
+			return drv.InsertMigration(tx, ver)
 		})
 		if err != nil {
 			return err
@@ -338,11 +334,7 @@ func (db *DB) Rollback() error {
 		}
 
 		// remove migration record
-		if err := drv.DeleteMigration(tx, latest); err != nil {
-			return err
-		}
-
-		return nil
+		return drv.DeleteMigration(tx, latest)
 	})
 	if err != nil {
 		return err
