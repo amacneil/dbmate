@@ -20,6 +20,6 @@ services:
       test: ["CMD", "mysqladmin", "status", "-proot"]
 
   postgres:
-    image: postgres
+    image: postgres:9.6
     healthcheck:
       test: ["CMD", "pg_isready"]

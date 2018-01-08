@@ -2,6 +2,7 @@ package dbmate
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -84,6 +85,11 @@ func (drv MySQLDriver) DropDatabase(u *url.URL) error {
 		quoteIdentifier(name)))
 
 	return err
+}
+
+// DumpSchema writes the current database schema to a file
+func (drv MySQLDriver) DumpSchema(u *url.URL) error {
+	return errors.New("not implemented")
 }
 
 // DatabaseExists determines whether the database exists

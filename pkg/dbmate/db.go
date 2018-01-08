@@ -15,17 +15,22 @@ import (
 // DefaultMigrationsDir specifies default directory to find migration files
 var DefaultMigrationsDir = "./db/migrations"
 
+// DefaultSchemaFile specifies default location for schema.sql
+var DefaultSchemaFile = "./db/schema.sql"
+
 // DB allows dbmate actions to be performed on a specified database
 type DB struct {
 	DatabaseURL   *url.URL
 	MigrationsDir string
+	SchemaFile    string
 }
 
-// NewDB initializes a new dbmate database
-func NewDB(databaseURL *url.URL) *DB {
+// New initializes a new dbmate database
+func New(databaseURL *url.URL) *DB {
 	return &DB{
 		DatabaseURL:   databaseURL,
 		MigrationsDir: DefaultMigrationsDir,
+		SchemaFile:    DefaultSchemaFile,
 	}
 }
 
@@ -34,8 +39,8 @@ func (db *DB) GetDriver() (Driver, error) {
 	return GetDriver(db.DatabaseURL.Scheme)
 }
 
-// Up creates the database (if necessary) and runs migrations
-func (db *DB) Up() error {
+// CreateAndMigrate creates the database (if necessary) and runs migrations
+func (db *DB) CreateAndMigrate() error {
 	drv, err := db.GetDriver()
 	if err != nil {
 		return err
@@ -55,8 +60,8 @@ func (db *DB) Up() error {
 	return db.Migrate()
 }
 
-// Create creates the current database
-func (db *DB) Create() error {
+// CreateDatabase creates the current database
+func (db *DB) CreateDatabase() error {
 	drv, err := db.GetDriver()
 	if err != nil {
 		return err
@@ -65,8 +70,8 @@ func (db *DB) Create() error {
 	return drv.CreateDatabase(db.DatabaseURL)
 }
 
-// Drop drops the current database (if it exists)
-func (db *DB) Drop() error {
+// DropDatabase drops the current database (if it exists)
+func (db *DB) DropDatabase() error {
 	drv, err := db.GetDriver()
 	if err != nil {
 		return err
@@ -75,10 +80,20 @@ func (db *DB) Drop() error {
 	return drv.DropDatabase(db.DatabaseURL)
 }
 
+// DumpSchema writes the current database schema to a file
+func (db *DB) DumpSchema() error {
+	drv, err := db.GetDriver()
+	if err != nil {
+		return err
+	}
+
+	return drv.DumpSchema(db.DatabaseURL)
+}
+
 const migrationTemplate = "-- migrate:up\n\n\n-- migrate:down\n\n"
 
-// New creates a new migration file
-func (db *DB) New(name string) error {
+// NewMigration creates a new migration file
+func (db *DB) NewMigration(name string) error {
 	// new migration name
 	timestamp := time.Now().UTC().Format("20060102150405")
 	if name == "" {

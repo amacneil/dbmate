@@ -23,7 +23,7 @@ func newTestDB(t *testing.T, u *url.URL) *DB {
 		require.Nil(t, err)
 	}
 
-	return NewDB(u)
+	return New(u)
 }
 
 func testURLs(t *testing.T) []*url.URL {
@@ -38,9 +38,9 @@ func testMigrateURL(t *testing.T, u *url.URL) {
 	db := newTestDB(t, u)
 
 	// drop and recreate database
-	err := db.Drop()
+	err := db.DropDatabase()
 	require.Nil(t, err)
-	err = db.Create()
+	err = db.CreateDatabase()
 	require.Nil(t, err)
 
 	// migrate
@@ -73,11 +73,11 @@ func testUpURL(t *testing.T, u *url.URL) {
 	db := newTestDB(t, u)
 
 	// drop database
-	err := db.Drop()
+	err := db.DropDatabase()
 	require.Nil(t, err)
 
 	// create and migrate
-	err = db.Up()
+	err = db.CreateAndMigrate()
 	require.Nil(t, err)
 
 	// verify results
@@ -106,9 +106,9 @@ func testRollbackURL(t *testing.T, u *url.URL) {
 	db := newTestDB(t, u)
 
 	// drop, recreate, and migrate database
-	err := db.Drop()
+	err := db.DropDatabase()
 	require.Nil(t, err)
-	err = db.Create()
+	err = db.CreateDatabase()
 	require.Nil(t, err)
 	err = db.Migrate()
 	require.Nil(t, err)

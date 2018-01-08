@@ -49,28 +49,28 @@ func NewApp() *cli.App {
 			Usage:   "Generate a new migration file",
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
 				name := c.Args().First()
-				return db.New(name)
+				return db.NewMigration(name)
 			}),
 		},
 		{
 			Name:  "up",
 			Usage: "Create database (if necessary) and migrate to the latest version",
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
-				return db.Up()
+				return db.CreateAndMigrate()
 			}),
 		},
 		{
 			Name:  "create",
 			Usage: "Create database",
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
-				return db.Create()
+				return db.CreateDatabase()
 			}),
 		},
 		{
 			Name:  "drop",
 			Usage: "Drop database (if it exists)",
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
-				return db.Drop()
+				return db.DropDatabase()
 			}),
 		},
 		{
@@ -86,6 +86,13 @@ func NewApp() *cli.App {
 			Usage:   "Rollback the most recent migration",
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
 				return db.Rollback()
+			}),
+		},
+		{
+			Name:  "dump",
+			Usage: "Dump the current database schema to file",
+			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				return db.DumpSchema()
 			}),
 		},
 	}
@@ -111,7 +118,7 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 		if err != nil {
 			return err
 		}
-		db := dbmate.NewDB(u)
+		db := dbmate.New(u)
 		db.MigrationsDir = c.GlobalString("migrations-dir")
 
 		return f(db, c)

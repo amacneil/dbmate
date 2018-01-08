@@ -2,6 +2,7 @@ package dbmate
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -54,6 +55,11 @@ func (drv SQLiteDriver) DropDatabase(u *url.URL) error {
 	}
 
 	return os.Remove(path)
+}
+
+// DumpSchema writes the current database schema to a file
+func (drv SQLiteDriver) DumpSchema(u *url.URL) error {
+	return errors.New("not implemented")
 }
 
 // DatabaseExists determines whether the database exists

@@ -1,9 +1,11 @@
 package dbmate
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
 	"net/url"
+	"os/exec"
 
 	"github.com/lib/pq"
 )
@@ -57,6 +59,24 @@ func (drv PostgresDriver) DropDatabase(u *url.URL) error {
 		pq.QuoteIdentifier(name)))
 
 	return err
+}
+
+// DumpSchema writes the current database schema to a file
+func (drv PostgresDriver) DumpSchema(u *url.URL) error {
+	fmt.Println("running pg_dump...")
+	cmd := exec.Command("pg_dump", "-Fp", "--no-acl", "--no-owner", u.String())
+	var out bytes.Buffer
+	var errout bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &errout
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("error running pg_dump: %s", errout.String())
+	}
+	fmt.Printf("pg_dump output: %q\n", out.String())
+	fmt.Printf("pg_dump errout: %q\n", errout.String())
+
+	return fmt.Errorf("error: not implemented")
 }
 
 // DatabaseExists determines whether the database exists
