@@ -1,6 +1,6 @@
 DC := docker-compose
 BUILD_FLAGS := -ldflags '-s'
-PACKAGES := . ./cmd/dbmate
+PACKAGES := ./cmd/... ./pkg/...
 
 all: clean container test lint build
 

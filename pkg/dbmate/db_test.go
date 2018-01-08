@@ -16,7 +16,7 @@ func newTestDB(t *testing.T, u *url.URL) *DB {
 
 	// only chdir once, because testdata is relative to current directory
 	if testdataDir == "" {
-		testdataDir, err = filepath.Abs("./testdata")
+		testdataDir, err = filepath.Abs("../../testdata")
 		require.Nil(t, err)
 
 		err = os.Chdir(testdataDir)
