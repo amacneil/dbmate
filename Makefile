@@ -13,14 +13,14 @@ container:
 	$(DC) up -d
 
 lint:
-	$(DC) run dbmate golint -set_exit_status $(PACKAGES)
-	$(DC) run dbmate go vet $(PACKAGES)
-	$(DC) run dbmate errcheck $(PACKAGES)
+	$(DC) run --rm dbmate golint -set_exit_status $(PACKAGES)
+	$(DC) run --rm dbmate go vet $(PACKAGES)
+	$(DC) run --rm dbmate errcheck $(PACKAGES)
 
 test:
-	$(DC) run dbmate go test -v $(PACKAGES)
+	$(DC) run --rm dbmate go test -v $(PACKAGES)
 
 build: clean
-	$(DC) run -e GOARCH=amd64 dbmate go build $(BUILD_FLAGS) -o dist/dbmate-linux-amd64 ./cmd/dbmate
+	$(DC) run --rm -e GOARCH=amd64 dbmate go build $(BUILD_FLAGS) -o dist/dbmate-linux-amd64 ./cmd/dbmate
 	# musl target does not support sqlite
-	$(DC) run -e GOARCH=amd64 -e CGO_ENABLED=0 dbmate go build $(BUILD_FLAGS) -o dist/dbmate-linux-musl-amd64 ./cmd/dbmate
+	$(DC) run --rm -e GOARCH=amd64 -e CGO_ENABLED=0 dbmate go build $(BUILD_FLAGS) -o dist/dbmate-linux-musl-amd64 ./cmd/dbmate

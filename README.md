@@ -42,6 +42,14 @@ $ sudo curl -fsSL -o /usr/local/bin/dbmate https://github.com/amacneil/dbmate/re
 $ sudo chmod +x /usr/local/bin/dbmate
 ```
 
+**Docker**
+
+You can run dbmate using the official docker image:
+
+```sh
+$ docker run --rm amacneil/dbmate --help
+```
+
 **Heroku**
 
 To use dbmate on Heroku, the easiest method is to store the linux binary in your git repository:
@@ -55,7 +63,7 @@ $ git commit -m "Add dbmate binary"
 $ git push heroku master
 ```
 
-You can now run dbmate on heroku:
+You can then run dbmate on heroku:
 
 ```sh
 $ heroku run bin/dbmate-heroku up

@@ -1,7 +1,9 @@
-version: '2.1'
+version: '2.3'
 services:
   dbmate:
-    build: .
+    build:
+      context: .
+      target: build
     volumes:
       - .:/go/src/github.com/amacneil/dbmate
     depends_on:
