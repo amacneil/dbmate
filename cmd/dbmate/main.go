@@ -31,14 +31,19 @@ func NewApp() *cli.App {
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
+			Name:  "env, e",
+			Value: "DATABASE_URL",
+			Usage: "specify an environment variable containing the database URL",
+		},
+		cli.StringFlag{
 			Name:  "migrations-dir, d",
 			Value: dbmate.DefaultMigrationsDir,
 			Usage: "specify the directory containing migration files",
 		},
 		cli.StringFlag{
-			Name:  "env, e",
-			Value: "DATABASE_URL",
-			Usage: "specify an environment variable containing the database URL",
+			Name:  "schema-file, s",
+			Value: dbmate.DefaultSchemaFile,
+			Usage: "specify the schema file location",
 		},
 	}
 
@@ -90,7 +95,7 @@ func NewApp() *cli.App {
 		},
 		{
 			Name:  "dump",
-			Usage: "Dump the current database schema to file",
+			Usage: "Write the database schema to disk",
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
 				return db.DumpSchema()
 			}),
@@ -120,6 +125,7 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 		}
 		db := dbmate.New(u)
 		db.MigrationsDir = c.GlobalString("migrations-dir")
+		db.SchemaFile = c.GlobalString("schema-file")
 
 		return f(db, c)
 	}
