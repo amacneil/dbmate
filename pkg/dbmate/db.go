@@ -82,12 +82,13 @@ func (db *DB) Drop() error {
 
 // DumpSchema writes the current database schema to a file
 func (db *DB) DumpSchema() error {
-	drv, err := db.GetDriver()
+	drv, sqlDB, err := db.openDatabaseForMigration()
 	if err != nil {
 		return err
 	}
+	defer mustClose(sqlDB)
 
-	schema, err := drv.DumpSchema(db.DatabaseURL)
+	schema, err := drv.DumpSchema(db.DatabaseURL, sqlDB)
 	if err != nil {
 		return err
 	}

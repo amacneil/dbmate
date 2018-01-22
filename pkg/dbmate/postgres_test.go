@@ -76,24 +76,32 @@ func TestPostgresDumpSchema(t *testing.T) {
 	drv := PostgresDriver{}
 	u := postgresTestURL(t)
 
-	// drop any existing database
-	err := drv.DropDatabase(u)
-	require.Nil(t, err)
-
-	// DumpSchema should fail
-	schema, err := drv.DumpSchema(u)
-	require.Nil(t, schema)
-	require.NotNil(t, err)
-	require.Equal(t, "pg_dump: [archiver (db)] connection to database \"dbmate\" failed: FATAL:  database \"dbmate\" does not exist", err.Error())
-
-	// create database
+	// prepare database
 	db := prepTestPostgresDB(t)
 	defer mustClose(db)
+	err := drv.CreateMigrationsTable(db)
+	require.Nil(t, err)
+
+	// insert migration
+	err = drv.InsertMigration(db, "abc1")
+	require.Nil(t, err)
 
 	// DumpSchema should return schema
-	schema, err = drv.DumpSchema(u)
+	schema, err := drv.DumpSchema(u, db)
 	require.Nil(t, err)
 	require.Contains(t, string(schema), "-- PostgreSQL database dump")
+	require.Contains(t, string(schema), "\n\n--\n-- Dbmate applied migrations\n--\n\n"+
+		"COPY schema_migrations (version) FROM stdin;\n"+
+		"abc1\n"+
+		"\\.\n")
+
+	// DumpSchema should return error if command fails
+	u.Path = "/fakedb"
+	schema, err = drv.DumpSchema(u, db)
+	require.Nil(t, schema)
+	require.NotNil(t, err)
+	require.Equal(t, "pg_dump: [archiver (db)] connection to database \"fakedb\" failed: "+
+		"FATAL:  database \"fakedb\" does not exist", err.Error())
 }
 
 func TestPostgresDatabaseExists(t *testing.T) {

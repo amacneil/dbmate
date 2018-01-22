@@ -94,24 +94,37 @@ func TestMySQLDumpSchema(t *testing.T) {
 	drv := MySQLDriver{}
 	u := mySQLTestURL(t)
 
-	// drop any existing database
-	err := drv.DropDatabase(u)
-	require.Nil(t, err)
-
-	// DumpSchema should fail
-	schema, err := drv.DumpSchema(u)
-	require.Nil(t, schema)
-	require.NotNil(t, err)
-	require.Equal(t, "mysqldump: Got error: 1049: \"Unknown database 'dbmate'\" when selecting the database", err.Error())
-
-	// create database
+	// prepare database
 	db := prepTestMySQLDB(t)
 	defer mustClose(db)
+	err := drv.CreateMigrationsTable(db)
+	require.Nil(t, err)
+
+	// insert migration
+	err = drv.InsertMigration(db, "abc1")
+	require.Nil(t, err)
 
 	// DumpSchema should return schema
-	schema, err = drv.DumpSchema(u)
+	schema, err := drv.DumpSchema(u, db)
 	require.Nil(t, err)
-	require.Contains(t, string(schema), "SET SQL_MODE=@OLD_SQL_MODE")
+	require.Contains(t, string(schema), "CREATE TABLE `schema_migrations`")
+	require.Contains(t, string(schema), "\n"+
+		"/*!40101 SET character_set_client = @saved_cs_client */;\n\n"+
+		"--\n-- Dbmate applied migrations\n--\n\n"+
+		"LOCK TABLES `schema_migrations` WRITE;\n"+
+		"/*!40000 ALTER TABLE `schema_migrations` DISABLE KEYS */;\n"+
+		"INSERT INTO `schema_migrations` VALUES ('abc1');\n"+
+		"/*!40000 ALTER TABLE `schema_migrations` ENABLE KEYS */;\n"+
+		"UNLOCK TABLES;\n\n"+
+		"/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;\n")
+
+	// DumpSchema should return error if command fails
+	u.Path = "/fakedb"
+	schema, err = drv.DumpSchema(u, db)
+	require.Nil(t, schema)
+	require.NotNil(t, err)
+	require.Equal(t, "mysqldump: Got error: 1049: \"Unknown database 'fakedb'\" "+
+		"when selecting the database", err.Error())
 }
 
 func TestMySQLDatabaseExists(t *testing.T) {

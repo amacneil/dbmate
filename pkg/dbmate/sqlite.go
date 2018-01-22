@@ -58,7 +58,7 @@ func (drv SQLiteDriver) DropDatabase(u *url.URL) error {
 }
 
 // DumpSchema returns the current database schema
-func (drv SQLiteDriver) DumpSchema(u *url.URL) ([]byte, error) {
+func (drv SQLiteDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -77,8 +77,8 @@ func (drv SQLiteDriver) DatabaseExists(u *url.URL) (bool, error) {
 
 // CreateMigrationsTable creates the schema_migrations table
 func (drv SQLiteDriver) CreateMigrationsTable(db *sql.DB) error {
-	_, err := db.Exec(`create table if not exists schema_migrations (
-		version varchar(255) primary key)`)
+	_, err := db.Exec("create table if not exists schema_migrations " +
+		"(version varchar(255) primary key)")
 
 	return err
 }
