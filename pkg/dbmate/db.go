@@ -87,7 +87,19 @@ func (db *DB) DumpSchema() error {
 		return err
 	}
 
-	return drv.DumpSchema(db.DatabaseURL)
+	schema, err := drv.DumpSchema(db.DatabaseURL)
+	if err != nil {
+		return err
+	}
+
+	// ensure schema directory exists
+	schemaDir := filepath.Dir(db.SchemaFile)
+	if err := os.MkdirAll(schemaDir, 0755); err != nil {
+		return fmt.Errorf("unable to create directory `%s`", schemaDir)
+	}
+
+	// write schema to file
+	return ioutil.WriteFile(db.SchemaFile, schema, 0644)
 }
 
 const migrationTemplate = "-- migrate:up\n\n\n-- migrate:down\n\n"

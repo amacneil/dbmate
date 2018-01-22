@@ -12,7 +12,7 @@ type Driver interface {
 	DatabaseExists(*url.URL) (bool, error)
 	CreateDatabase(*url.URL) error
 	DropDatabase(*url.URL) error
-	DumpSchema(*url.URL) error
+	DumpSchema(*url.URL) ([]byte, error)
 	CreateMigrationsTable(*sql.DB) error
 	SelectMigrations(*sql.DB, int) (map[string]bool, error)
 	InsertMigration(Transaction, string) error

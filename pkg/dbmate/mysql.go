@@ -88,8 +88,8 @@ func (drv MySQLDriver) DropDatabase(u *url.URL) error {
 }
 
 // DumpSchema writes the current database schema to a file
-func (drv MySQLDriver) DumpSchema(u *url.URL) error {
-	return errors.New("not implemented")
+func (drv MySQLDriver) DumpSchema(u *url.URL) ([]byte, error) {
+	return nil, errors.New("not implemented")
 }
 
 // DatabaseExists determines whether the database exists

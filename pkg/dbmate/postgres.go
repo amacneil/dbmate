@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os/exec"
+	"strings"
 
 	"github.com/lib/pq"
 )
@@ -62,21 +63,18 @@ func (drv PostgresDriver) DropDatabase(u *url.URL) error {
 }
 
 // DumpSchema writes the current database schema to a file
-func (drv PostgresDriver) DumpSchema(u *url.URL) error {
-	fmt.Println("running pg_dump...")
-	cmd := exec.Command("pg_dump", "-Fp", "--no-acl", "--no-owner", u.String())
-	var out bytes.Buffer
-	var errout bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &errout
-	err := cmd.Run()
-	if err != nil {
-		return fmt.Errorf("error running pg_dump: %s", errout.String())
-	}
-	fmt.Printf("pg_dump output: %q\n", out.String())
-	fmt.Printf("pg_dump errout: %q\n", errout.String())
+func (drv PostgresDriver) DumpSchema(u *url.URL) ([]byte, error) {
+	var stdout bytes.Buffer
+	cmd := exec.Command("pg_dump", "--format=plain", "--encoding=UTF8", "--schema-only",
+		"--no-acl", "--no-owner", u.String())
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stdout
 
-	return fmt.Errorf("error: not implemented")
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("error: %s", strings.TrimSpace(stdout.String()))
+	}
+
+	return stdout.Bytes(), nil
 }
 
 // DatabaseExists determines whether the database exists

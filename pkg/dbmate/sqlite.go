@@ -58,8 +58,8 @@ func (drv SQLiteDriver) DropDatabase(u *url.URL) error {
 }
 
 // DumpSchema writes the current database schema to a file
-func (drv SQLiteDriver) DumpSchema(u *url.URL) error {
-	return errors.New("not implemented")
+func (drv SQLiteDriver) DumpSchema(u *url.URL) ([]byte, error) {
+	return nil, errors.New("not implemented")
 }
 
 // DatabaseExists determines whether the database exists
