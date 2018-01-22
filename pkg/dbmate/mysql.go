@@ -88,10 +88,10 @@ func (drv MySQLDriver) DropDatabase(u *url.URL) error {
 	return err
 }
 
-// DumpSchema returns the current database schema
-func (drv MySQLDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
+func mysqldumpArgs(u *url.URL) []string {
 	// generate CLI arguments
-	args := []string{"--opt", "--no-data", "--skip-dump-date", "--skip-add-drop-table"}
+	args := []string{"--opt", "--routines", "--no-data",
+		"--skip-dump-date", "--skip-add-drop-table"}
 
 	if hostname := u.Hostname(); hostname != "" {
 		args = append(args, "--host="+hostname)
@@ -112,35 +112,60 @@ func (drv MySQLDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
 	// add database name
 	args = append(args, strings.TrimLeft(u.Path, "/"))
 
-	schema, err := runCommand("mysqldump", args...)
-	if err != nil {
-		return nil, err
-	}
+	return args
+}
 
+func mysqlSchemaMigrationsDump(db *sql.DB) ([]byte, error) {
 	// load applied migrations
-	rows, err := db.Query("select quote(version) from schema_migrations order by version desc")
+	// (can't use SelectMigrations because this version is quoted)
+	rows, err := db.Query("select quote(version) from schema_migrations " +
+		"order by version asc")
 	if err != nil {
 		return nil, err
 	}
 	defer mustClose(rows)
 
-	// build schema_migrations table data
-	var buf bytes.Buffer
-	buf.WriteString("\n--\n-- Dbmate applied migrations\n--\n\n" +
-		"LOCK TABLES `schema_migrations` WRITE;\n" +
-		"/*!40000 ALTER TABLE `schema_migrations` DISABLE KEYS */;\n")
-
+	// read into slice
+	var migrations []string
 	for rows.Next() {
 		var version string
 		if err := rows.Scan(&version); err != nil {
 			return nil, err
 		}
 
-		buf.WriteString(
-			fmt.Sprintf("INSERT INTO `schema_migrations` VALUES (%s);\n", version))
+		migrations = append(migrations, fmt.Sprintf("(%s)", version))
 	}
-	buf.WriteString("/*!40000 ALTER TABLE `schema_migrations` ENABLE KEYS */;\n" +
-		"UNLOCK TABLES;\n\n")
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// build schema_migrations table data
+	var buf bytes.Buffer
+	buf.WriteString("\n--\n-- Dbmate schema migrations\n--\n\n" +
+		"LOCK TABLES `schema_migrations` WRITE;\n")
+
+	if len(migrations) > 0 {
+		buf.WriteString("INSERT INTO `schema_migrations` VALUES\n  " +
+			strings.Join(migrations, ",\n  ") +
+			";\n")
+	}
+
+	buf.WriteString("UNLOCK TABLES;\n\n")
+
+	return buf.Bytes(), nil
+}
+
+// DumpSchema returns the current database schema
+func (drv MySQLDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
+	schema, err := runCommand("mysqldump", mysqldumpArgs(u)...)
+	if err != nil {
+		return nil, err
+	}
+
+	migrations, err := mysqlSchemaMigrationsDump(db)
+	if err != nil {
+		return nil, err
+	}
 
 	// insert migrations table data before client settings are restored
 	re := regexp.MustCompile(`(?m)^.*SET TIME_ZONE=@OLD_TIME_ZONE.*$`)
@@ -152,10 +177,10 @@ func (drv MySQLDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
 		}
 
 		matched = true
-		return append(buf.Bytes(), match...)
+		return append(migrations, match...)
 	})
 
-	return schema, nil
+	return trimLeadingSQLComments(schema)
 }
 
 // DatabaseExists determines whether the database exists

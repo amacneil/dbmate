@@ -85,14 +85,17 @@ func TestPostgresDumpSchema(t *testing.T) {
 	// insert migration
 	err = drv.InsertMigration(db, "abc1")
 	require.Nil(t, err)
+	err = drv.InsertMigration(db, "abc2")
+	require.Nil(t, err)
 
 	// DumpSchema should return schema
 	schema, err := drv.DumpSchema(u, db)
 	require.Nil(t, err)
 	require.Contains(t, string(schema), "-- PostgreSQL database dump")
-	require.Contains(t, string(schema), "\n\n--\n-- Dbmate applied migrations\n--\n\n"+
+	require.Contains(t, string(schema), "\n\n--\n-- Dbmate schema migrations\n--\n\n"+
 		"COPY schema_migrations (version) FROM stdin;\n"+
 		"abc1\n"+
+		"abc2\n"+
 		"\\.\n")
 
 	// DumpSchema should return error if command fails

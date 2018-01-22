@@ -103,18 +103,20 @@ func TestMySQLDumpSchema(t *testing.T) {
 	// insert migration
 	err = drv.InsertMigration(db, "abc1")
 	require.Nil(t, err)
+	err = drv.InsertMigration(db, "abc2")
+	require.Nil(t, err)
 
 	// DumpSchema should return schema
 	schema, err := drv.DumpSchema(u, db)
 	require.Nil(t, err)
 	require.Contains(t, string(schema), "CREATE TABLE `schema_migrations`")
-	require.Contains(t, string(schema), "\n"+
-		"/*!40101 SET character_set_client = @saved_cs_client */;\n\n"+
-		"--\n-- Dbmate applied migrations\n--\n\n"+
+	require.Contains(t, string(schema), "\n--\n"+
+		"-- Dumping routines for database 'dbmate'\n--\n\n"+
+		"--\n-- Dbmate schema migrations\n--\n\n"+
 		"LOCK TABLES `schema_migrations` WRITE;\n"+
-		"/*!40000 ALTER TABLE `schema_migrations` DISABLE KEYS */;\n"+
-		"INSERT INTO `schema_migrations` VALUES ('abc1');\n"+
-		"/*!40000 ALTER TABLE `schema_migrations` ENABLE KEYS */;\n"+
+		"INSERT INTO `schema_migrations` VALUES\n"+
+		"  ('abc1'),\n"+
+		"  ('abc2');\n"+
 		"UNLOCK TABLES;\n\n"+
 		"/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;\n")
 

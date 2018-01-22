@@ -1,6 +1,7 @@
 package dbmate
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -56,4 +57,39 @@ func runCommand(name string, args ...string) ([]byte, error) {
 
 	// return stdout
 	return stdout.Bytes(), nil
+}
+
+// trimLeadingSQLComments removes sql comments and blank lines from the beginning of text
+// generally when performing sql dumps these contain host-specific information such as
+// client/server version numbers
+func trimLeadingSQLComments(data []byte) ([]byte, error) {
+	// create decent size buffer
+	out := bytes.NewBuffer(make([]byte, 0, len(data)))
+
+	// iterate over sql lines
+	preamble := true
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	for scanner.Scan() {
+		// we read bytes directly for premature performance optimization
+		line := scanner.Bytes()
+
+		if preamble && (len(line) == 0 || bytes.Equal(line[0:2], []byte("--"))) {
+			// header section, skip this line in output buffer
+			continue
+		}
+
+		// header section is over, copy bytes to output buffer
+		preamble = false
+		if _, err := out.Write(line); err != nil {
+			return nil, err
+		}
+		if _, err := out.WriteString("\n"); err != nil {
+			return nil, err
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return out.Bytes(), nil
 }

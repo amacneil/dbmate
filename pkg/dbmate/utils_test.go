@@ -22,3 +22,14 @@ func TestDatabaseName_Empty(t *testing.T) {
 	name := databaseName(u)
 	require.Equal(t, "", name)
 }
+
+func TestTrimLeadingSQLComments(t *testing.T) {
+	in := "--\n" +
+		"-- foo\n\n" +
+		"-- bar\n\n" +
+		"real stuff\n" +
+		"-- end\n"
+	out, err := trimLeadingSQLComments([]byte(in))
+	require.Nil(t, err)
+	require.Equal(t, "real stuff\n-- end\n", string(out))
+}

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/url"
+	"sort"
 
 	"github.com/lib/pq"
 )
@@ -64,7 +65,7 @@ func (drv PostgresDriver) DropDatabase(u *url.URL) error {
 func (drv PostgresDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
 	// load schema
 	schema, err := runCommand("pg_dump", "--format=plain", "--encoding=UTF8",
-		"--schema-only", "--no-acl", "--no-owner", u.String())
+		"--schema-only", "--no-privileges", "--no-owner", u.String())
 	if err != nil {
 		return nil, err
 	}
@@ -75,15 +76,23 @@ func (drv PostgresDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
 		return nil, err
 	}
 
+	// write in ascending order
+	// TODO: faster to SelectMigrations in correct order
 	buf := bytes.NewBuffer(schema)
-	buf.WriteString("\n--\n-- Dbmate applied migrations\n--\n\n" +
+	buf.WriteString("\n--\n-- Dbmate schema migrations\n--\n\n" +
 		"COPY schema_migrations (version) FROM stdin;\n")
+
+	migrations := make([]string, 0, len(applied))
 	for k := range applied {
-		buf.WriteString(fmt.Sprintf("%s\n", k))
+		migrations = append(migrations, k)
+	}
+	sort.Strings(migrations)
+	for _, v := range migrations {
+		buf.WriteString(fmt.Sprintf("%s\n", v))
 	}
 	buf.WriteString("\\.\n")
 
-	return buf.Bytes(), nil
+	return trimLeadingSQLComments(buf.Bytes())
 }
 
 // DatabaseExists determines whether the database exists
