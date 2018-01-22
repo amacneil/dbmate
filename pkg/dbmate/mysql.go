@@ -89,7 +89,7 @@ func (drv MySQLDriver) DropDatabase(u *url.URL) error {
 // DumpSchema returns the current database schema
 func (drv MySQLDriver) DumpSchema(u *url.URL) ([]byte, error) {
 	// generate CLI arguments
-	args := []string{"--no-data", "--skip-comments"}
+	args := []string{"--no-data", "--skip-comments", "--skip-add-drop-table"}
 
 	if hostname := u.Hostname(); hostname != "" {
 		args = append(args, "--host="+hostname)
