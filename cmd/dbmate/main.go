@@ -63,14 +63,14 @@ func NewApp() *cli.App {
 			Name:  "create",
 			Usage: "Create database",
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
-				return db.CreateDatabase()
+				return db.Create()
 			}),
 		},
 		{
 			Name:  "drop",
 			Usage: "Drop database (if it exists)",
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
-				return db.DropDatabase()
+				return db.Drop()
 			}),
 		},
 		{

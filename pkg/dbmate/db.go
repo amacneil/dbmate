@@ -60,8 +60,8 @@ func (db *DB) CreateAndMigrate() error {
 	return db.Migrate()
 }
 
-// CreateDatabase creates the current database
-func (db *DB) CreateDatabase() error {
+// Create creates the current database
+func (db *DB) Create() error {
 	drv, err := db.GetDriver()
 	if err != nil {
 		return err
@@ -70,8 +70,8 @@ func (db *DB) CreateDatabase() error {
 	return drv.CreateDatabase(db.DatabaseURL)
 }
 
-// DropDatabase drops the current database (if it exists)
-func (db *DB) DropDatabase() error {
+// Drop drops the current database (if it exists)
+func (db *DB) Drop() error {
 	drv, err := db.GetDriver()
 	if err != nil {
 		return err
