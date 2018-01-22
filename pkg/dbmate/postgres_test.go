@@ -72,6 +72,31 @@ func TestPostgresCreateDropDatabase(t *testing.T) {
 	}()
 }
 
+func TestPostgresDumpSchema(t *testing.T) {
+	drv := PostgresDriver{}
+	u := postgresTestURL(t)
+
+	// drop any existing database
+	err := drv.DropDatabase(u)
+	require.Nil(t, err)
+
+	// DumpSchema should fail
+	schema, err := drv.DumpSchema(u)
+	require.Nil(t, schema)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "error: pg_dump:")
+	require.Contains(t, err.Error(), "database \"dbmate\" does not exist")
+
+	// create database
+	db := prepTestPostgresDB(t)
+	defer mustClose(db)
+
+	// DumpSchema should return schema
+	schema, err = drv.DumpSchema(u)
+	require.Nil(t, err)
+	require.Contains(t, string(schema), "-- PostgreSQL database dump")
+}
+
 func TestPostgresDatabaseExists(t *testing.T) {
 	drv := PostgresDriver{}
 	u := postgresTestURL(t)
