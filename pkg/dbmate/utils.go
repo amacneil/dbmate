@@ -3,8 +3,10 @@ package dbmate
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -19,10 +21,20 @@ func databaseName(u *url.URL) string {
 	return name
 }
 
+// mustClose ensures a stream is closed
 func mustClose(c io.Closer) {
 	if err := c.Close(); err != nil {
 		panic(err)
 	}
+}
+
+// ensureDir creates a directory if it does not already exist
+func ensureDir(dir string) error {
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("unable to create directory `%s`", dir)
+	}
+
+	return nil
 }
 
 // runCommand runs a command and returns the stdout if successful

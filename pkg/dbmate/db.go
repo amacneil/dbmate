@@ -93,9 +93,8 @@ func (db *DB) DumpSchema() error {
 	}
 
 	// ensure schema directory exists
-	schemaDir := filepath.Dir(db.SchemaFile)
-	if err := os.MkdirAll(schemaDir, 0755); err != nil {
-		return fmt.Errorf("unable to create directory `%s`", schemaDir)
+	if err = ensureDir(filepath.Dir(db.SchemaFile)); err != nil {
+		return err
 	}
 
 	// write schema to file
@@ -114,8 +113,8 @@ func (db *DB) NewMigration(name string) error {
 	name = fmt.Sprintf("%s_%s.sql", timestamp, name)
 
 	// create migrations dir if missing
-	if err := os.MkdirAll(db.MigrationsDir, 0755); err != nil {
-		return fmt.Errorf("unable to create directory `%s`", db.MigrationsDir)
+	if err := ensureDir(db.MigrationsDir); err != nil {
+		return err
 	}
 
 	// check file does not already exist
