@@ -2,7 +2,6 @@ package dbmate
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -87,9 +86,30 @@ func (drv MySQLDriver) DropDatabase(u *url.URL) error {
 	return err
 }
 
-// DumpSchema writes the current database schema to a file
+// DumpSchema returns the current database schema
 func (drv MySQLDriver) DumpSchema(u *url.URL) ([]byte, error) {
-	return nil, errors.New("not implemented")
+	// generate CLI arguments
+	args := []string{"--no-data", "--skip-comments"}
+
+	if hostname := u.Hostname(); hostname != "" {
+		args = append(args, "--host="+hostname)
+	}
+	if port := u.Port(); port != "" {
+		args = append(args, "--port="+port)
+	}
+	if username := u.User.Username(); username != "" {
+		args = append(args, "--user="+username)
+	}
+	// mysql recommands against using environment variables to supply password
+	// https://dev.mysql.com/doc/refman/5.7/en/password-security-user.html
+	if password, set := u.User.Password(); set {
+		args = append(args, "--password="+password)
+	}
+
+	// add database name
+	args = append(args, strings.TrimLeft(u.Path, "/"))
+
+	return runCommand("mysqldump", args...)
 }
 
 // DatabaseExists determines whether the database exists

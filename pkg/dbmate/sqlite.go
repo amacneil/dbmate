@@ -57,7 +57,7 @@ func (drv SQLiteDriver) DropDatabase(u *url.URL) error {
 	return os.Remove(path)
 }
 
-// DumpSchema writes the current database schema to a file
+// DumpSchema returns the current database schema
 func (drv SQLiteDriver) DumpSchema(u *url.URL) ([]byte, error) {
 	return nil, errors.New("not implemented")
 }

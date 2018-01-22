@@ -90,6 +90,30 @@ func TestMySQLCreateDropDatabase(t *testing.T) {
 	}()
 }
 
+func TestMySQLDumpSchema(t *testing.T) {
+	drv := MySQLDriver{}
+	u := mySQLTestURL(t)
+
+	// drop any existing database
+	err := drv.DropDatabase(u)
+	require.Nil(t, err)
+
+	// DumpSchema should fail
+	schema, err := drv.DumpSchema(u)
+	require.Nil(t, schema)
+	require.NotNil(t, err)
+	require.Equal(t, "mysqldump: Got error: 1049: \"Unknown database 'dbmate'\" when selecting the database", err.Error())
+
+	// create database
+	db := prepTestMySQLDB(t)
+	defer mustClose(db)
+
+	// DumpSchema should return schema
+	schema, err = drv.DumpSchema(u)
+	require.Nil(t, err)
+	require.Contains(t, string(schema), "SET SQL_MODE=@OLD_SQL_MODE")
+}
+
 func TestMySQLDatabaseExists(t *testing.T) {
 	drv := MySQLDriver{}
 	u := mySQLTestURL(t)

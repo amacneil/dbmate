@@ -84,8 +84,7 @@ func TestPostgresDumpSchema(t *testing.T) {
 	schema, err := drv.DumpSchema(u)
 	require.Nil(t, schema)
 	require.NotNil(t, err)
-	require.Contains(t, err.Error(), "error: pg_dump:")
-	require.Contains(t, err.Error(), "database \"dbmate\" does not exist")
+	require.Equal(t, "pg_dump: [archiver (db)] connection to database \"dbmate\" failed: FATAL:  database \"dbmate\" does not exist", err.Error())
 
 	// create database
 	db := prepTestPostgresDB(t)
