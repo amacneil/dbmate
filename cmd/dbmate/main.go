@@ -45,6 +45,10 @@ func NewApp() *cli.App {
 			Value: dbmate.DefaultSchemaFile,
 			Usage: "specify the schema file location",
 		},
+		cli.BoolFlag{
+			Name:  "no-dump-schema",
+			Usage: "don't update the schema file on migrate/rollback",
+		},
 	}
 
 	app.Commands = []cli.Command{
@@ -124,6 +128,7 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 			return err
 		}
 		db := dbmate.New(u)
+		db.AutoDumpSchema = !c.GlobalBool("no-dump-schema")
 		db.MigrationsDir = c.GlobalString("migrations-dir")
 		db.SchemaFile = c.GlobalString("schema-file")
 

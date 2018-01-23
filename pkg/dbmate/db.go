@@ -20,17 +20,19 @@ var DefaultSchemaFile = "./db/schema.sql"
 
 // DB allows dbmate actions to be performed on a specified database
 type DB struct {
-	DatabaseURL   *url.URL
-	MigrationsDir string
-	SchemaFile    string
+	AutoDumpSchema bool
+	DatabaseURL    *url.URL
+	MigrationsDir  string
+	SchemaFile     string
 }
 
 // New initializes a new dbmate database
 func New(databaseURL *url.URL) *DB {
 	return &DB{
-		DatabaseURL:   databaseURL,
-		MigrationsDir: DefaultMigrationsDir,
-		SchemaFile:    DefaultSchemaFile,
+		AutoDumpSchema: true,
+		DatabaseURL:    databaseURL,
+		MigrationsDir:  DefaultMigrationsDir,
+		SchemaFile:     DefaultSchemaFile,
 	}
 }
 
@@ -92,6 +94,8 @@ func (db *DB) DumpSchema() error {
 	if err != nil {
 		return err
 	}
+
+	fmt.Printf("Writing: %s\n", db.SchemaFile)
 
 	// ensure schema directory exists
 	if err = ensureDir(filepath.Dir(db.SchemaFile)); err != nil {
@@ -230,6 +234,11 @@ func (db *DB) Migrate() error {
 
 	}
 
+	// automatically update schema file, silence errors
+	if db.AutoDumpSchema {
+		_ = db.DumpSchema()
+	}
+
 	return nil
 }
 
@@ -365,6 +374,11 @@ func (db *DB) Rollback() error {
 	})
 	if err != nil {
 		return err
+	}
+
+	// automatically update schema file, silence errors
+	if db.AutoDumpSchema {
+		_ = db.DumpSchema()
 	}
 
 	return nil

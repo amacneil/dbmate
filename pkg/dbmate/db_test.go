@@ -24,14 +24,26 @@ func newTestDB(t *testing.T, u *url.URL) *DB {
 		require.Nil(t, err)
 	}
 
-	return New(u)
+	db := New(u)
+	db.AutoDumpSchema = false
+
+	return db
+}
+
+func TestNew(t *testing.T) {
+	u := postgresTestURL(t)
+	db := New(u)
+	require.True(t, db.AutoDumpSchema)
+	require.Equal(t, u.String(), db.DatabaseURL.String())
+	require.Equal(t, "./db/migrations", db.MigrationsDir)
+	require.Equal(t, "./db/schema.sql", db.SchemaFile)
 }
 
 func TestDumpSchema(t *testing.T) {
 	u := postgresTestURL(t)
 	db := newTestDB(t, u)
 
-	// create custom schema file
+	// create custom schema file directory
 	dir, err := ioutil.TempDir("", "dbmate")
 	require.Nil(t, err)
 	defer func() {
@@ -60,6 +72,53 @@ func TestDumpSchema(t *testing.T) {
 
 	// verify schema
 	schema, err := ioutil.ReadFile(db.SchemaFile)
+	require.Nil(t, err)
+	require.Contains(t, string(schema), "-- PostgreSQL database dump")
+}
+
+func TestAutoDumpSchema(t *testing.T) {
+	u := postgresTestURL(t)
+	db := newTestDB(t, u)
+	db.AutoDumpSchema = true
+
+	// create custom schema file directory
+	dir, err := ioutil.TempDir("", "dbmate")
+	require.Nil(t, err)
+	defer func() {
+		err := os.RemoveAll(dir)
+		require.Nil(t, err)
+	}()
+
+	// create schema.sql in subdirectory to test creating directory
+	db.SchemaFile = filepath.Join(dir, "/schema/schema.sql")
+
+	// drop database
+	err = db.Drop()
+	require.Nil(t, err)
+
+	// schema.sql should not exist
+	_, err = os.Stat(db.SchemaFile)
+	require.True(t, os.IsNotExist(err))
+
+	// create and migrate
+	err = db.CreateAndMigrate()
+	require.Nil(t, err)
+
+	// verify schema
+	schema, err := ioutil.ReadFile(db.SchemaFile)
+	require.Nil(t, err)
+	require.Contains(t, string(schema), "-- PostgreSQL database dump")
+
+	// remove schema
+	err = os.Remove(db.SchemaFile)
+	require.Nil(t, err)
+
+	// rollback
+	err = db.Rollback()
+	require.Nil(t, err)
+
+	// schema should be recreated
+	schema, err = ioutil.ReadFile(db.SchemaFile)
 	require.Nil(t, err)
 	require.Contains(t, string(schema), "-- PostgreSQL database dump")
 }
