@@ -205,9 +205,9 @@ Rolling back: 20151127184807_create_users_table.sql
 Writing: ./db/schema.sql
 ```
 
-### Schema Dumps
+### Schema File
 
-When you run the `up`, `migrate`, or `rollback` commands, dbmate will automatically create a `./db/schema.sql` file containing a complete representation of your database schema. Dbmate keeps this file up to date for you, and you should not manually edit it.
+When you run the `up`, `migrate`, or `rollback` commands, dbmate will automatically create a `./db/schema.sql` file containing a complete representation of your database schema. Dbmate keeps this file up to date for you, so you should not manually edit it.
 
 It is recommended to check this file into source control, so that you can easily review changes to the schema in commits or pull requests. It's also possible to use this file when you want to quickly load a database schema, without running each migration sequentially (for example in your test harness). However, if you do not wish to save this file, you could add it to `.gitignore`, or pass the `--no-dump-schema` command line option.
 
@@ -263,7 +263,7 @@ Why another database schema migration tool? Dbmate was inspired by many other to
 | **Features** |||||||
 |Plain SQL migration files|:white_check_mark:|:white_check_mark:|:white_check_mark:|||:white_check_mark:|
 |Support for creating and dropping databases||||:white_check_mark:||:white_check_mark:|
-|Support for saving schema dump files||||||:white_check_mark:|
+|Support for saving schema dump files||||:white_check_mark:||:white_check_mark:|
 |Timestamp-versioned migration files|:white_check_mark:|||:white_check_mark:|:white_check_mark:|:white_check_mark:|
 |Database connection string loaded from environment variables||||||:white_check_mark:|
 |Automatically load .env file||||||:white_check_mark:|
