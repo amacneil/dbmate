@@ -15,17 +15,24 @@ import (
 // DefaultMigrationsDir specifies default directory to find migration files
 var DefaultMigrationsDir = "./db/migrations"
 
+// DefaultSchemaFile specifies default location for schema.sql
+var DefaultSchemaFile = "./db/schema.sql"
+
 // DB allows dbmate actions to be performed on a specified database
 type DB struct {
-	DatabaseURL   *url.URL
-	MigrationsDir string
+	AutoDumpSchema bool
+	DatabaseURL    *url.URL
+	MigrationsDir  string
+	SchemaFile     string
 }
 
-// NewDB initializes a new dbmate database
-func NewDB(databaseURL *url.URL) *DB {
+// New initializes a new dbmate database
+func New(databaseURL *url.URL) *DB {
 	return &DB{
-		DatabaseURL:   databaseURL,
-		MigrationsDir: DefaultMigrationsDir,
+		AutoDumpSchema: true,
+		DatabaseURL:    databaseURL,
+		MigrationsDir:  DefaultMigrationsDir,
+		SchemaFile:     DefaultSchemaFile,
 	}
 }
 
@@ -34,8 +41,8 @@ func (db *DB) GetDriver() (Driver, error) {
 	return GetDriver(db.DatabaseURL.Scheme)
 }
 
-// Up creates the database (if necessary) and runs migrations
-func (db *DB) Up() error {
+// CreateAndMigrate creates the database (if necessary) and runs migrations
+func (db *DB) CreateAndMigrate() error {
 	drv, err := db.GetDriver()
 	if err != nil {
 		return err
@@ -75,10 +82,34 @@ func (db *DB) Drop() error {
 	return drv.DropDatabase(db.DatabaseURL)
 }
 
+// DumpSchema writes the current database schema to a file
+func (db *DB) DumpSchema() error {
+	drv, sqlDB, err := db.openDatabaseForMigration()
+	if err != nil {
+		return err
+	}
+	defer mustClose(sqlDB)
+
+	schema, err := drv.DumpSchema(db.DatabaseURL, sqlDB)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Writing: %s\n", db.SchemaFile)
+
+	// ensure schema directory exists
+	if err = ensureDir(filepath.Dir(db.SchemaFile)); err != nil {
+		return err
+	}
+
+	// write schema to file
+	return ioutil.WriteFile(db.SchemaFile, schema, 0644)
+}
+
 const migrationTemplate = "-- migrate:up\n\n\n-- migrate:down\n\n"
 
-// New creates a new migration file
-func (db *DB) New(name string) error {
+// NewMigration creates a new migration file
+func (db *DB) NewMigration(name string) error {
 	// new migration name
 	timestamp := time.Now().UTC().Format("20060102150405")
 	if name == "" {
@@ -87,8 +118,8 @@ func (db *DB) New(name string) error {
 	name = fmt.Sprintf("%s_%s.sql", timestamp, name)
 
 	// create migrations dir if missing
-	if err := os.MkdirAll(db.MigrationsDir, 0755); err != nil {
-		return fmt.Errorf("unable to create directory `%s`", db.MigrationsDir)
+	if err := ensureDir(db.MigrationsDir); err != nil {
+		return err
 	}
 
 	// check file does not already exist
@@ -201,6 +232,11 @@ func (db *DB) Migrate() error {
 			return err
 		}
 
+	}
+
+	// automatically update schema file, silence errors
+	if db.AutoDumpSchema {
+		_ = db.DumpSchema()
 	}
 
 	return nil
@@ -338,6 +374,11 @@ func (db *DB) Rollback() error {
 	})
 	if err != nil {
 		return err
+	}
+
+	// automatically update schema file, silence errors
+	if db.AutoDumpSchema {
+		_ = db.DumpSchema()
 	}
 
 	return nil

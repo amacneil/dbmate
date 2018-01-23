@@ -1,9 +1,11 @@
 package dbmate
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/lib/pq"
 )
@@ -59,6 +61,45 @@ func (drv PostgresDriver) DropDatabase(u *url.URL) error {
 	return err
 }
 
+func postgresSchemaMigrationsDump(db *sql.DB) ([]byte, error) {
+	// load applied migrations
+	migrations, err := queryColumn(db,
+		"select quote_literal(version) from schema_migrations order by version asc")
+	if err != nil {
+		return nil, err
+	}
+
+	// build schema_migrations table data
+	var buf bytes.Buffer
+	buf.WriteString("\n--\n-- Dbmate schema migrations\n--\n\n")
+
+	if len(migrations) > 0 {
+		buf.WriteString("INSERT INTO schema_migrations (version) VALUES\n    (" +
+			strings.Join(migrations, "),\n    (") +
+			");\n")
+	}
+
+	return buf.Bytes(), nil
+}
+
+// DumpSchema returns the current database schema
+func (drv PostgresDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
+	// load schema
+	schema, err := runCommand("pg_dump", "--format=plain", "--encoding=UTF8",
+		"--schema-only", "--no-privileges", "--no-owner", u.String())
+	if err != nil {
+		return nil, err
+	}
+
+	migrations, err := postgresSchemaMigrationsDump(db)
+	if err != nil {
+		return nil, err
+	}
+
+	schema = append(schema, migrations...)
+	return trimLeadingSQLComments(schema)
+}
+
 // DatabaseExists determines whether the database exists
 func (drv PostgresDriver) DatabaseExists(u *url.URL) (bool, error) {
 	name := databaseName(u)
@@ -81,8 +122,8 @@ func (drv PostgresDriver) DatabaseExists(u *url.URL) (bool, error) {
 
 // CreateMigrationsTable creates the schema_migrations table
 func (drv PostgresDriver) CreateMigrationsTable(db *sql.DB) error {
-	_, err := db.Exec(`create table if not exists schema_migrations (
-		version varchar(255) primary key)`)
+	_, err := db.Exec("create table if not exists schema_migrations " +
+		"(version varchar(255) primary key)")
 
 	return err
 }

@@ -13,13 +13,13 @@ services:
         condition: service_healthy
 
   mysql:
-    image: mysql
+    image: mysql:5.7
     environment:
       MYSQL_ROOT_PASSWORD: root
     healthcheck:
       test: ["CMD", "mysqladmin", "status", "-proot"]
 
   postgres:
-    image: postgres
+    image: postgres:9.6
     healthcheck:
       test: ["CMD", "pg_isready"]

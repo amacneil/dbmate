@@ -1,6 +1,7 @@
 package dbmate
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
 	"net/url"
@@ -46,7 +47,7 @@ func (drv MySQLDriver) openRootDB(u *url.URL) (*sql.DB, error) {
 	return drv.Open(&rootURL)
 }
 
-func quoteIdentifier(str string) string {
+func mysqlQuoteIdentifier(str string) string {
 	str = strings.Replace(str, "`", "\\`", -1)
 
 	return fmt.Sprintf("`%s`", str)
@@ -64,7 +65,7 @@ func (drv MySQLDriver) CreateDatabase(u *url.URL) error {
 	defer mustClose(db)
 
 	_, err = db.Exec(fmt.Sprintf("create database %s",
-		quoteIdentifier(name)))
+		mysqlQuoteIdentifier(name)))
 
 	return err
 }
@@ -81,9 +82,75 @@ func (drv MySQLDriver) DropDatabase(u *url.URL) error {
 	defer mustClose(db)
 
 	_, err = db.Exec(fmt.Sprintf("drop database if exists %s",
-		quoteIdentifier(name)))
+		mysqlQuoteIdentifier(name)))
 
 	return err
+}
+
+func mysqldumpArgs(u *url.URL) []string {
+	// generate CLI arguments
+	args := []string{"--opt", "--routines", "--no-data",
+		"--skip-dump-date", "--skip-add-drop-table"}
+
+	if hostname := u.Hostname(); hostname != "" {
+		args = append(args, "--host="+hostname)
+	}
+	if port := u.Port(); port != "" {
+		args = append(args, "--port="+port)
+	}
+	if username := u.User.Username(); username != "" {
+		args = append(args, "--user="+username)
+	}
+	// mysql recommands against using environment variables to supply password
+	// https://dev.mysql.com/doc/refman/5.7/en/password-security-user.html
+	if password, set := u.User.Password(); set {
+		args = append(args, "--password="+password)
+	}
+
+	// add database name
+	args = append(args, strings.TrimLeft(u.Path, "/"))
+
+	return args
+}
+
+func mysqlSchemaMigrationsDump(db *sql.DB) ([]byte, error) {
+	// load applied migrations
+	migrations, err := queryColumn(db,
+		"select quote(version) from schema_migrations order by version asc")
+	if err != nil {
+		return nil, err
+	}
+
+	// build schema_migrations table data
+	var buf bytes.Buffer
+	buf.WriteString("\n--\n-- Dbmate schema migrations\n--\n\n" +
+		"LOCK TABLES `schema_migrations` WRITE;\n")
+
+	if len(migrations) > 0 {
+		buf.WriteString("INSERT INTO `schema_migrations` (version) VALUES\n  (" +
+			strings.Join(migrations, "),\n  (") +
+			");\n")
+	}
+
+	buf.WriteString("UNLOCK TABLES;\n")
+
+	return buf.Bytes(), nil
+}
+
+// DumpSchema returns the current database schema
+func (drv MySQLDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
+	schema, err := runCommand("mysqldump", mysqldumpArgs(u)...)
+	if err != nil {
+		return nil, err
+	}
+
+	migrations, err := mysqlSchemaMigrationsDump(db)
+	if err != nil {
+		return nil, err
+	}
+
+	schema = append(schema, migrations...)
+	return trimLeadingSQLComments(schema)
 }
 
 // DatabaseExists determines whether the database exists
@@ -97,8 +164,8 @@ func (drv MySQLDriver) DatabaseExists(u *url.URL) (bool, error) {
 	defer mustClose(db)
 
 	exists := false
-	err = db.QueryRow(`select true from information_schema.schemata
-		where schema_name = ?`, name).Scan(&exists)
+	err = db.QueryRow("select true from information_schema.schemata "+
+		"where schema_name = ?", name).Scan(&exists)
 	if err == sql.ErrNoRows {
 		return false, nil
 	}
@@ -108,8 +175,8 @@ func (drv MySQLDriver) DatabaseExists(u *url.URL) (bool, error) {
 
 // CreateMigrationsTable creates the schema_migrations table
 func (drv MySQLDriver) CreateMigrationsTable(db *sql.DB) error {
-	_, err := db.Exec(`create table if not exists schema_migrations (
-		version varchar(255) primary key)`)
+	_, err := db.Exec("create table if not exists schema_migrations " +
+		"(version varchar(255) primary key)")
 
 	return err
 }

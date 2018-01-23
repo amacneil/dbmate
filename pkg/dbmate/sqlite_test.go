@@ -61,6 +61,40 @@ func TestSQLiteCreateDropDatabase(t *testing.T) {
 	require.Equal(t, true, os.IsNotExist(err))
 }
 
+func TestSQLiteDumpSchema(t *testing.T) {
+	drv := SQLiteDriver{}
+	u := sqliteTestURL(t)
+
+	// prepare database
+	db := prepTestSQLiteDB(t)
+	defer mustClose(db)
+	err := drv.CreateMigrationsTable(db)
+	require.Nil(t, err)
+
+	// insert migration
+	err = drv.InsertMigration(db, "abc1")
+	require.Nil(t, err)
+	err = drv.InsertMigration(db, "abc2")
+	require.Nil(t, err)
+
+	// DumpSchema should return schema
+	schema, err := drv.DumpSchema(u, db)
+	require.Nil(t, err)
+	require.Contains(t, string(schema), "CREATE TABLE schema_migrations")
+	require.Contains(t, string(schema), ");\n-- Dbmate schema migrations\n"+
+		"INSERT INTO schema_migrations (version) VALUES\n"+
+		"  ('abc1'),\n"+
+		"  ('abc2');\n")
+
+	// DumpSchema should return error if command fails
+	u.Path = "/."
+	schema, err = drv.DumpSchema(u, db)
+	require.Nil(t, schema)
+	require.NotNil(t, err)
+	require.Equal(t, "Error: unable to open database \".\": unable to open database file",
+		err.Error())
+}
+
 func TestSQLiteDatabaseExists(t *testing.T) {
 	drv := SQLiteDriver{}
 	u := sqliteTestURL(t)

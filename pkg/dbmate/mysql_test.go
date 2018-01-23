@@ -90,6 +90,45 @@ func TestMySQLCreateDropDatabase(t *testing.T) {
 	}()
 }
 
+func TestMySQLDumpSchema(t *testing.T) {
+	drv := MySQLDriver{}
+	u := mySQLTestURL(t)
+
+	// prepare database
+	db := prepTestMySQLDB(t)
+	defer mustClose(db)
+	err := drv.CreateMigrationsTable(db)
+	require.Nil(t, err)
+
+	// insert migration
+	err = drv.InsertMigration(db, "abc1")
+	require.Nil(t, err)
+	err = drv.InsertMigration(db, "abc2")
+	require.Nil(t, err)
+
+	// DumpSchema should return schema
+	schema, err := drv.DumpSchema(u, db)
+	require.Nil(t, err)
+	require.Contains(t, string(schema), "CREATE TABLE `schema_migrations`")
+	require.Contains(t, string(schema), "\n-- Dump completed\n\n"+
+		"--\n"+
+		"-- Dbmate schema migrations\n"+
+		"--\n\n"+
+		"LOCK TABLES `schema_migrations` WRITE;\n"+
+		"INSERT INTO `schema_migrations` (version) VALUES\n"+
+		"  ('abc1'),\n"+
+		"  ('abc2');\n"+
+		"UNLOCK TABLES;\n")
+
+	// DumpSchema should return error if command fails
+	u.Path = "/fakedb"
+	schema, err = drv.DumpSchema(u, db)
+	require.Nil(t, schema)
+	require.NotNil(t, err)
+	require.Equal(t, "mysqldump: Got error: 1049: \"Unknown database 'fakedb'\" "+
+		"when selecting the database", err.Error())
+}
+
 func TestMySQLDatabaseExists(t *testing.T) {
 	drv := MySQLDriver{}
 	u := mySQLTestURL(t)
