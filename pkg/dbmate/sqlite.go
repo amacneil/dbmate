@@ -1,12 +1,13 @@
 package dbmate
 
 import (
+	"bytes"
 	"database/sql"
-	"errors"
 	"fmt"
 	"net/url"
 	"os"
 	"regexp"
+	"strings"
 
 	_ "github.com/mattn/go-sqlite3" // sqlite driver for database/sql
 )
@@ -57,9 +58,42 @@ func (drv SQLiteDriver) DropDatabase(u *url.URL) error {
 	return os.Remove(path)
 }
 
+func sqliteSchemaMigrationsDump(db *sql.DB) ([]byte, error) {
+	// load applied migrations
+	migrations, err := queryColumn(db,
+		"select quote(version) from schema_migrations order by version asc")
+	if err != nil {
+		return nil, err
+	}
+
+	// build schema_migrations table data
+	var buf bytes.Buffer
+	buf.WriteString("-- Dbmate schema migrations\n")
+
+	if len(migrations) > 0 {
+		buf.WriteString("INSERT INTO schema_migrations (version) VALUES\n  (" +
+			strings.Join(migrations, "),\n  (") +
+			");\n")
+	}
+
+	return buf.Bytes(), nil
+}
+
 // DumpSchema returns the current database schema
 func (drv SQLiteDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
-	return nil, errors.New("not implemented")
+	path := sqlitePath(u)
+	schema, err := runCommand("sqlite3", path, ".schema")
+	if err != nil {
+		return nil, err
+	}
+
+	migrations, err := sqliteSchemaMigrationsDump(db)
+	if err != nil {
+		return nil, err
+	}
+
+	schema = append(schema, migrations...)
+	return trimLeadingSQLComments(schema)
 }
 
 // DatabaseExists determines whether the database exists

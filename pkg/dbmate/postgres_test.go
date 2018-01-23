@@ -91,6 +91,7 @@ func TestPostgresDumpSchema(t *testing.T) {
 	// DumpSchema should return schema
 	schema, err := drv.DumpSchema(u, db)
 	require.Nil(t, err)
+	require.Contains(t, string(schema), "CREATE TABLE schema_migrations")
 	require.Contains(t, string(schema), "\n--\n"+
 		"-- PostgreSQL database dump complete\n"+
 		"--\n\n\n"+
