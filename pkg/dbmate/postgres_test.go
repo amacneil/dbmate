@@ -91,12 +91,15 @@ func TestPostgresDumpSchema(t *testing.T) {
 	// DumpSchema should return schema
 	schema, err := drv.DumpSchema(u, db)
 	require.Nil(t, err)
-	require.Contains(t, string(schema), "-- PostgreSQL database dump")
-	require.Contains(t, string(schema), "\n\n--\n-- Dbmate schema migrations\n--\n\n"+
-		"COPY schema_migrations (version) FROM stdin;\n"+
-		"abc1\n"+
-		"abc2\n"+
-		"\\.\n")
+	require.Contains(t, string(schema), "\n--\n"+
+		"-- PostgreSQL database dump complete\n"+
+		"--\n\n\n"+
+		"--\n"+
+		"-- Dbmate schema migrations\n"+
+		"--\n\n"+
+		"INSERT INTO schema_migrations (version) VALUES\n"+
+		"    ('abc1'),\n"+
+		"    ('abc2');\n")
 
 	// DumpSchema should return error if command fails
 	u.Path = "/fakedb"

@@ -3,6 +3,7 @@ package dbmate
 import (
 	"bufio"
 	"bytes"
+	"database/sql"
 	"errors"
 	"fmt"
 	"io"
@@ -92,4 +93,31 @@ func trimLeadingSQLComments(data []byte) ([]byte, error) {
 	}
 
 	return out.Bytes(), nil
+}
+
+// queryColumn runs a SQL statement and returns a slice of strings
+// it is assumed that the statement returns only one column
+// e.g. schema_migrations table
+func queryColumn(db *sql.DB, query string) ([]string, error) {
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer mustClose(rows)
+
+	// read into slice
+	var result []string
+	for rows.Next() {
+		var v string
+		if err := rows.Scan(&v); err != nil {
+			return nil, err
+		}
+
+		result = append(result, v)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }

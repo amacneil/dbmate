@@ -110,15 +110,15 @@ func TestMySQLDumpSchema(t *testing.T) {
 	schema, err := drv.DumpSchema(u, db)
 	require.Nil(t, err)
 	require.Contains(t, string(schema), "CREATE TABLE `schema_migrations`")
-	require.Contains(t, string(schema), "\n--\n"+
-		"-- Dumping routines for database 'dbmate'\n--\n\n"+
-		"--\n-- Dbmate schema migrations\n--\n\n"+
+	require.Contains(t, string(schema), "\n-- Dump completed\n\n"+
+		"--\n"+
+		"-- Dbmate schema migrations\n"+
+		"--\n\n"+
 		"LOCK TABLES `schema_migrations` WRITE;\n"+
-		"INSERT INTO `schema_migrations` VALUES\n"+
+		"INSERT INTO `schema_migrations` (version) VALUES\n"+
 		"  ('abc1'),\n"+
 		"  ('abc2');\n"+
-		"UNLOCK TABLES;\n\n"+
-		"/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;\n")
+		"UNLOCK TABLES;\n")
 
 	// DumpSchema should return error if command fails
 	u.Path = "/fakedb"

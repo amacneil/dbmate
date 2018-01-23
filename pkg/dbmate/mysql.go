@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"net/url"
-	"regexp"
 	"strings"
 
 	_ "github.com/go-sql-driver/mysql" // mysql driver for database/sql
@@ -48,7 +47,7 @@ func (drv MySQLDriver) openRootDB(u *url.URL) (*sql.DB, error) {
 	return drv.Open(&rootURL)
 }
 
-func quoteIdentifier(str string) string {
+func mysqlQuoteIdentifier(str string) string {
 	str = strings.Replace(str, "`", "\\`", -1)
 
 	return fmt.Sprintf("`%s`", str)
@@ -66,7 +65,7 @@ func (drv MySQLDriver) CreateDatabase(u *url.URL) error {
 	defer mustClose(db)
 
 	_, err = db.Exec(fmt.Sprintf("create database %s",
-		quoteIdentifier(name)))
+		mysqlQuoteIdentifier(name)))
 
 	return err
 }
@@ -83,7 +82,7 @@ func (drv MySQLDriver) DropDatabase(u *url.URL) error {
 	defer mustClose(db)
 
 	_, err = db.Exec(fmt.Sprintf("drop database if exists %s",
-		quoteIdentifier(name)))
+		mysqlQuoteIdentifier(name)))
 
 	return err
 }
@@ -117,25 +116,9 @@ func mysqldumpArgs(u *url.URL) []string {
 
 func mysqlSchemaMigrationsDump(db *sql.DB) ([]byte, error) {
 	// load applied migrations
-	// (can't use SelectMigrations because this version is quoted)
-	rows, err := db.Query("select quote(version) from schema_migrations " +
-		"order by version asc")
+	migrations, err := queryColumn(db,
+		"select quote(version) from schema_migrations order by version asc")
 	if err != nil {
-		return nil, err
-	}
-	defer mustClose(rows)
-
-	// read into slice
-	var migrations []string
-	for rows.Next() {
-		var version string
-		if err := rows.Scan(&version); err != nil {
-			return nil, err
-		}
-
-		migrations = append(migrations, fmt.Sprintf("(%s)", version))
-	}
-	if err = rows.Err(); err != nil {
 		return nil, err
 	}
 
@@ -145,12 +128,12 @@ func mysqlSchemaMigrationsDump(db *sql.DB) ([]byte, error) {
 		"LOCK TABLES `schema_migrations` WRITE;\n")
 
 	if len(migrations) > 0 {
-		buf.WriteString("INSERT INTO `schema_migrations` VALUES\n  " +
-			strings.Join(migrations, ",\n  ") +
-			";\n")
+		buf.WriteString("INSERT INTO `schema_migrations` (version) VALUES\n  (" +
+			strings.Join(migrations, "),\n  (") +
+			");\n")
 	}
 
-	buf.WriteString("UNLOCK TABLES;\n\n")
+	buf.WriteString("UNLOCK TABLES;\n")
 
 	return buf.Bytes(), nil
 }
@@ -167,19 +150,7 @@ func (drv MySQLDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
 		return nil, err
 	}
 
-	// insert migrations table data before client settings are restored
-	re := regexp.MustCompile(`(?m)^.*SET TIME_ZONE=@OLD_TIME_ZONE.*$`)
-	matched := false
-	schema = re.ReplaceAllFunc(schema, func(match []byte) []byte {
-		// match only once
-		if matched {
-			return match
-		}
-
-		matched = true
-		return append(migrations, match...)
-	})
-
+	schema = append(schema, migrations...)
 	return trimLeadingSQLComments(schema)
 }
 
