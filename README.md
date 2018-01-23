@@ -18,6 +18,7 @@ For a comparison between dbmate and other popular database schema migration tool
 * Migrations are timestamp-versioned, to avoid version number conflicts with multiple developers.
 * Migrations are run atomically inside a transaction.
 * Supports creating and dropping databases (handy in development/test).
+* Supports saving a `schema.sql` file to easily diff schema changes in git.
 * Database connection URL is definied using an environment variable (`DATABASE_URL` by default), or specified on the command line.
 * Built-in support for reading environment variables from your `.env` file.
 * Easy to distribute, single self-contained binary.
@@ -88,6 +89,7 @@ dbmate drop      # drop the database
 dbmate migrate   # run any pending migrations
 dbmate rollback  # roll back the most recent migration
 dbmate down      # alias for rollback
+dbmate dump      # write the database schema.sql file
 ```
 
 ## Usage
@@ -174,6 +176,7 @@ Run `dbmate up` to run any pending migrations.
 $ dbmate up
 Creating: myapp_development
 Applying: 20151127184807_create_users_table.sql
+Writing: ./db/schema.sql
 ```
 
 > Note: `dbmate up` will create the database if it does not already exist (assuming the current user has permission to create databases). If you want to run migrations without creating the database, run `dbmate migrate`.
@@ -199,14 +202,34 @@ Run `dbmate rollback` to roll back the most recent migration:
 ```sh
 $ dbmate rollback
 Rolling back: 20151127184807_create_users_table.sql
+Writing: ./db/schema.sql
 ```
+
+### Schema Dumps
+
+When you run the `up`, `migrate`, or `rollback` commands, dbmate will automatically create a `./db/schema.sql` file containing a complete representation of your database schema. Dbmate keeps this file up to date for you, and you should not manually edit it.
+
+It is recommended to check this file into source control, so that you can easily review changes to the schema in commits or pull requests. It's also possible to use this file when you want to quickly load a database schema, without running each migration sequentially (for example in your test harness). However, if you do not wish to save this file, you could add it to `.gitignore`, or pass the `--no-dump-schema` command line option.
+
+To dump the `schema.sql` file without performing any other actions, run `dbmate dump`. Unlike other dbmate actions, this command relies on the respective `pg_dump`, `mysqldump`, or `sqlite3` commands being available in your PATH. If these tools are not available, dbmate will silenty skip the schema dump step during `up`, `migrate`, or `rollback` actions. You can diagnose the issue by running `dbmate dump` and looking at the output:
+
+```sh
+$ dbmate dump
+exec: "pg_dump": executable file not found in $PATH
+```
+
+On Ubuntu or Debian systems, you can fix this by installing `postgresql-client`, `mysql-client`, or `sqlite3` respectively. Ensure that the package version you install is greater than or equal to the version running on your database server.
+
+> Note: The `schema.sql` file will contain a complete schema for your database, even if some tables or columns were created outside of dbmate migrations.
 
 ### Options
 
 The following command line options are available with all commands. You must use command line arguments in the order `dbmate [global options] command [command options]`.
 
-* `--migrations-dir, -d "./db/migrations"` - where to keep the migration files.
 * `--env, -e "DATABASE_URL"` - specify an environment variable to read the database connection URL from.
+* `--migrations-dir, -d "./db/migrations"` - where to keep the migration files.
+* `--schema-file, -s "./db/schema.sql"` - a path to keep the schema.sql file.
+* `--no-dump-schema` - don't auto-update the schema.sql file on migrate/rollback
 
 For example, before running your test suite, you may wish to drop and recreate the test database. One easy way to do this is to store your test database connection URL in the `TEST_DATABASE_URL` environment variable:
 
@@ -220,7 +243,7 @@ You can then specify this environment variable in your test script (Makefile or 
 ```sh
 $ dbmate -e TEST_DATABASE_URL drop
 Dropping: myapp_test
-$ dbmate -e TEST_DATABASE_URL up
+$ dbmate -e TEST_DATABASE_URL --no-dump-schema up
 Creating: myapp_test
 Applying: 20151127184807_create_users_table.sql
 ```
@@ -240,6 +263,7 @@ Why another database schema migration tool? Dbmate was inspired by many other to
 | **Features** |||||||
 |Plain SQL migration files|:white_check_mark:|:white_check_mark:|:white_check_mark:|||:white_check_mark:|
 |Support for creating and dropping databases||||:white_check_mark:||:white_check_mark:|
+|Support for saving schema dump files||||||:white_check_mark:|
 |Timestamp-versioned migration files|:white_check_mark:|||:white_check_mark:|:white_check_mark:|:white_check_mark:|
 |Database connection string loaded from environment variables||||||:white_check_mark:|
 |Automatically load .env file||||||:white_check_mark:|
