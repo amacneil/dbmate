@@ -4,7 +4,11 @@ services:
 install:
   - docker version
   - docker-compose version
+  - docker-compose pull
+  - docker-compose build
+  - docker-compose up -d
 script:
-  - make
+  - docker-compose run --rm dbmate make test
+  - docker-compose run --rm dbmate make lint
   - docker build -t dbmate .
   - docker run --rm dbmate --help
