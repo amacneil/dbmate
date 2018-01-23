@@ -18,13 +18,15 @@ RUN go get \
 	github.com/kisielk/errcheck
 
 # copy source files
-COPY . $GOPATH/src/github.com/amacneil/dbmate
-WORKDIR $GOPATH/src/github.com/amacneil/dbmate
+COPY . /go/src/github.com/amacneil/dbmate
+WORKDIR /go/src/github.com/amacneil/dbmate
 
 # build
-RUN go build -ldflags '-s' -o /go/bin/dbmate ./cmd/dbmate
+RUN make install build
 
 # runtime image
 FROM debian:stretch-slim
-COPY --from=build /go/bin/dbmate /usr/local/bin/dbmate
-ENTRYPOINT ["dbmate"]
+COPY --from=build /go/src/github.com/amacneil/dbmate/dist/dbmate-linux-amd64 \
+	/usr/local/bin/dbmate
+WORKDIR /app
+ENTRYPOINT ["/usr/local/bin/dbmate"]
