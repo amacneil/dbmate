@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"unicode"
 )
 
 // databaseName returns the database name from a URL
@@ -79,8 +80,13 @@ func trimLeadingSQLComments(data []byte) ([]byte, error) {
 			continue
 		}
 
-		// header section is over, copy bytes to output buffer
+		// header section is over
 		preamble = false
+
+		// trim trailing whitespace
+		line = bytes.TrimRightFunc(line, unicode.IsSpace)
+
+		// copy bytes to output buffer
 		if _, err := out.Write(line); err != nil {
 			return nil, err
 		}
