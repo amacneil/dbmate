@@ -39,7 +39,7 @@ $ brew install dbmate
 Download the binary directly:
 
 ```sh
-$ sudo curl -fsSL -o /usr/local/bin/dbmate https://github.com/amacneil/dbmate/releases/download/v1.2.1/dbmate-linux-amd64
+$ sudo curl -fsSL -o /usr/local/bin/dbmate https://github.com/amacneil/dbmate/releases/download/v1.3.0/dbmate-linux-amd64
 $ sudo chmod +x /usr/local/bin/dbmate
 ```
 
@@ -57,7 +57,7 @@ To use dbmate on Heroku, the easiest method is to store the linux binary in your
 
 ```sh
 $ mkdir -p bin
-$ curl -fsSL -o bin/dbmate-heroku https://github.com/amacneil/dbmate/releases/download/v1.2.1/dbmate-linux-amd64
+$ curl -fsSL -o bin/dbmate-heroku https://github.com/amacneil/dbmate/releases/download/v1.3.0/dbmate-linux-amd64
 $ chmod +x bin/dbmate-heroku
 $ git add bin/dbmate-heroku
 $ git commit -m "Add dbmate binary"
@@ -75,7 +75,7 @@ $ heroku run bin/dbmate-heroku up
 Dbmate can be installed directly using `go get`:
 
 ```sh
-$ go get -u github.com/amacneil/dbmate
+$ go get -u github.com/amacneil/dbmate/cmd/dbmate
 ```
 
 ## Commands
