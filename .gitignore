@@ -1,4 +1,5 @@
 .DS_Store
+.env
 /dist
-/testdata/.env
 /testdata/db/schema.sql
+/vendor

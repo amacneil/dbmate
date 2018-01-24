@@ -13,6 +13,8 @@ RUN apt-get update \
 	&& rm -rf /var/lib/apt/lists/*
 
 # development dependencies
+RUN curl -fsSL -o /usr/local/bin/dep https://github.com/golang/dep/releases/download/v0.3.2/dep-linux-amd64 \
+	&& chmod +x /usr/local/bin/dep
 RUN go get \
 	github.com/golang/lint/golint \
 	github.com/kisielk/errcheck
@@ -22,7 +24,7 @@ COPY . /go/src/github.com/amacneil/dbmate
 WORKDIR /go/src/github.com/amacneil/dbmate
 
 # build
-RUN make install build
+RUN make dep install build
 
 # runtime image
 FROM debian:stretch-slim

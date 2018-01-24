@@ -4,6 +4,7 @@ services:
 install:
   - docker version
   - docker-compose version
+  - rm docker-compose.override.yml
   - docker-compose pull
   - docker-compose build
   - docker-compose up -d
