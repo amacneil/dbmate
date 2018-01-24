@@ -19,6 +19,13 @@ type Driver interface {
 	DeleteMigration(Transaction, string) error
 }
 
+var drivers = map[string]Driver{}
+
+// RegisterDriver registers a driver for a URL scheme
+func RegisterDriver(drv Driver, scheme string) {
+	drivers[scheme] = drv
+}
+
 // Transaction can represent a database or open transaction
 type Transaction interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
@@ -26,16 +33,11 @@ type Transaction interface {
 
 // GetDriver loads a database driver by name
 func GetDriver(name string) (Driver, error) {
-	switch name {
-	case "mysql":
-		return MySQLDriver{}, nil
-	case "postgres", "postgresql":
-		return PostgresDriver{}, nil
-	case "sqlite", "sqlite3":
-		return SQLiteDriver{}, nil
-	default:
-		return nil, fmt.Errorf("unknown driver: %s", name)
+	if val, ok := drivers[name]; ok {
+		return val, nil
 	}
+
+	return nil, fmt.Errorf("unsupported driver: %s", name)
 }
 
 // GetDriverOpen is a shortcut for GetDriver(u.Scheme).Open(u)
