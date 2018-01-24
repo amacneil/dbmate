@@ -3,7 +3,11 @@ BUILD_FLAGS := -ldflags '-s'
 PACKAGES := ./cmd/... ./pkg/...
 
 .PHONY: all
-all: install test lint build
+all: dep install test lint build
+
+.PHONY: dep
+dep:
+	dep ensure -vendor-only
 
 .PHONY: install
 install:
