@@ -10,6 +10,10 @@ import (
 	_ "github.com/go-sql-driver/mysql" // mysql driver for database/sql
 )
 
+func init() {
+	RegisterDriver(MySQLDriver{}, "mysql")
+}
+
 // MySQLDriver provides top level database functions
 type MySQLDriver struct {
 }

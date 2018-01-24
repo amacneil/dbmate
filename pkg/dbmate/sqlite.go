@@ -1,3 +1,5 @@
+// +build cgo
+
 package dbmate
 
 import (
@@ -11,6 +13,11 @@ import (
 
 	_ "github.com/mattn/go-sqlite3" // sqlite driver for database/sql
 )
+
+func init() {
+	RegisterDriver(SQLiteDriver{}, "sqlite")
+	RegisterDriver(SQLiteDriver{}, "sqlite3")
+}
 
 // SQLiteDriver provides top level database functions
 type SQLiteDriver struct {

@@ -10,6 +10,11 @@ import (
 	"github.com/lib/pq"
 )
 
+func init() {
+	RegisterDriver(PostgresDriver{}, "postgres")
+	RegisterDriver(PostgresDriver{}, "postgresql")
+}
+
 // PostgresDriver provides top level database functions
 type PostgresDriver struct {
 }

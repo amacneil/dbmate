@@ -22,6 +22,6 @@ func TestGetDriver_MySQL(t *testing.T) {
 
 func TestGetDriver_Error(t *testing.T) {
 	drv, err := GetDriver("foo")
-	require.Equal(t, "unknown driver: foo", err.Error())
+	require.Equal(t, "unsupported driver: foo", err.Error())
 	require.Nil(t, drv)
 }
