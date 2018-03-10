@@ -383,3 +383,39 @@ func (db *DB) Rollback() error {
 
 	return nil
 }
+
+func getMigrationFiles() {}
+
+func (db *DB) Status() error {
+	re := regexp.MustCompile(`^\d.*\.sql$`)
+	files, err := findMigrationFiles(db.MigrationsDir, re)
+	if err != nil {
+		return err
+	}
+
+	if len(files) == 0 {
+		return fmt.Errorf("no migration files found")
+	}
+
+	drv, sqlDB, err := db.openDatabaseForMigration()
+	if err != nil {
+		return err
+	}
+	defer mustClose(sqlDB)
+
+	applied, err := drv.SelectMigrations(sqlDB, -1)
+	if err != nil {
+		return err
+	}
+
+	for _, filename := range files {
+		ver := migrationVersion(filename)
+		if ok := applied[ver]; ok {
+			fmt.Println("[X]", filename)
+		} else {
+			fmt.Println("[ ]", filename)
+		}
+	}
+
+	return nil
+}

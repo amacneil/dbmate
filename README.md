@@ -90,6 +90,7 @@ dbmate migrate   # run any pending migrations
 dbmate rollback  # roll back the most recent migration
 dbmate down      # alias for rollback
 dbmate dump      # write the database schema.sql file
+dbmate status    # show the status of all migrations
 ```
 
 ## Usage
