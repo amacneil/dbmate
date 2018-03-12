@@ -384,8 +384,7 @@ func (db *DB) Rollback() error {
 	return nil
 }
 
-func getMigrationFiles() {}
-
+// Status show the status of all migrations
 func (db *DB) Status() error {
 	re := regexp.MustCompile(`^\d.*\.sql$`)
 	files, err := findMigrationFiles(db.MigrationsDir, re)
