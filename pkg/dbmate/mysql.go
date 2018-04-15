@@ -225,3 +225,15 @@ func (drv MySQLDriver) DeleteMigration(db Transaction, version string) error {
 
 	return err
 }
+
+// Ping verifies a connection to the database server. It does not verify whether the
+// specified database exists.
+func (drv MySQLDriver) Ping(u *url.URL) error {
+	db, err := drv.openRootDB(u)
+	if err != nil {
+		return err
+	}
+	defer mustClose(db)
+
+	return db.Ping()
+}

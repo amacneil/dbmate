@@ -90,6 +90,7 @@ dbmate migrate   # run any pending migrations
 dbmate rollback  # roll back the most recent migration
 dbmate down      # alias for rollback
 dbmate dump      # write the database schema.sql file
+dbmate wait      # wait for the database server to become available
 ```
 
 ## Usage
@@ -222,6 +223,43 @@ On Ubuntu or Debian systems, you can fix this by installing `postgresql-client`,
 
 > Note: The `schema.sql` file will contain a complete schema for your database, even if some tables or columns were created outside of dbmate migrations.
 
+### Waiting For The Database
+
+If you use a Docker development environment for your project, you may encounter issues with the database not being immediately ready when running migrations or unit tests. This can be due to the database server having only just started.
+
+In general, your application should be resilient to not having a working database connection on startup. However, for the purpose of running migrations or unit tests, this is not practical. The `wait` command avoids this situation by allowing you to pause a script or other application until the database is available. Dbmate will attempt a connection to the database server every second, up to a maximum of 60 seconds.
+
+If the database is available, `wait` will return no output:
+
+```sh
+$ dbmate wait
+```
+
+If the database is unavailable, `wait` will block until the database becomes available:
+
+```sh
+$ dbmate wait
+Waiting for database....
+```
+
+You can chain `wait` together with other commands if you sometimes see failures caused by the database not yet being ready:
+
+```sh
+$ dbmate wait && dbmate up
+Waiting for database....
+Creating: myapp_development
+```
+
+If the database is still not available after 60 seconds, the command will return an error:
+
+```sh
+$ dbmate wait
+Waiting for database............................................................
+Error: unable to connect to database: pq: role "foobar" does not exist
+```
+
+Please note that the `wait` command does not verify whether your specified database exists, only that the server is available and ready (so it will return success if the database server is available, but your database has not yet been created).
+
 ### Options
 
 The following command line options are available with all commands. You must use command line arguments in the order `dbmate [global options] command [command options]`.
@@ -265,6 +303,7 @@ Why another database schema migration tool? Dbmate was inspired by many other to
 |Support for creating and dropping databases||||:white_check_mark:||:white_check_mark:|
 |Support for saving schema dump files||||:white_check_mark:||:white_check_mark:|
 |Timestamp-versioned migration files|:white_check_mark:|||:white_check_mark:|:white_check_mark:|:white_check_mark:|
+|Ability to wait for database to become ready||||||:white_check_mark:|
 |Database connection string loaded from environment variables||||||:white_check_mark:|
 |Automatically load .env file||||||:white_check_mark:|
 |No separate configuration file||||:white_check_mark:|:white_check_mark:|:white_check_mark:|

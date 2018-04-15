@@ -164,3 +164,16 @@ func (drv SQLiteDriver) DeleteMigration(db Transaction, version string) error {
 
 	return err
 }
+
+// Ping verifies a connection to the database. Due to the way SQLite works, by
+// testing whether the database is valid, it will automatically create the database
+// if it does not already exist.
+func (drv SQLiteDriver) Ping(u *url.URL) error {
+	db, err := drv.Open(u)
+	if err != nil {
+		return err
+	}
+	defer mustClose(db)
+
+	return db.Ping()
+}

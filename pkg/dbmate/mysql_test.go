@@ -254,3 +254,22 @@ func TestMySQLDeleteMigration(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 1, count)
 }
+
+func TestMySQLPing(t *testing.T) {
+	drv := MySQLDriver{}
+	u := mySQLTestURL(t)
+
+	// drop any existing database
+	err := drv.DropDatabase(u)
+	require.Nil(t, err)
+
+	// ping database
+	err = drv.Ping(u)
+	require.Nil(t, err)
+
+	// ping invalid host should return error
+	u.Host = "mysql:404"
+	err = drv.Ping(u)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "getsockopt: connection refused")
+}

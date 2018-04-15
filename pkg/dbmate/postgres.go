@@ -173,3 +173,15 @@ func (drv PostgresDriver) DeleteMigration(db Transaction, version string) error 
 
 	return err
 }
+
+// Ping verifies a connection to the database server. It does not verify whether the
+// specified database exists.
+func (drv PostgresDriver) Ping(u *url.URL) error {
+	db, err := drv.openPostgresDB(u)
+	if err != nil {
+		return err
+	}
+	defer mustClose(db)
+
+	return db.Ping()
+}

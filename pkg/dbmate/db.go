@@ -13,10 +13,16 @@ import (
 )
 
 // DefaultMigrationsDir specifies default directory to find migration files
-var DefaultMigrationsDir = "./db/migrations"
+const DefaultMigrationsDir = "./db/migrations"
 
 // DefaultSchemaFile specifies default location for schema.sql
-var DefaultSchemaFile = "./db/schema.sql"
+const DefaultSchemaFile = "./db/schema.sql"
+
+// DefaultWaitInterval specifies length of time between connection attempts
+const DefaultWaitInterval = time.Second
+
+// DefaultWaitTimeout specifies maximum time for connection attempts
+const DefaultWaitTimeout = 60 * time.Second
 
 // DB allows dbmate actions to be performed on a specified database
 type DB struct {
@@ -24,6 +30,8 @@ type DB struct {
 	DatabaseURL    *url.URL
 	MigrationsDir  string
 	SchemaFile     string
+	WaitInterval   time.Duration
+	WaitTimeout    time.Duration
 }
 
 // New initializes a new dbmate database
@@ -33,12 +41,48 @@ func New(databaseURL *url.URL) *DB {
 		DatabaseURL:    databaseURL,
 		MigrationsDir:  DefaultMigrationsDir,
 		SchemaFile:     DefaultSchemaFile,
+		WaitInterval:   DefaultWaitInterval,
+		WaitTimeout:    DefaultWaitTimeout,
 	}
 }
 
 // GetDriver loads the required database driver
 func (db *DB) GetDriver() (Driver, error) {
 	return GetDriver(db.DatabaseURL.Scheme)
+}
+
+// Wait blocks until the database server is available. It does not verify that
+// the specified database exists, only that the host is ready to accept connections.
+func (db *DB) Wait() error {
+	drv, err := db.GetDriver()
+	if err != nil {
+		return err
+	}
+
+	// attempt connection to database server
+	err = drv.Ping(db.DatabaseURL)
+	if err == nil {
+		// connection successful
+		return nil
+	}
+
+	fmt.Print("Waiting for database")
+	for i := 0 * time.Second; i < db.WaitTimeout; i += db.WaitInterval {
+		fmt.Print(".")
+		time.Sleep(db.WaitInterval)
+
+		// attempt connection to database server
+		err = drv.Ping(db.DatabaseURL)
+		if err == nil {
+			// connection successful
+			fmt.Print("\n")
+			return nil
+		}
+	}
+
+	// if we find outselves here, we could not connect within the timeout
+	fmt.Print("\n")
+	return fmt.Errorf("unable to connect to database: %s", err)
 }
 
 // CreateAndMigrate creates the database (if necessary) and runs migrations
