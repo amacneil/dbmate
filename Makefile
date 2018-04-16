@@ -21,6 +21,11 @@ test:
 lint:
 	gometalinter.v2 $(PACKAGES)
 
+.PHONY: wait
+wait:
+	dbmate -e MYSQL_URL wait
+	dbmate -e POSTGRESQL_URL wait
+
 .PHONY: clean
 clean:
 	rm -rf dist
