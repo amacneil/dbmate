@@ -138,11 +138,7 @@ func (db *DB) NewMigration(name string) error {
 
 	defer mustClose(file)
 	_, err = file.WriteString(migrationTemplate)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func doTransaction(db *sql.DB, txFunc func(Transaction) error) error {

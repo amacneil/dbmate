@@ -19,9 +19,7 @@ test:
 
 .PHONY: lint
 lint:
-	golint -set_exit_status $(PACKAGES)
-	go vet $(PACKAGES)
-	errcheck $(PACKAGES)
+	gometalinter.v2 $(PACKAGES)
 
 .PHONY: clean
 clean:

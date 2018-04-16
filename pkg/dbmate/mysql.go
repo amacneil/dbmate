@@ -105,7 +105,7 @@ func mysqldumpArgs(u *url.URL) []string {
 	if username := u.User.Username(); username != "" {
 		args = append(args, "--user="+username)
 	}
-	// mysql recommands against using environment variables to supply password
+	// mysql recommends against using environment variables to supply password
 	// https://dev.mysql.com/doc/refman/5.7/en/password-security-user.html
 	if password, set := u.User.Password(); set {
 		args = append(args, "--password="+password)

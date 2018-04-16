@@ -15,9 +15,8 @@ RUN apt-get update \
 # development dependencies
 RUN curl -fsSL -o /usr/local/bin/dep https://github.com/golang/dep/releases/download/v0.3.2/dep-linux-amd64 \
 	&& chmod +x /usr/local/bin/dep
-RUN go get \
-	github.com/golang/lint/golint \
-	github.com/kisielk/errcheck
+RUN go get gopkg.in/alecthomas/gometalinter.v2 \
+	&& gometalinter.v2 --install
 
 # copy source files
 COPY . /go/src/github.com/amacneil/dbmate
