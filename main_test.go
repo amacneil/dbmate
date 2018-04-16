@@ -11,9 +11,7 @@ import (
 )
 
 func testContext(t *testing.T, u *url.URL) *cli.Context {
-	var err error
-
-	err = os.Setenv("DATABASE_URL", u.String())
+	err := os.Setenv("DATABASE_URL", u.String())
 	require.Nil(t, err)
 
 	app := NewApp()
