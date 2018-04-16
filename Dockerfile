@@ -1,5 +1,5 @@
 # build image
-FROM golang:1.9 as build
+FROM golang:1.10 as build
 
 # required to force cgo (for sqlite driver) with cross compile
 ENV CGO_ENABLED 1
