@@ -63,7 +63,7 @@ func TestWait(t *testing.T) {
 	err = db.Wait()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unable to connect to database: dial tcp")
-	require.Contains(t, err.Error(), "getsockopt: connection refused")
+	require.Contains(t, err.Error(), "connect: connection refused")
 }
 
 func TestDumpSchema(t *testing.T) {

@@ -270,5 +270,5 @@ func TestMySQLPing(t *testing.T) {
 	u.Host = "mysql:404"
 	err = drv.Ping(u)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "getsockopt: connection refused")
+	require.Contains(t, err.Error(), "connect: connection refused")
 }
