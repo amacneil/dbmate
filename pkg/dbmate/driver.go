@@ -17,6 +17,7 @@ type Driver interface {
 	SelectMigrations(*sql.DB, int) (map[string]bool, error)
 	InsertMigration(Transaction, string) error
 	DeleteMigration(Transaction, string) error
+	Ping(*url.URL) error
 }
 
 var drivers = map[string]Driver{}

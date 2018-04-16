@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -37,6 +38,32 @@ func TestNew(t *testing.T) {
 	require.Equal(t, u.String(), db.DatabaseURL.String())
 	require.Equal(t, "./db/migrations", db.MigrationsDir)
 	require.Equal(t, "./db/schema.sql", db.SchemaFile)
+	require.Equal(t, time.Second, db.WaitInterval)
+	require.Equal(t, 60*time.Second, db.WaitTimeout)
+}
+
+func TestWait(t *testing.T) {
+	u := postgresTestURL(t)
+	db := newTestDB(t, u)
+
+	// speed up our retry loop for testing
+	db.WaitInterval = time.Millisecond
+	db.WaitTimeout = 5 * time.Millisecond
+
+	// drop database
+	err := db.Drop()
+	require.Nil(t, err)
+
+	// test wait
+	err = db.Wait()
+	require.Nil(t, err)
+
+	// test invalid connection
+	u.Host = "postgres:404"
+	err = db.Wait()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unable to connect to database: dial tcp")
+	require.Contains(t, err.Error(), "getsockopt: connection refused")
 }
 
 func TestDumpSchema(t *testing.T) {

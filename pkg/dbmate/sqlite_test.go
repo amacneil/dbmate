@@ -40,6 +40,7 @@ func prepTestSQLiteDB(t *testing.T) *sql.DB {
 func TestSQLiteCreateDropDatabase(t *testing.T) {
 	drv := SQLiteDriver{}
 	u := sqliteTestURL(t)
+	path := sqlitePath(u)
 
 	// drop any existing database
 	err := drv.DropDatabase(u)
@@ -50,7 +51,7 @@ func TestSQLiteCreateDropDatabase(t *testing.T) {
 	require.Nil(t, err)
 
 	// check that database exists
-	_, err = os.Stat(sqlitePath(u))
+	_, err = os.Stat(path)
 	require.Nil(t, err)
 
 	// drop the database
@@ -58,7 +59,7 @@ func TestSQLiteCreateDropDatabase(t *testing.T) {
 	require.Nil(t, err)
 
 	// check that database no longer exists
-	_, err = os.Stat(sqlitePath(u))
+	_, err = os.Stat(path)
 	require.NotNil(t, err)
 	require.Equal(t, true, os.IsNotExist(err))
 }
@@ -211,4 +212,38 @@ func TestSQLiteDeleteMigration(t *testing.T) {
 	err = db.QueryRow("select count(*) from schema_migrations").Scan(&count)
 	require.Nil(t, err)
 	require.Equal(t, 1, count)
+}
+
+func TestSQLitePing(t *testing.T) {
+	drv := SQLiteDriver{}
+	u := sqliteTestURL(t)
+	path := sqlitePath(u)
+
+	// drop any existing database
+	err := drv.DropDatabase(u)
+	require.Nil(t, err)
+
+	// ping database
+	err = drv.Ping(u)
+	require.Nil(t, err)
+
+	// check that the database was created (sqlite-only behavior)
+	_, err = os.Stat(path)
+	require.Nil(t, err)
+
+	// drop the database
+	err = drv.DropDatabase(u)
+	require.Nil(t, err)
+
+	// create directory where database file is expected
+	err = os.Mkdir(path, 0755)
+	require.Nil(t, err)
+	defer func() {
+		err = os.RemoveAll(path)
+		require.Nil(t, err)
+	}()
+
+	// ping database should fail
+	err = drv.Ping(u)
+	require.EqualError(t, err, "unable to open database file")
 }
