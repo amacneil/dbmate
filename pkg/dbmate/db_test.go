@@ -19,10 +19,10 @@ func newTestDB(t *testing.T, u *url.URL) *DB {
 	// only chdir once, because testdata is relative to current directory
 	if testdataDir == "" {
 		testdataDir, err = filepath.Abs("../../testdata")
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		err = os.Chdir(testdataDir)
-		require.Nil(t, err)
+		require.NoError(t, err)
 	}
 
 	db := New(u)
@@ -52,11 +52,11 @@ func TestWait(t *testing.T) {
 
 	// drop database
 	err := db.Drop()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// test wait
 	err = db.Wait()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// test invalid connection
 	u.Host = "postgres:404"
@@ -72,10 +72,10 @@ func TestDumpSchema(t *testing.T) {
 
 	// create custom schema file directory
 	dir, err := ioutil.TempDir("", "dbmate")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	defer func() {
 		err := os.RemoveAll(dir)
-		require.Nil(t, err)
+		require.NoError(t, err)
 	}()
 
 	// create schema.sql in subdirectory to test creating directory
@@ -83,11 +83,11 @@ func TestDumpSchema(t *testing.T) {
 
 	// drop database
 	err = db.Drop()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// create and migrate
 	err = db.CreateAndMigrate()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// schema.sql should not exist
 	_, err = os.Stat(db.SchemaFile)
@@ -95,11 +95,11 @@ func TestDumpSchema(t *testing.T) {
 
 	// dump schema
 	err = db.DumpSchema()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// verify schema
 	schema, err := ioutil.ReadFile(db.SchemaFile)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Contains(t, string(schema), "-- PostgreSQL database dump")
 }
 
@@ -110,10 +110,10 @@ func TestAutoDumpSchema(t *testing.T) {
 
 	// create custom schema file directory
 	dir, err := ioutil.TempDir("", "dbmate")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	defer func() {
 		err := os.RemoveAll(dir)
-		require.Nil(t, err)
+		require.NoError(t, err)
 	}()
 
 	// create schema.sql in subdirectory to test creating directory
@@ -121,7 +121,7 @@ func TestAutoDumpSchema(t *testing.T) {
 
 	// drop database
 	err = db.Drop()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// schema.sql should not exist
 	_, err = os.Stat(db.SchemaFile)
@@ -129,24 +129,24 @@ func TestAutoDumpSchema(t *testing.T) {
 
 	// create and migrate
 	err = db.CreateAndMigrate()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// verify schema
 	schema, err := ioutil.ReadFile(db.SchemaFile)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Contains(t, string(schema), "-- PostgreSQL database dump")
 
 	// remove schema
 	err = os.Remove(db.SchemaFile)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// rollback
 	err = db.Rollback()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// schema should be recreated
 	schema, err = ioutil.ReadFile(db.SchemaFile)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Contains(t, string(schema), "-- PostgreSQL database dump")
 }
 
@@ -163,27 +163,27 @@ func testMigrateURL(t *testing.T, u *url.URL) {
 
 	// drop and recreate database
 	err := db.Drop()
-	require.Nil(t, err)
+	require.NoError(t, err)
 	err = db.Create()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// migrate
 	err = db.Migrate()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// verify results
 	sqlDB, err := GetDriverOpen(u)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	defer mustClose(sqlDB)
 
 	count := 0
 	err = sqlDB.QueryRow(`select count(*) from schema_migrations
 		where version = '20151129054053'`).Scan(&count)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, 1, count)
 
 	err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, 1, count)
 }
 
@@ -198,25 +198,25 @@ func testUpURL(t *testing.T, u *url.URL) {
 
 	// drop database
 	err := db.Drop()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// create and migrate
 	err = db.CreateAndMigrate()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// verify results
 	sqlDB, err := GetDriverOpen(u)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	defer mustClose(sqlDB)
 
 	count := 0
 	err = sqlDB.QueryRow(`select count(*) from schema_migrations
 		where version = '20151129054053'`).Scan(&count)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, 1, count)
 
 	err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, 1, count)
 }
 
@@ -231,30 +231,30 @@ func testRollbackURL(t *testing.T, u *url.URL) {
 
 	// drop, recreate, and migrate database
 	err := db.Drop()
-	require.Nil(t, err)
+	require.NoError(t, err)
 	err = db.Create()
-	require.Nil(t, err)
+	require.NoError(t, err)
 	err = db.Migrate()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// verify migration
 	sqlDB, err := GetDriverOpen(u)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	defer mustClose(sqlDB)
 
 	count := 0
 	err = sqlDB.QueryRow(`select count(*) from schema_migrations
 		where version = '20151129054053'`).Scan(&count)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, 1, count)
 
 	// rollback
 	err = db.Rollback()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// verify rollback
 	err = sqlDB.QueryRow("select count(*) from schema_migrations").Scan(&count)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, 0, count)
 
 	err = sqlDB.QueryRow("select count(*) from users").Scan(&count)

@@ -12,7 +12,7 @@ import (
 
 func testContext(t *testing.T, u *url.URL) *cli.Context {
 	err := os.Setenv("DATABASE_URL", u.String())
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	app := NewApp()
 	flagset := flag.NewFlagSet(app.Name, flag.ContinueOnError)
@@ -25,11 +25,11 @@ func testContext(t *testing.T, u *url.URL) *cli.Context {
 
 func TestGetDatabaseUrl(t *testing.T) {
 	envURL, err := url.Parse("foo://example.org/db")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	ctx := testContext(t, envURL)
 
 	u, err := getDatabaseURL(ctx)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	require.Equal(t, "foo", u.Scheme)
 	require.Equal(t, "example.org", u.Host)
