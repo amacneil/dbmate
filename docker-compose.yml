@@ -5,19 +5,16 @@ services:
       context: .
       target: build
     depends_on:
-      mysql:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
+      - mysql
+      - postgres
+    environment:
+      MYSQL_URL: mysql://root:root@mysql/dbmate
+      POSTGRESQL_URL: postgres://postgres:postgres@postgres/dbmate?sslmode=disable
 
   mysql:
     image: mysql:5.7
     environment:
       MYSQL_ROOT_PASSWORD: root
-    healthcheck:
-      test: ["CMD", "mysqladmin", "status", "-proot"]
 
   postgres:
     image: postgres:9.6
-    healthcheck:
-      test: ["CMD", "pg_isready"]
