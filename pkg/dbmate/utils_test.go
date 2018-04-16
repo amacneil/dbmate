@@ -9,7 +9,7 @@ import (
 
 func TestDatabaseName(t *testing.T) {
 	u, err := url.Parse("ignore://localhost/foo?query")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	name := databaseName(u)
 	require.Equal(t, "foo", name)
@@ -17,7 +17,7 @@ func TestDatabaseName(t *testing.T) {
 
 func TestDatabaseName_Empty(t *testing.T) {
 	u, err := url.Parse("ignore://localhost")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	name := databaseName(u)
 	require.Equal(t, "", name)
@@ -30,6 +30,6 @@ func TestTrimLeadingSQLComments(t *testing.T) {
 		"real stuff\n" +
 		"-- end\n"
 	out, err := trimLeadingSQLComments([]byte(in))
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, "real stuff\n-- end\n", string(out))
 }
