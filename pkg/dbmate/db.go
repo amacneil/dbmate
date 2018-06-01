@@ -204,6 +204,23 @@ func doTransaction(db *sql.DB, txFunc func(Transaction) error) error {
 	return tx.Commit()
 }
 
+func dryrunTransaction(db *sql.DB, txFunc func(Transaction) error) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+
+	if err := txFunc(tx); err != nil {
+		if err1 := tx.Rollback(); err1 != nil {
+			return err1
+		}
+
+		return err
+	}
+
+	return tx.Rollback()
+}
+
 func (db *DB) openDatabaseForMigration() (Driver, *sql.DB, error) {
 	drv, err := db.GetDriver()
 	if err != nil {
@@ -226,6 +243,59 @@ func (db *DB) openDatabaseForMigration() (Driver, *sql.DB, error) {
 // Migrate migrates database to the latest version. If dryrun is true, this doesn't migrate but
 // returns if such a migration may fail.
 func (db *DB) Migrate(dryrun bool) error {
+	if dryrun {
+		return db.migrateDryrun()
+	}
+	return db.migrate()
+}
+
+func (db *DB) migrateDryrun() error {
+	re := regexp.MustCompile(`^\d.*\.sql$`)
+	files, err := findMigrationFiles(db.MigrationsDir, re)
+	if err != nil {
+		return err
+	}
+
+	if len(files) == 0 {
+		return fmt.Errorf("no migration files found")
+	}
+
+	drv, sqlDB, err := db.openDatabaseForMigration()
+	if err != nil {
+		return err
+	}
+	defer mustClose(sqlDB)
+
+	applied, err := drv.SelectMigrations(sqlDB, -1)
+	if err != nil {
+		return err
+	}
+	// begin transaction
+	err = dryrunTransaction(sqlDB, func(tx Transaction) error {
+		for _, filename := range files {
+			ver := migrationVersion(filename)
+			if ok := applied[ver]; ok {
+				// migration already applied
+				continue
+			}
+
+			fmt.Printf("Attempting to apply : %s\n", filename)
+			migration, err := parseMigration(filepath.Join(db.MigrationsDir, filename))
+			if err != nil {
+				return err
+			}
+
+			// run actual migration
+			if _, err := tx.Exec(migration["up"]); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return err
+}
+
+func (db *DB) migrate() error {
 	re := regexp.MustCompile(`^\d.*\.sql$`)
 	files, err := findMigrationFiles(db.MigrationsDir, re)
 	if err != nil {
@@ -255,7 +325,6 @@ func (db *DB) Migrate(dryrun bool) error {
 		}
 
 		fmt.Printf("Applying: %s\n", filename)
-
 		migration, err := parseMigration(filepath.Join(db.MigrationsDir, filename))
 		if err != nil {
 			return err
