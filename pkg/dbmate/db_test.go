@@ -193,6 +193,41 @@ func TestMigrate(t *testing.T) {
 	}
 }
 
+func testMigrateDryrunURL(t *testing.T, u *url.URL) {
+	db := newTestDB(t, u)
+
+	// drop and recreate database
+	err := db.Drop()
+	require.NoError(t, err)
+	err = db.Create(false)
+	require.NoError(t, err)
+
+	// migrate
+	err = db.Migrate(true)
+	require.NoError(t, err)
+
+	// verify results
+	sqlDB, err := GetDriverOpen(u)
+	require.NoError(t, err)
+	defer mustClose(sqlDB)
+
+	count := 1
+	err = sqlDB.QueryRow(`select count(*) from schema_migrations
+		where version = '20151129054053'`).Scan(&count)
+	require.NoError(t, err)
+	require.Equal(t, 0, count)
+
+	err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
+	require.NotNil(t, err)
+	require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
+}
+
+func TestMigrateDryrun(t *testing.T) {
+	for _, u := range testURLs(t) {
+		testMigrateDryrunURL(t, u)
+	}
+}
+
 func testUpURL(t *testing.T, u *url.URL) {
 	db := newTestDB(t, u)
 
