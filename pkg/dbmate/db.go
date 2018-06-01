@@ -85,8 +85,9 @@ func (db *DB) Wait() error {
 	return fmt.Errorf("unable to connect to database: %s", err)
 }
 
-// CreateAndMigrate creates the database (if necessary) and runs migrations
-func (db *DB) CreateAndMigrate() error {
+// CreateAndMigrate creates and migrates and share errors if any. If dryrun is true, this doesn't
+// create or migrate but returns if CreateAndMigrate would succeed.
+func (db *DB) CreateAndMigrate(dryrun bool) error {
 	drv, err := db.GetDriver()
 	if err != nil {
 		return err
@@ -103,11 +104,12 @@ func (db *DB) CreateAndMigrate() error {
 	}
 
 	// migrate
-	return db.Migrate()
+	return db.Migrate(dryrun)
 }
 
-// Create creates the current database
-func (db *DB) Create() error {
+// Create creates the current database. If dryrun is true, it doesn't create the database but only returns
+// if create would succeed.
+func (db *DB) Create(dryrun bool) error {
 	drv, err := db.GetDriver()
 	if err != nil {
 		return err
@@ -221,8 +223,9 @@ func (db *DB) openDatabaseForMigration() (Driver, *sql.DB, error) {
 	return drv, sqlDB, nil
 }
 
-// Migrate migrates database to the latest version
-func (db *DB) Migrate() error {
+// Migrate migrates database to the latest version. If dryrun is true, this doesn't migrate but
+// returns if such a migration may fail.
+func (db *DB) Migrate(dryrun bool) error {
 	re := regexp.MustCompile(`^\d.*\.sql$`)
 	files, err := findMigrationFiles(db.MigrationsDir, re)
 	if err != nil {
