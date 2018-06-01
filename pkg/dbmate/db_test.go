@@ -86,7 +86,7 @@ func TestDumpSchema(t *testing.T) {
 	require.NoError(t, err)
 
 	// create and migrate
-	err = db.CreateAndMigrate()
+	err = db.CreateAndMigrate(false)
 	require.NoError(t, err)
 
 	// schema.sql should not exist
@@ -128,7 +128,7 @@ func TestAutoDumpSchema(t *testing.T) {
 	require.True(t, os.IsNotExist(err))
 
 	// create and migrate
-	err = db.CreateAndMigrate()
+	err = db.CreateAndMigrate(false)
 	require.NoError(t, err)
 
 	// verify schema
@@ -164,11 +164,11 @@ func testMigrateURL(t *testing.T, u *url.URL) {
 	// drop and recreate database
 	err := db.Drop()
 	require.NoError(t, err)
-	err = db.Create()
+	err = db.Create(false)
 	require.NoError(t, err)
 
 	// migrate
-	err = db.Migrate()
+	err = db.Migrate(false)
 	require.NoError(t, err)
 
 	// verify results
@@ -201,7 +201,7 @@ func testUpURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 
 	// create and migrate
-	err = db.CreateAndMigrate()
+	err = db.CreateAndMigrate(false)
 	require.NoError(t, err)
 
 	// verify results
@@ -232,9 +232,9 @@ func testRollbackURL(t *testing.T, u *url.URL) {
 	// drop, recreate, and migrate database
 	err := db.Drop()
 	require.NoError(t, err)
-	err = db.Create()
+	err = db.Create(false)
 	require.NoError(t, err)
-	err = db.Migrate()
+	err = db.Migrate(false)
 	require.NoError(t, err)
 
 	// verify migration
