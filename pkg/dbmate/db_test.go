@@ -217,9 +217,9 @@ func testMigrateAndRollbackURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 	require.Equal(t, 0, count)
 
-	err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
-	require.NotNil(t, err)
-	require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
+	// err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
+	// require.NotNil(t, err)
+	// require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
 }
 
 func TestMigrateAndRollback(t *testing.T) {
@@ -258,6 +258,39 @@ func testUpURL(t *testing.T, u *url.URL) {
 func TestUp(t *testing.T) {
 	for _, u := range testURLs(t) {
 		testUpURL(t, u)
+	}
+}
+
+func testUpAndRollbackURL(t *testing.T, u *url.URL) {
+	db := newTestDB(t, u)
+
+	// drop database
+	err := db.Drop()
+	require.NoError(t, err)
+
+	// create and migrate
+	err = db.CreateAndMigrate(false)
+	require.NoError(t, err)
+
+	// verify results
+	sqlDB, err := GetDriverOpen(u)
+	require.NoError(t, err)
+	defer mustClose(sqlDB)
+
+	count := 0
+	err = sqlDB.QueryRow(`select count(*) from schema_migrations
+		where version = '20151129054053'`).Scan(&count)
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+
+	// err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
+	// require.NotNil(t, err)
+	// require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
+}
+
+func TestUpAndRollback(t *testing.T) {
+	for _, u := range testURLs(t) {
+		testUpAndRollbackURL(t, u)
 	}
 }
 
