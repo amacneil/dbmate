@@ -104,7 +104,7 @@ func NewApp() *cli.App {
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
-				return db.Migrate(c.GlobalBool("dryrun"))
+				return db.Migrate(c.Bool("dryrun"))
 			}),
 		},
 		{
