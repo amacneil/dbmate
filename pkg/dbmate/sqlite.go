@@ -177,3 +177,8 @@ func (drv SQLiteDriver) Ping(u *url.URL) error {
 
 	return db.Ping()
 }
+
+// SupportsTransactionalDDL reports if the database engine supports Transactional DDL
+func (drv SQLiteDriver) SupportsTransactionalDDL() bool {
+	return true
+}

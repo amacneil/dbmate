@@ -185,3 +185,8 @@ func (drv PostgresDriver) Ping(u *url.URL) error {
 
 	return db.Ping()
 }
+
+// SupportsTransactionalDDL reports if the database engine supports Transactional DDL
+func (drv PostgresDriver) SupportsTransactionalDDL() bool {
+	return true
+}

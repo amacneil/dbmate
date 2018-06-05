@@ -94,6 +94,10 @@ func (db *DB) CreateAndMigrate(withRollback bool) error {
 		return err
 	}
 
+	if !drv.SupportsTransactionalDDL() && withRollback {
+		return nil
+	}
+
 	// create database if it does not already exist
 	// skip this step if we cannot determine status
 	// (e.g. user does not have list database permission)
@@ -272,6 +276,10 @@ func (db *DB) migrateAndRollback() error {
 		return err
 	}
 	defer mustClose(sqlDB)
+
+	if !drv.SupportsTransactionalDDL() {
+		return nil
+	}
 
 	applied, err := drv.SelectMigrations(sqlDB, -1)
 	if err != nil {
