@@ -85,8 +85,9 @@ func (db *DB) Wait() error {
 	return fmt.Errorf("unable to connect to database: %s", err)
 }
 
-// CreateAndMigrate creates and migrates and share errors if any. If withRollback is true, this doesn't
-// create or migrate but returns if CreateAndMigrate would succeed.
+// CreateAndMigrate creates and migrates and share errors if any.
+// If withRollback is true, this doesn't create or migrate but
+// returns if CreateAndMigrate would succeed.
 func (db *DB) CreateAndMigrate(withRollback bool) error {
 	drv, err := db.GetDriver()
 	if err != nil {
@@ -246,8 +247,8 @@ func (db *DB) openDatabaseForMigration() (Driver, *sql.DB, error) {
 	return drv, sqlDB, nil
 }
 
-// Migrate migrates database to the latest version. If withRollback is true, this doesn't migrate but
-// returns if such a migration may fail.
+// Migrate migrates database to the latest version. If withRollback is true,
+// this doesn't migrate but returns if such a migration may fail.
 func (db *DB) Migrate(withRollback bool) error {
 	if withRollback {
 		return db.migrateAndRollback()
