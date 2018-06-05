@@ -85,9 +85,9 @@ func (db *DB) Wait() error {
 	return fmt.Errorf("unable to connect to database: %s", err)
 }
 
-// CreateAndMigrate creates and migrates and share errors if any. If dryrun is true, this doesn't
+// CreateAndMigrate creates and migrates and share errors if any. If with_rollback is true, this doesn't
 // create or migrate but returns if CreateAndMigrate would succeed.
-func (db *DB) CreateAndMigrate(dryrun bool) error {
+func (db *DB) CreateAndMigrate(with_rollback bool) error {
 	drv, err := db.GetDriver()
 	if err != nil {
 		return err
@@ -104,12 +104,12 @@ func (db *DB) CreateAndMigrate(dryrun bool) error {
 	}
 
 	// migrate
-	return db.Migrate(dryrun)
+	return db.Migrate(with_rollback)
 }
 
-// Create creates the current database. If dryrun is true, it doesn't create the database but only returns
+// Create creates the current database. If with_rollback is true, it doesn't create the database but only returns
 // if create would succeed.
-func (db *DB) Create(dryrun bool) error {
+func (db *DB) Create(with_rollback bool) error {
 	drv, err := db.GetDriver()
 	if err != nil {
 		return err
@@ -204,7 +204,7 @@ func doTransaction(db *sql.DB, txFunc func(Transaction) error) error {
 	return tx.Commit()
 }
 
-func dryrunTransaction(db *sql.DB, txFunc func(Transaction) error) error {
+func transactAndRollback(db *sql.DB, txFunc func(Transaction) error) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -240,16 +240,16 @@ func (db *DB) openDatabaseForMigration() (Driver, *sql.DB, error) {
 	return drv, sqlDB, nil
 }
 
-// Migrate migrates database to the latest version. If dryrun is true, this doesn't migrate but
+// Migrate migrates database to the latest version. If with_rollback is true, this doesn't migrate but
 // returns if such a migration may fail.
-func (db *DB) Migrate(dryrun bool) error {
-	if dryrun {
-		return db.migrateDryrun()
+func (db *DB) Migrate(with_rollback bool) error {
+	if with_rollback {
+		return db.migrateAndRollback()
 	}
 	return db.migrate()
 }
 
-func (db *DB) migrateDryrun() error {
+func (db *DB) migrateAndRollback() error {
 	re := regexp.MustCompile(`^\d.*\.sql$`)
 	files, err := findMigrationFiles(db.MigrationsDir, re)
 	if err != nil {
@@ -271,7 +271,7 @@ func (db *DB) migrateDryrun() error {
 		return err
 	}
 	// begin transaction
-	err = dryrunTransaction(sqlDB, func(tx Transaction) error {
+	err = transactAndRollback(sqlDB, func(tx Transaction) error {
 		for _, filename := range files {
 			ver := migrationVersion(filename)
 			if ok := applied[ver]; ok {

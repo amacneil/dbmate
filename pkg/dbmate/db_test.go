@@ -193,7 +193,7 @@ func TestMigrate(t *testing.T) {
 	}
 }
 
-func testMigrateDryrunURL(t *testing.T, u *url.URL) {
+func testMigrateAndRollbackURL(t *testing.T, u *url.URL) {
 	db := newTestDB(t, u)
 
 	// drop and recreate database
@@ -222,9 +222,9 @@ func testMigrateDryrunURL(t *testing.T, u *url.URL) {
 	require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
 }
 
-func TestMigrateDryrun(t *testing.T) {
+func TestMigrateAndRollback(t *testing.T) {
 	for _, u := range testURLs(t) {
-		testMigrateDryrunURL(t, u)
+		testMigrateAndRollbackURL(t, u)
 	}
 }
 
