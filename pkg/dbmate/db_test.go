@@ -269,7 +269,7 @@ func testUpAndRollbackURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 
 	// create and migrate
-	err = db.CreateAndMigrate(false)
+	err = db.CreateAndMigrate(true)
 	require.NoError(t, err)
 
 	// verify results
@@ -277,15 +277,13 @@ func testUpAndRollbackURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 	defer mustClose(sqlDB)
 
-	count := 0
-	err = sqlDB.QueryRow(`select count(*) from schema_migrations
-		where version = '20151129054053'`).Scan(&count)
+	drv, err := db.GetDriver()
 	require.NoError(t, err)
-	require.Equal(t, 1, count)
 
-	err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
-	require.NotNil(t, err)
-	require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
+	exists, err := drv.DatabaseExists(u)
+	require.NoError(t, err)
+
+	require.Equal(t, exists, false)
 }
 
 func TestUpAndRollback(t *testing.T) {
