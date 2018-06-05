@@ -217,9 +217,9 @@ func testMigrateAndRollbackURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 	require.Equal(t, 0, count)
 
-	// err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
-	// require.NotNil(t, err)
-	// require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
+	err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
+	require.NotNil(t, err)
+	require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
 }
 
 func TestMigrateAndRollback(t *testing.T) {
@@ -283,9 +283,9 @@ func testUpAndRollbackURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
 
-	// err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
-	// require.NotNil(t, err)
-	// require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
+	err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
+	require.NotNil(t, err)
+	require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
 }
 
 func TestUpAndRollback(t *testing.T) {
