@@ -66,12 +66,12 @@ func NewApp() *cli.App {
 			Usage: "Create database (if necessary) and migrate to the latest version",
 			Flags: []cli.Flag{
 				cli.BoolFlag{
-					Name:  "dryrun",
-					Usage: "Only checks if this command can succeed by testing it on the database",
+					Name:  "with-rollback",
+					Usage: "Checks if this command can succeed by running migrations within a transaction that is ultimately rolled back.",
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
-				return db.CreateAndMigrate(c.GlobalBool("dryrun"))
+				return db.CreateAndMigrate(c.Bool("with-rollback"))
 			}),
 		},
 		{
@@ -79,12 +79,12 @@ func NewApp() *cli.App {
 			Usage: "Create database",
 			Flags: []cli.Flag{
 				cli.BoolFlag{
-					Name:  "dryrun",
-					Usage: "Only checks if this command can succeed by testing it on the database",
+					Name:  "with-rollback",
+					Usage: "Checks if this command can succeed by running creating within a transaction that is ultimately rolled back.",
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
-				return db.Create(c.GlobalBool("dryrun"))
+				return db.Create(c.Bool("with-rollback"))
 			}),
 		},
 		{
@@ -99,12 +99,12 @@ func NewApp() *cli.App {
 			Usage: "Migrate to the latest version",
 			Flags: []cli.Flag{
 				cli.BoolFlag{
-					Name:  "dryrun",
-					Usage: "Only checks if this command can succeed by testing it on the database",
+					Name:  "with-rollback",
+					Usage: "Checks if this command can succeed by running migrations within a transaction that is ultimately rolled back.",
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
-				return db.Migrate(c.Bool("dryrun"))
+				return db.Migrate(c.Bool("with-rollback"))
 			}),
 		},
 		{
