@@ -85,9 +85,9 @@ func (db *DB) Wait() error {
 	return fmt.Errorf("unable to connect to database: %s", err)
 }
 
-// CreateAndMigrate creates and migrates and share errors if any. If with_rollback is true, this doesn't
+// CreateAndMigrate creates and migrates and share errors if any. If withRollback is true, this doesn't
 // create or migrate but returns if CreateAndMigrate would succeed.
-func (db *DB) CreateAndMigrate(with_rollback bool) error {
+func (db *DB) CreateAndMigrate(withRollback bool) error {
 	drv, err := db.GetDriver()
 	if err != nil {
 		return err
@@ -96,19 +96,19 @@ func (db *DB) CreateAndMigrate(with_rollback bool) error {
 	// create database if it does not already exist
 	// skip this step if we cannot determine status
 	// (e.g. user does not have list database permission)
-	created_db = false
+	createdDb := false
 
 	exists, err := drv.DatabaseExists(db.DatabaseURL)
 	if err == nil && !exists {
 		if err := drv.CreateDatabase(db.DatabaseURL); err != nil {
 			return err
 		}
-		created_db = true
+		createdDb = true
 	}
 
 	// migrate
-	err = db.Migrate(with_rollback)
-	if err == nil && with_rollback && created_db {
+	err = db.Migrate(withRollback)
+	if err == nil && withRollback && createdDb {
 		return drv.DropDatabase(db.DatabaseURL)
 	}
 	return err
@@ -246,10 +246,10 @@ func (db *DB) openDatabaseForMigration() (Driver, *sql.DB, error) {
 	return drv, sqlDB, nil
 }
 
-// Migrate migrates database to the latest version. If with_rollback is true, this doesn't migrate but
+// Migrate migrates database to the latest version. If withRollback is true, this doesn't migrate but
 // returns if such a migration may fail.
-func (db *DB) Migrate(with_rollback bool) error {
-	if with_rollback {
+func (db *DB) Migrate(withRollback bool) error {
+	if withRollback {
 		return db.migrateAndRollback()
 	}
 	return db.migrate()
