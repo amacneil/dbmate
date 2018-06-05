@@ -164,7 +164,7 @@ func testMigrateURL(t *testing.T, u *url.URL) {
 	// drop and recreate database
 	err := db.Drop()
 	require.NoError(t, err)
-	err = db.Create(false)
+	err = db.Create()
 	require.NoError(t, err)
 
 	// migrate
@@ -199,7 +199,7 @@ func testMigrateAndRollbackURL(t *testing.T, u *url.URL) {
 	// drop and recreate database
 	err := db.Drop()
 	require.NoError(t, err)
-	err = db.Create(false)
+	err = db.Create()
 	require.NoError(t, err)
 
 	// migrate
@@ -267,7 +267,7 @@ func testRollbackURL(t *testing.T, u *url.URL) {
 	// drop, recreate, and migrate database
 	err := db.Drop()
 	require.NoError(t, err)
-	err = db.Create(false)
+	err = db.Create()
 	require.NoError(t, err)
 	err = db.Migrate(false)
 	require.NoError(t, err)

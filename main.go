@@ -67,8 +67,8 @@ func NewApp() *cli.App {
 			Flags: []cli.Flag{
 				cli.BoolFlag{
 					Name: "with-rollback",
-					Usage: "Checks if this command can succeed by running migrations within a transaction that is ultimately rolled back.\n" +
-						"\tWARNING:- MySQL doesn't support transactional DDL and therefore this flag results in an error for MySQL.",
+					Usage: "Checks if this command can succeed by running migrations within a transaction that is ultimately rolled back\n" +
+						"\tWARNING:- MySQL doesn't support transactional DDL and therefore this flag results in an error for MySQL",
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
@@ -78,15 +78,8 @@ func NewApp() *cli.App {
 		{
 			Name:  "create",
 			Usage: "Create database",
-			Flags: []cli.Flag{
-				cli.BoolFlag{
-					Name: "with-rollback",
-					Usage: "Checks if this command can succeed by running creating within a transaction that is ultimately rolled back.\n" +
-						"\tWARNING:- MySQL doesn't support transactional DDL and therefore this flag results in an error for MySQL.",
-				},
-			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
-				return db.Create(c.Bool("with-rollback"))
+				return db.Create()
 			}),
 		},
 		{
@@ -102,8 +95,8 @@ func NewApp() *cli.App {
 			Flags: []cli.Flag{
 				cli.BoolFlag{
 					Name: "with-rollback",
-					Usage: "Checks if this command can succeed by running migrations within a transaction that is ultimately rolled back.\n" +
-						"\tWARNING:- MySQL doesn't support transactional DDL and therefore this flag results in an error for MySQL.",
+					Usage: "Checks if this command can succeed by running migrations within a transaction that is ultimately rolled back\n" +
+						"\tWARNING:- MySQL doesn't support transactional DDL and therefore this flag results in an error for MySQL",
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {

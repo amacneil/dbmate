@@ -107,9 +107,8 @@ func (db *DB) CreateAndMigrate(with_rollback bool) error {
 	return db.Migrate(with_rollback)
 }
 
-// Create creates the current database. If with_rollback is true, it doesn't create the database but only returns
-// if create would succeed.
-func (db *DB) Create(with_rollback bool) error {
+// Create creates the current database.
+func (db *DB) Create() error {
 	drv, err := db.GetDriver()
 	if err != nil {
 		return err
