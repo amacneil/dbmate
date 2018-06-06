@@ -341,7 +341,7 @@ Why another database schema migration tool? Dbmate was inspired by many other to
 
 > :eight_pointed_black_star: In theory these tools could be used with other languages, but a Go development environment is required because binary builds are not provided.
 
-> :eight_spoked_asterisk: [sql-migrate](https://github.com/rubenv/sql-migrate) supports `dryrun` during which it simply prints migration without applying. This isn't same as `with-rollback`
+> :eight_spoked_asterisk: [sql-migrate](https://github.com/rubenv/sql-migrate) supports `dryrun` during which it simply prints migrations without applying. This isn't same as `with-rollback`
 
 *If you notice any inaccuracies in this table, please [propose a change](https://github.com/amacneil/dbmate/edit/master/README.md).*
 
