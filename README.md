@@ -333,7 +333,7 @@ Why another database schema migration tool? Dbmate was inspired by many other to
 |Automatically load .env file||||||:white_check_mark:|
 |No separate configuration file||||:white_check_mark:|:white_check_mark:|:white_check_mark:|
 |Language/framework independent|:eight_pointed_black_star:|:eight_pointed_black_star:|:eight_pointed_black_star:|||:white_check_mark:|
-|Support for validating migrations|:eight_spoked_asterisk:|||||:white_check_mark:|
+|Support for validating migrations||:eight_spoked_asterisk:||||:white_check_mark:|
 | **Drivers** |||||||
 |PostgreSQL|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
 |MySQL|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
