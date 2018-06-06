@@ -193,6 +193,8 @@ func TestMigrate(t *testing.T) {
 	}
 }
 
+// We need a separate function since we need to apply all
+// migrations inside a transaction.
 func testMigrateAndRollbackURL(t *testing.T, u *url.URL) {
 	db := newTestDB(t, u)
 
@@ -226,8 +228,10 @@ func testMigrateAndRollbackURL(t *testing.T, u *url.URL) {
 		err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
 		require.NotNil(t, err)
 		require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
+
 	} else {
 		require.Error(t, migrateWithRollbackResult)
+
 	}
 }
 
@@ -290,7 +294,6 @@ func testUpAndRollbackURL(t *testing.T, u *url.URL) {
 
 	// validate results
 	if drv.SupportsTransactionalDDL() {
-
 		require.NoError(t, createMigrateWithRollbackResult)
 
 		exists, err := drv.DatabaseExists(u)
@@ -299,6 +302,7 @@ func testUpAndRollbackURL(t *testing.T, u *url.URL) {
 
 	} else {
 		require.Error(t, createMigrateWithRollbackResult)
+
 	}
 }
 
