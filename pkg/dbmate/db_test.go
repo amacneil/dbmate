@@ -203,23 +203,32 @@ func testMigrateAndRollbackURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 
 	// migrate
-	err = db.Migrate(true)
-	require.NoError(t, err)
+	migrateWithRollbackResult := db.Migrate(true)
 
-	// verify results
+	// get things necessary to validate result
 	sqlDB, err := GetDriverOpen(u)
 	require.NoError(t, err)
 	defer mustClose(sqlDB)
 
-	count := 1
-	err = sqlDB.QueryRow(`select count(*) from schema_migrations
-		where version = '20151129054053'`).Scan(&count)
+	drv, err := db.GetDriver()
 	require.NoError(t, err)
-	require.Equal(t, 0, count)
 
-	err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
-	require.NotNil(t, err)
-	require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
+	// validate results
+	if drv.SupportsTransactionalDDL() {
+		require.NoError(t, migrateWithRollbackResult)
+
+		count := 1
+		err = sqlDB.QueryRow(`select count(*) from schema_migrations
+		where version = '20151129054053'`).Scan(&count)
+		require.NoError(t, err)
+		require.Equal(t, 0, count)
+
+		err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
+		require.NotNil(t, err)
+		require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
+	} else {
+		require.Error(t, migrateWithRollbackResult)
+	}
 }
 
 func TestMigrateAndRollback(t *testing.T) {
@@ -269,10 +278,9 @@ func testUpAndRollbackURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 
 	// create and migrate
-	err = db.CreateAndMigrate(true)
-	require.NoError(t, err)
+	createMigrateWithRollbackResult := db.CreateAndMigrate(true)
 
-	// verify results
+	// get things necessary to validate result
 	sqlDB, err := GetDriverOpen(u)
 	require.NoError(t, err)
 	defer mustClose(sqlDB)
@@ -280,10 +288,18 @@ func testUpAndRollbackURL(t *testing.T, u *url.URL) {
 	drv, err := db.GetDriver()
 	require.NoError(t, err)
 
-	exists, err := drv.DatabaseExists(u)
-	require.NoError(t, err)
+	// validate results
+	if drv.SupportsTransactionalDDL() {
 
-	require.Equal(t, exists, false)
+		require.NoError(t, createMigrateWithRollbackResult)
+
+		exists, err := drv.DatabaseExists(u)
+		require.NoError(t, err)
+		require.Equal(t, exists, false)
+
+	} else {
+		require.Error(t, createMigrateWithRollbackResult)
+	}
 }
 
 func TestUpAndRollback(t *testing.T) {
