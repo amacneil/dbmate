@@ -95,7 +95,7 @@ func (db *DB) CreateAndMigrate(withRollback bool) error {
 	}
 
 	if !drv.SupportsTransactionalDDL() && withRollback {
-		return fmt.Errorf("%s doesn't support Transactional DDL. with-rollback is not supported", db.DatabaseURL.Scheme)
+		return fmt.Errorf("%s doesn't support Transactional DDL. Therefore, with-rollback flag is not supported", db.DatabaseURL.Scheme)
 	}
 
 	// create database if it does not already exist
@@ -278,7 +278,7 @@ func (db *DB) migrateAndRollback() error {
 	defer mustClose(sqlDB)
 
 	if !drv.SupportsTransactionalDDL() {
-		return fmt.Errorf("%s doesn't support Transactional DDL. with-rollback is not supported", db.DatabaseURL.Scheme)
+		return fmt.Errorf("%s doesn't support Transactional DDL. Therefore, with-rollback flag is not supported", db.DatabaseURL.Scheme)
 	}
 
 	applied, err := drv.SelectMigrations(sqlDB, -1)
