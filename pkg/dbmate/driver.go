@@ -18,6 +18,7 @@ type Driver interface {
 	InsertMigration(Transaction, string) error
 	DeleteMigration(Transaction, string) error
 	Ping(*url.URL) error
+	SupportsTransactionalDDL() bool
 }
 
 var drivers = map[string]Driver{}

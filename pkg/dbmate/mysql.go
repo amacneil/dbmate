@@ -237,3 +237,8 @@ func (drv MySQLDriver) Ping(u *url.URL) error {
 
 	return db.Ping()
 }
+
+// SupportsTransactionalDDL reports if the database engine supports Transactional DDL
+func (drv MySQLDriver) SupportsTransactionalDDL() bool {
+	return false
+}

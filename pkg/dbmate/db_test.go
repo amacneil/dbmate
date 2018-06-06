@@ -86,7 +86,7 @@ func TestDumpSchema(t *testing.T) {
 	require.NoError(t, err)
 
 	// create and migrate
-	err = db.CreateAndMigrate()
+	err = db.CreateAndMigrate(false)
 	require.NoError(t, err)
 
 	// schema.sql should not exist
@@ -128,7 +128,7 @@ func TestAutoDumpSchema(t *testing.T) {
 	require.True(t, os.IsNotExist(err))
 
 	// create and migrate
-	err = db.CreateAndMigrate()
+	err = db.CreateAndMigrate(false)
 	require.NoError(t, err)
 
 	// verify schema
@@ -168,7 +168,7 @@ func testMigrateURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 
 	// migrate
-	err = db.Migrate()
+	err = db.Migrate(false)
 	require.NoError(t, err)
 
 	// verify results
@@ -193,6 +193,54 @@ func TestMigrate(t *testing.T) {
 	}
 }
 
+// We need a separate function since we need to apply all
+// migrations inside a transaction.
+func testMigrateAndRollbackURL(t *testing.T, u *url.URL) {
+	db := newTestDB(t, u)
+
+	// drop and recreate database
+	err := db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
+
+	// migrate
+	migrateWithRollbackResult := db.Migrate(true)
+
+	// get things necessary to validate result
+	sqlDB, err := GetDriverOpen(u)
+	require.NoError(t, err)
+	defer mustClose(sqlDB)
+
+	drv, err := db.GetDriver()
+	require.NoError(t, err)
+
+	// validate results
+	if drv.SupportsTransactionalDDL() {
+		require.NoError(t, migrateWithRollbackResult)
+
+		count := 1
+		err = sqlDB.QueryRow(`select count(*) from schema_migrations
+		where version = '20151129054053'`).Scan(&count)
+		require.NoError(t, err)
+		require.Equal(t, 0, count)
+
+		err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
+		require.NotNil(t, err)
+		require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
+
+	} else {
+		require.Error(t, migrateWithRollbackResult)
+
+	}
+}
+
+func TestMigrateAndRollback(t *testing.T) {
+	for _, u := range testURLs(t) {
+		testMigrateAndRollbackURL(t, u)
+	}
+}
+
 func testUpURL(t *testing.T, u *url.URL) {
 	db := newTestDB(t, u)
 
@@ -201,7 +249,7 @@ func testUpURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 
 	// create and migrate
-	err = db.CreateAndMigrate()
+	err = db.CreateAndMigrate(false)
 	require.NoError(t, err)
 
 	// verify results
@@ -226,6 +274,44 @@ func TestUp(t *testing.T) {
 	}
 }
 
+func testUpAndRollbackURL(t *testing.T, u *url.URL) {
+	db := newTestDB(t, u)
+
+	// drop database
+	err := db.Drop()
+	require.NoError(t, err)
+
+	// create and migrate
+	createMigrateWithRollbackResult := db.CreateAndMigrate(true)
+
+	// get things necessary to validate result
+	sqlDB, err := GetDriverOpen(u)
+	require.NoError(t, err)
+	defer mustClose(sqlDB)
+
+	drv, err := db.GetDriver()
+	require.NoError(t, err)
+
+	// validate results
+	if drv.SupportsTransactionalDDL() {
+		require.NoError(t, createMigrateWithRollbackResult)
+
+		exists, err := drv.DatabaseExists(u)
+		require.NoError(t, err)
+		require.Equal(t, exists, false)
+
+	} else {
+		require.Error(t, createMigrateWithRollbackResult)
+
+	}
+}
+
+func TestUpAndRollback(t *testing.T) {
+	for _, u := range testURLs(t) {
+		testUpAndRollbackURL(t, u)
+	}
+}
+
 func testRollbackURL(t *testing.T, u *url.URL) {
 	db := newTestDB(t, u)
 
@@ -234,7 +320,7 @@ func testRollbackURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 	err = db.Create()
 	require.NoError(t, err)
-	err = db.Migrate()
+	err = db.Migrate(false)
 	require.NoError(t, err)
 
 	// verify migration

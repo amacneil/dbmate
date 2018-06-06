@@ -85,28 +85,44 @@ func (db *DB) Wait() error {
 	return fmt.Errorf("unable to connect to database: %s", err)
 }
 
-// CreateAndMigrate creates the database (if necessary) and runs migrations
-func (db *DB) CreateAndMigrate() error {
+// CreateAndMigrate creates the database (if necessary) and runs migrations.
+// If withRollback is true, this doesn't create or migrate but
+// returns if creation of database and applying of migrations would succeed.
+func (db *DB) CreateAndMigrate(withRollback bool) error {
 	drv, err := db.GetDriver()
 	if err != nil {
 		return err
 	}
 
+	if !drv.SupportsTransactionalDDL() && withRollback {
+		return fmt.Errorf("%s doesn't support Transactional DDL. "+
+			"Therefore, with-rollback flag is not supported", db.DatabaseURL.Scheme)
+	}
+
 	// create database if it does not already exist
 	// skip this step if we cannot determine status
 	// (e.g. user does not have list database permission)
+
+	// Could use defer for dropping the database, but will lose ability to return errors
+	createdDb := false
+
 	exists, err := drv.DatabaseExists(db.DatabaseURL)
 	if err == nil && !exists {
 		if err := drv.CreateDatabase(db.DatabaseURL); err != nil {
 			return err
 		}
+		createdDb = true
 	}
 
 	// migrate
-	return db.Migrate()
+	err = db.Migrate(withRollback)
+	if err == nil && withRollback && createdDb {
+		return drv.DropDatabase(db.DatabaseURL)
+	}
+	return err
 }
 
-// Create creates the current database
+// Create creates the current database.
 func (db *DB) Create() error {
 	drv, err := db.GetDriver()
 	if err != nil {
@@ -202,6 +218,23 @@ func doTransaction(db *sql.DB, txFunc func(Transaction) error) error {
 	return tx.Commit()
 }
 
+func transactAndRollback(db *sql.DB, txFunc func(Transaction) error) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+
+	if err := txFunc(tx); err != nil {
+		if err1 := tx.Rollback(); err1 != nil {
+			return err1
+		}
+
+		return err
+	}
+
+	return tx.Rollback()
+}
+
 func (db *DB) openDatabaseForMigration() (Driver, *sql.DB, error) {
 	drv, err := db.GetDriver()
 	if err != nil {
@@ -221,8 +254,67 @@ func (db *DB) openDatabaseForMigration() (Driver, *sql.DB, error) {
 	return drv, sqlDB, nil
 }
 
-// Migrate migrates database to the latest version
-func (db *DB) Migrate() error {
+// Migrate migrates database to the latest version. If withRollback is true,
+// this doesn't migrate but returns if such a migration may fail.
+func (db *DB) Migrate(withRollback bool) error {
+	if withRollback {
+		return db.migrateAndRollback()
+	}
+	return db.migrate()
+}
+
+func (db *DB) migrateAndRollback() error {
+	re := regexp.MustCompile(`^\d.*\.sql$`)
+	files, err := findMigrationFiles(db.MigrationsDir, re)
+	if err != nil {
+		return err
+	}
+
+	if len(files) == 0 {
+		return fmt.Errorf("no migration files found")
+	}
+
+	drv, sqlDB, err := db.openDatabaseForMigration()
+	if err != nil {
+		return err
+	}
+	defer mustClose(sqlDB)
+
+	if !drv.SupportsTransactionalDDL() {
+		return fmt.Errorf("%s doesn't support Transactional DDL. "+
+			"Therefore, with-rollback flag is not supported", db.DatabaseURL.Scheme)
+	}
+
+	applied, err := drv.SelectMigrations(sqlDB, -1)
+	if err != nil {
+		return err
+	}
+	// begin transaction
+	err = transactAndRollback(sqlDB, func(tx Transaction) error {
+		for _, filename := range files {
+			ver := migrationVersion(filename)
+			if ok := applied[ver]; ok {
+				// migration already applied
+				continue
+			}
+
+			fmt.Printf("Attempting to apply : %s\n", filename)
+			migration, err := parseMigration(filepath.Join(db.MigrationsDir, filename))
+			if err != nil {
+				return err
+			}
+
+			// run actual migration
+			if _, err := tx.Exec(migration["up"]); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return err
+}
+
+func (db *DB) migrate() error {
 	re := regexp.MustCompile(`^\d.*\.sql$`)
 	files, err := findMigrationFiles(db.MigrationsDir, re)
 	if err != nil {

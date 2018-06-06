@@ -286,6 +286,31 @@ Creating: myapp_test
 Applying: 20151127184807_create_users_table.sql
 ```
 
+### Support for validating `up` and `migrate`
+
+To support checking if `up` and `migrate` would succeed, these commands are provided with an option called `--with-rollback`.
+When running with this option, all the migrations are applied within a transaction and then the transaction is rolled back.
+If there is a failure with one of the migrations, then `dbmate` returns that error.
+
+This feature is supported only for databases that supports [DDL transactions](https://wiki.postgresql.org/wiki/Transactional_DDL_in_PostgreSQL:_A_Competitive_Analysis)
+
+At the moment, this is enabled for `PostgreSQL` and `SQLite` and disabled for `MySQL` driver.
+
+
+```sh
+$ export TEST_DATABASE_URL=$POSTGRESQL_URL
+$ dbmate -e TEST_DATABASE_URL up --with-rollback
+Attempting to apply : 20151129054053_test_migration.sql
+$ dbmate -e TEST_DATABASE_URL up
+Applying: 20151129054053_test_migration.sql
+Writing: ./db/schema.sql
+$ export TEST_DATABASE_URL=$MYSQL_URL
+$ dbmate -e TEST_DATABASE_URL up --with-rollback
+Error: mysql doesn't support Transactional DDL. Therefore, with-rollback flag is not supported
+
+```
+
+
 ## FAQ
 
 **How do I use dbmate under Alpine linux?**
@@ -308,12 +333,15 @@ Why another database schema migration tool? Dbmate was inspired by many other to
 |Automatically load .env file||||||:white_check_mark:|
 |No separate configuration file||||:white_check_mark:|:white_check_mark:|:white_check_mark:|
 |Language/framework independent|:eight_pointed_black_star:|:eight_pointed_black_star:|:eight_pointed_black_star:|||:white_check_mark:|
+|Support for validating migrations|:eight_spoked_asterisk:|||||:white_check_mark:|
 | **Drivers** |||||||
 |PostgreSQL|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
 |MySQL|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
 |SQLite|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
 
 > :eight_pointed_black_star: In theory these tools could be used with other languages, but a Go development environment is required because binary builds are not provided.
+
+> :eight_spoked_asterisk: [sql-migrate](https://github.com/rubenv/sql-migrate) supports `dryrun` during which it simply prints migration without applying. This isn't same as `with-rollback`
 
 *If you notice any inaccuracies in this table, please [propose a change](https://github.com/amacneil/dbmate/edit/master/README.md).*
 
