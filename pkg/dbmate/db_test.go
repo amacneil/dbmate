@@ -86,7 +86,7 @@ func TestDumpSchema(t *testing.T) {
 	require.NoError(t, err)
 
 	// create and migrate
-	err = db.CreateAndMigrate(false)
+	err = db.CreateAndMigrate()
 	require.NoError(t, err)
 
 	// schema.sql should not exist
@@ -128,7 +128,7 @@ func TestAutoDumpSchema(t *testing.T) {
 	require.True(t, os.IsNotExist(err))
 
 	// create and migrate
-	err = db.CreateAndMigrate(false)
+	err = db.CreateAndMigrate()
 	require.NoError(t, err)
 
 	// verify schema
@@ -249,7 +249,7 @@ func testUpURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 
 	// create and migrate
-	err = db.CreateAndMigrate(false)
+	err = db.CreateAndMigrate()
 	require.NoError(t, err)
 
 	// verify results
@@ -282,7 +282,7 @@ func testUpAndRollbackURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 
 	// create and migrate
-	createMigrateWithRollbackResult := db.CreateAndMigrate(true)
+	createMigrateWithRollbackResult := db.CreateAndMigrateWithRollback()
 
 	// get things necessary to validate result
 	sqlDB, err := GetDriverOpen(u)

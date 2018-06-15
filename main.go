@@ -74,7 +74,10 @@ func NewApp() *cli.App {
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
-				return db.CreateAndMigrate(c.Bool("with-rollback"))
+				if c.Bool("with-rollback") {
+					return db.CreateAndMigrateWithRollback()
+				}
+				return db.CreateAndMigrate()
 			}),
 		},
 		{

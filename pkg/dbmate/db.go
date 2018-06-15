@@ -86,15 +86,36 @@ func (db *DB) Wait() error {
 }
 
 // CreateAndMigrate creates the database (if necessary) and runs migrations.
-// If withRollback is true, this doesn't create or migrate but
-// returns if creation of database and applying of migrations would succeed.
-func (db *DB) CreateAndMigrate(withRollback bool) error {
+func (db *DB) CreateAndMigrate() error {
 	drv, err := db.GetDriver()
 	if err != nil {
 		return err
 	}
 
-	if !drv.SupportsTransactionalDDL() && withRollback {
+	// create database if it does not already exist
+	// skip this step if we cannot determine status
+	// (e.g. user does not have list database permission)
+
+	exists, err := drv.DatabaseExists(db.DatabaseURL)
+	if err == nil && !exists {
+		if err := drv.CreateDatabase(db.DatabaseURL); err != nil {
+			return err
+		}
+	}
+
+	// migrate
+	return db.Migrate()
+}
+
+// CreateAndMigrateWithRollback creates the database (if necessary) and runs migrations.
+// This function returns if creation of database and applying of migrations would succeed.
+func (db *DB) CreateAndMigrateWithRollback() error {
+	drv, err := db.GetDriver()
+	if err != nil {
+		return err
+	}
+
+	if !drv.SupportsTransactionalDDL() {
 		return fmt.Errorf("%s doesn't support Transactional DDL. "+
 			"Therefore, with-rollback flag is not supported", db.DatabaseURL.Scheme)
 	}
@@ -115,8 +136,8 @@ func (db *DB) CreateAndMigrate(withRollback bool) error {
 	}
 
 	// migrate
-	err = db.Migrate(withRollback)
-	if err == nil && withRollback && createdDb {
+	err = db.MigrateWithRollback()
+	if err == nil && createdDb {
 		return drv.DropDatabase(db.DatabaseURL)
 	}
 	return err
@@ -254,13 +275,14 @@ func (db *DB) openDatabaseForMigration() (Driver, *sql.DB, error) {
 	return drv, sqlDB, nil
 }
 
-// Migrate migrates database to the latest version. If withRollback is true,
-// this doesn't migrate but returns if such a migration may fail.
-func (db *DB) Migrate(withRollback bool) error {
-	if withRollback {
-		return db.migrateAndRollback()
-	}
+// Migrate migrates database to the latest version.
+func (db *DB) Migrate() error {
 	return db.migrate()
+}
+
+// MigrateWithRollback doesn't migrate but returns if such a migration may fail.
+func (db *DB) MigrateWithRollback() error {
+	return db.migrateAndRollback()
 }
 
 func (db *DB) migrateAndRollback() error {
