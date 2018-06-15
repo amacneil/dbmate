@@ -51,6 +51,7 @@ func NewApp() *cli.App {
 		},
 	}
 
+	withRollbackFlag := "with-rollback"
 	app.Commands = []cli.Command{
 		{
 			Name:    "new",
@@ -66,7 +67,7 @@ func NewApp() *cli.App {
 			Usage: "Create database (if necessary) and migrate to the latest version",
 			Flags: []cli.Flag{
 				cli.BoolFlag{
-					Name: "with-rollback",
+					Name: withRollbackFlag,
 					Usage: "Checks if this command can succeed by running migrations " +
 						"within a transaction that is ultimately rolled back\n" +
 						"\tWARNING:- MySQL doesn't support transactional DDL and " +
@@ -74,7 +75,7 @@ func NewApp() *cli.App {
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
-				if c.Bool("with-rollback") {
+				if c.Bool(withRollbackFlag) {
 					return db.CreateAndMigrateWithRollback()
 				}
 				return db.CreateAndMigrate()
@@ -99,7 +100,7 @@ func NewApp() *cli.App {
 			Usage: "Migrate to the latest version",
 			Flags: []cli.Flag{
 				cli.BoolFlag{
-					Name: "with-rollback",
+					Name: withRollbackFlag,
 					Usage: "Checks if this command can succeed by running migrations " +
 						"within a transaction that is ultimately rolled back\n" +
 						"\tWARNING:- MySQL doesn't support transactional DDL and " +
@@ -107,7 +108,11 @@ func NewApp() *cli.App {
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
-				return db.Migrate(c.Bool("with-rollback"))
+				if c.Bool(withRollbackFlag) {
+					return db.MigrateWithRollback()
+				} else {
+					return db.Migrate()
+				}
 			}),
 		},
 		{
