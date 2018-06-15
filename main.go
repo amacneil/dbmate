@@ -110,9 +110,8 @@ func NewApp() *cli.App {
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
 				if c.Bool(withRollbackFlag) {
 					return db.MigrateWithRollback()
-				} else {
-					return db.Migrate()
 				}
+				return db.Migrate()
 			}),
 		},
 		{
