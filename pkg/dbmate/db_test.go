@@ -168,7 +168,7 @@ func testMigrateURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 
 	// migrate
-	err = db.Migrate(false)
+	err = db.Migrate()
 	require.NoError(t, err)
 
 	// verify results
@@ -205,7 +205,7 @@ func testMigrateAndRollbackURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 
 	// migrate
-	migrateWithRollbackResult := db.Migrate(true)
+	migrateWithRollbackResult := db.MigrateWithRollback()
 
 	// get things necessary to validate result
 	sqlDB, err := GetDriverOpen(u)
@@ -320,7 +320,7 @@ func testRollbackURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 	err = db.Create()
 	require.NoError(t, err)
-	err = db.Migrate(false)
+	err = db.Migrate()
 	require.NoError(t, err)
 
 	// verify migration
