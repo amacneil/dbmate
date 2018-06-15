@@ -51,7 +51,7 @@ func NewApp() *cli.App {
 		},
 	}
 
-	withRollbackFlag := "with-rollback"
+	const withRollbackFlag = "with-rollback"
 	app.Commands = []cli.Command{
 		{
 			Name:    "new",
