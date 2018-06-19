@@ -230,10 +230,10 @@ func doTransaction(db *sql.DB, txFunc func(Transaction) error) error {
 
 	if err := txFunc(tx); err != nil {
 		if err1 := tx.Rollback(); err1 != nil {
-			return err1
+			return fmt.Errorf("Transaction err %s. Rollback also erred %s", err.Error(), err1.Error())
 		}
 
-		return err
+		return fmt.Errorf("Transaction err %s", err.Error())
 	}
 
 	return tx.Commit()
