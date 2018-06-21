@@ -298,7 +298,7 @@ func testUpAndRollbackURL(t *testing.T, u *url.URL) {
 
 		exists, err := drv.DatabaseExists(u)
 		require.NoError(t, err)
-		require.Equal(t, exists, false)
+		require.Equal(t, exists, true)
 
 	} else {
 		require.Error(t, createMigrateWithRollbackResult)
