@@ -124,23 +124,15 @@ func (db *DB) CreateAndMigrateWithRollback() error {
 	// skip this step if we cannot determine status
 	// (e.g. user does not have list database permission)
 
-	// Could use defer for dropping the database, but will lose ability to return errors
-	createdDb := false
-
 	exists, err := drv.DatabaseExists(db.DatabaseURL)
 	if err == nil && !exists {
 		if err := drv.CreateDatabase(db.DatabaseURL); err != nil {
 			return err
 		}
-		createdDb = true
 	}
 
 	// migrate
-	err = db.MigrateWithRollback()
-	if err == nil && createdDb {
-		return drv.DropDatabase(db.DatabaseURL)
-	}
-	return err
+	return db.MigrateWithRollback()
 }
 
 // Create creates the current database.
