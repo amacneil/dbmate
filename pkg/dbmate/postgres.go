@@ -79,7 +79,7 @@ func postgresSchemaMigrationsDump(db *sql.DB) ([]byte, error) {
 	buf.WriteString("\n--\n-- Dbmate schema migrations\n--\n\n")
 
 	if len(migrations) > 0 {
-		buf.WriteString("INSERT INTO schema_migrations (version) VALUES\n    (" +
+		buf.WriteString("INSERT INTO public.schema_migrations (version) VALUES\n    (" +
 			strings.Join(migrations, "),\n    (") +
 			");\n")
 	}
