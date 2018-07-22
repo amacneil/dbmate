@@ -91,14 +91,14 @@ func TestPostgresDumpSchema(t *testing.T) {
 	// DumpSchema should return schema
 	schema, err := drv.DumpSchema(u, db)
 	require.NoError(t, err)
-	require.Contains(t, string(schema), "CREATE TABLE schema_migrations")
+	require.Contains(t, string(schema), "CREATE TABLE public.schema_migrations")
 	require.Contains(t, string(schema), "\n--\n"+
 		"-- PostgreSQL database dump complete\n"+
 		"--\n\n\n"+
 		"--\n"+
 		"-- Dbmate schema migrations\n"+
 		"--\n\n"+
-		"INSERT INTO schema_migrations (version) VALUES\n"+
+		"INSERT INTO public.schema_migrations (version) VALUES\n"+
 		"    ('abc1'),\n"+
 		"    ('abc2');\n")
 
