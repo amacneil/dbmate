@@ -150,15 +150,15 @@ func TestPostgresCreateMigrationsTable(t *testing.T) {
 
 	// migrations table should not exist
 	count := 0
-	err := db.QueryRow("select count(*) from schema_migrations").Scan(&count)
-	require.Equal(t, "pq: relation \"schema_migrations\" does not exist", err.Error())
+	err := db.QueryRow("select count(*) from public.schema_migrations").Scan(&count)
+	require.Equal(t, "pq: relation \"public.schema_migrations\" does not exist", err.Error())
 
 	// create table
 	err = drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
 	// migrations table should exist
-	err = db.QueryRow("select count(*) from schema_migrations").Scan(&count)
+	err = db.QueryRow("select count(*) from public.schema_migrations").Scan(&count)
 	require.NoError(t, err)
 
 	// create table should be idempotent
@@ -174,7 +174,7 @@ func TestPostgresSelectMigrations(t *testing.T) {
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
-	_, err = db.Exec(`insert into schema_migrations (version)
+	_, err = db.Exec(`insert into public.schema_migrations (version)
 		values ('abc2'), ('abc1'), ('abc3')`)
 	require.NoError(t, err)
 
@@ -201,7 +201,7 @@ func TestPostgresInsertMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	count := 0
-	err = db.QueryRow("select count(*) from schema_migrations").Scan(&count)
+	err = db.QueryRow("select count(*) from public.schema_migrations").Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 0, count)
 
@@ -209,7 +209,7 @@ func TestPostgresInsertMigration(t *testing.T) {
 	err = drv.InsertMigration(db, "abc1")
 	require.NoError(t, err)
 
-	err = db.QueryRow("select count(*) from schema_migrations where version = 'abc1'").
+	err = db.QueryRow("select count(*) from public.schema_migrations where version = 'abc1'").
 		Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
@@ -223,7 +223,7 @@ func TestPostgresDeleteMigration(t *testing.T) {
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
-	_, err = db.Exec(`insert into schema_migrations (version)
+	_, err = db.Exec(`insert into public.schema_migrations (version)
 		values ('abc1'), ('abc2')`)
 	require.NoError(t, err)
 
@@ -231,7 +231,7 @@ func TestPostgresDeleteMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	count := 0
-	err = db.QueryRow("select count(*) from schema_migrations").Scan(&count)
+	err = db.QueryRow("select count(*) from public.schema_migrations").Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
 }
