@@ -78,7 +78,24 @@ func NewApp() *cli.App {
 		{
 			Name:  "drop",
 			Usage: "Drop database (if it exists)",
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "force, f",
+					Usage: "Force to drop databse by skipping warning message.",
+				},
+			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				fmt.Printf("Database URL: %v\n", db.DatabaseURL)
+				if c.Bool("delete") == false {
+					fmt.Println("WARNING: This will drop database and ALL DATA WILL BE LOST. Enter 'YES' to confirm.")
+					var input string
+
+					fmt.Scanln(&input)
+					if input != "YES" {
+						fmt.Println("Database is not dropped.")
+						return nil
+					}
+				}
 				return db.Drop()
 			}),
 		},
