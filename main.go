@@ -86,11 +86,16 @@ func NewApp() *cli.App {
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
 				fmt.Printf("Database URL: %v\n", db.DatabaseURL)
-				if c.Bool("delete") == false {
-					fmt.Println("WARNING: This will drop database and ALL DATA WILL BE LOST. Enter 'YES' to confirm.")
+				if !c.Bool("delete") {
+					fmt.Println("WARNING: This will drop database and ALL DATA WILL BE LOST." +
+						" Enter 'YES' to confirm.")
 					var input string
 
-					fmt.Scanln(&input)
+					_, err := fmt.Scanln(&input)
+					if err != nil {
+						_, _ = fmt.Fprintf(os.Stderr, "Error: %s\n", err)
+						os.Exit(1)
+					}
 					if input != "YES" {
 						fmt.Println("Database is not dropped.")
 						return nil
