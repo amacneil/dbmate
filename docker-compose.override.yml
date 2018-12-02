@@ -4,4 +4,4 @@ version: '2.3'
 services:
   dbmate:
     volumes:
-      - .:/go/src/github.com/amacneil/dbmate
+      - .:/src
