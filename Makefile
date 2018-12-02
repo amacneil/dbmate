@@ -1,30 +1,21 @@
 DC := docker-compose
 BUILD_FLAGS := -ldflags '-s'
-PACKAGES := . ./pkg/...
 
 .PHONY: all
-all: dep install test lint build
-
-.PHONY: dep
-dep:
-	dep ensure -vendor-only
-
-.PHONY: install
-install:
-	go install -v $(PACKAGES)
+all: test lint build
 
 .PHONY: test
 test:
-	go test -v $(PACKAGES)
+	go test -v ./...
 
 .PHONY: lint
 lint:
-	gometalinter.v2 $(PACKAGES)
+	golangci-lint run
 
 .PHONY: wait
 wait:
-	dbmate -e MYSQL_URL wait
-	dbmate -e POSTGRESQL_URL wait
+	dist/dbmate-linux-amd64 -e MYSQL_URL wait
+	dist/dbmate-linux-amd64 -e POSTGRESQL_URL wait
 
 .PHONY: clean
 clean:
