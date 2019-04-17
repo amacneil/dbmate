@@ -111,6 +111,13 @@ func NewApp() *cli.App {
 				return db.Wait()
 			}),
 		},
+		{
+			Name:  "pending",
+			Usage: "List pending migrations",
+			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				return db.Pending()
+			}),
+		},
 	}
 
 	return app

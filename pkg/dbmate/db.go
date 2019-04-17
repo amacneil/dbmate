@@ -221,6 +221,39 @@ func (db *DB) openDatabaseForMigration() (Driver, *sql.DB, error) {
 	return drv, sqlDB, nil
 }
 
+func (db *DB) Pending() error {
+	re := regexp.MustCompile(`^\d.*\.sql$`)
+	files, err := findMigrationFiles(db.MigrationsDir, re)
+	if err != nil {
+		return err
+	}
+
+	if len(files) == 0 {
+		return fmt.Errorf("no migration files found")
+	}
+
+	drv, sqlDB, err := db.openDatabaseForMigration()
+	if err != nil {
+		return err
+	}
+	defer mustClose(sqlDB)
+
+	applied, err := drv.SelectMigrations(sqlDB, -1)
+	if err != nil {
+		return err
+	}
+
+	for _, filename := range files {
+		ver := migrationVersion(filename)
+		if ok := applied[ver]; ok {
+			// migration already applied
+			continue
+		}
+		fmt.Printf("%s\n", filename)
+	}
+	return nil
+}
+
 // Migrate migrates database to the latest version
 func (db *DB) Migrate() error {
 	re := regexp.MustCompile(`^\d.*\.sql$`)

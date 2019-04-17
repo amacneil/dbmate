@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+	"bytes"
+	"io"
 
 	"github.com/stretchr/testify/require"
 )
@@ -190,6 +192,93 @@ func testMigrateURL(t *testing.T, u *url.URL) {
 func TestMigrate(t *testing.T) {
 	for _, u := range testURLs(t) {
 		testMigrateURL(t, u)
+	}
+}
+
+func testWithPendingURL(t *testing.T, u *url.URL) {
+	db := newTestDB(t, u)
+
+	// drop and recreate database
+	err := db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
+
+	// Capture stdout to test the output
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	// List pending migrations on the Stdout
+	err = db.Pending()
+	require.NoError(t, err)
+
+	outC := make(chan string)
+
+	go func() {
+		var buf bytes.Buffer
+		_, err := io.Copy(&buf, r)
+		require.NoError(t, err)
+		outC <- buf.String()
+	}()
+
+	w.Close()
+	// restoring the real stdout
+	os.Stdout = old
+	out := <-outC
+
+	// reading our temp stdout
+	require.Equal(t, "20151129054053_test_migration.sql\n", out)
+}
+
+func TestWithPending(t *testing.T) {
+	for _, u := range testURLs(t) {
+		testWithPendingURL(t, u)
+	}
+}
+
+
+func testWithoutPendingURL(t *testing.T, u *url.URL) {
+	db := newTestDB(t, u)
+
+	// drop and recreate database and play migrations
+	err := db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
+	err = db.Migrate()
+	require.NoError(t, err)
+
+	// Capture stdout to test the output
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	// List pending migrations on the Stdout
+	err = db.Pending()
+	require.NoError(t, err)
+
+	outC := make(chan string)
+
+	go func() {
+		var buf bytes.Buffer
+		_, err := io.Copy(&buf, r)
+		require.NoError(t, err)
+		outC <- buf.String()
+	}()
+
+	w.Close()
+	// restoring the real stdout
+	os.Stdout = old
+	out := <-outC
+
+	// reading our temp stdout
+	require.Equal(t, "", out)
+}
+
+func TestWithoutPending(t *testing.T) {
+	for _, u := range testURLs(t) {
+		testWithoutPendingURL(t, u)
 	}
 }
 
