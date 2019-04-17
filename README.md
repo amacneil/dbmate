@@ -86,6 +86,7 @@ dbmate up        # create the database (if it does not already exist) and run an
 dbmate create    # create the database
 dbmate drop      # drop the database
 dbmate migrate   # run any pending migrations
+dbmate pending   # lists any pending migrations without running them
 dbmate rollback  # roll back the most recent migration
 dbmate down      # alias for rollback
 dbmate dump      # write the database schema.sql file
