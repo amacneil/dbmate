@@ -14,11 +14,9 @@ drop table users;`
 
 	up, down := parseMigrationContents(migration)
 
-	require.Equal(t, "up", up.Direction)
 	require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);", up.Contents)
 	require.Equal(t, false, up.Options.SkipTransaction())
 
-	require.Equal(t, "down", down.Direction)
 	require.Equal(t, "-- migrate:down\ndrop table users;", down.Contents)
 	require.Equal(t, false, down.Options.SkipTransaction())
 
@@ -30,11 +28,9 @@ create table users (id serial, name text);
 
 	up, down = parseMigrationContents(migration)
 
-	require.Equal(t, "up", up.Direction)
 	require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);", up.Contents)
 	require.Equal(t, false, up.Options.SkipTransaction())
 
-	require.Equal(t, "down", down.Direction)
 	require.Equal(t, "-- migrate:down\ndrop table users;", down.Contents)
 	require.Equal(t, false, down.Options.SkipTransaction())
 
@@ -45,11 +41,9 @@ ALTER TYPE colors ADD VALUE 'yellow' AFTER 'orange';
 
 	up, down = parseMigrationContents(migration)
 
-	require.Equal(t, "up", up.Direction)
 	require.Equal(t, "-- migrate:up skip_transaction:true\nALTER TYPE colors ADD VALUE 'orange' AFTER 'red';\nALTER TYPE colors ADD VALUE 'yellow' AFTER 'orange';", up.Contents)
 	require.Equal(t, true, up.Options.SkipTransaction())
 
-	require.Equal(t, "down", down.Direction)
 	require.Equal(t, "", down.Contents)
 	require.Equal(t, false, down.Options.SkipTransaction())
 
