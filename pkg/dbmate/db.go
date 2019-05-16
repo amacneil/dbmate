@@ -268,12 +268,12 @@ func (db *DB) Migrate() error {
 			return drv.InsertMigration(tx, ver)
 		}
 
-		if up.Options.SkipTransaction() {
-			// run outside of transaction
-			err = execMigration(sqlDB)
-		} else {
+		if up.Options.Transaction() {
 			// begin transaction
 			err = doTransaction(sqlDB, execMigration)
+		} else {
+			// run outside of transaction
+			err = execMigration(sqlDB)
 		}
 
 		if err != nil {
@@ -383,12 +383,12 @@ func (db *DB) Rollback() error {
 		return drv.DeleteMigration(tx, latest)
 	}
 
-	if down.Options.SkipTransaction() {
-		// run outside of transaction
-		err = execMigration(sqlDB)
-	} else {
+	if down.Options.Transaction() {
 		// begin transaction
 		err = doTransaction(sqlDB, execMigration)
+	} else {
+		// run outside of transaction
+		err = execMigration(sqlDB)
 	}
 
 	if err != nil {

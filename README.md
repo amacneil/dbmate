@@ -209,19 +209,19 @@ Writing: ./db/schema.sql
 
 dbmate supports options passed to a migration block in the form of `key:value` pairs. List of supported options:
 
-* `skip_transaction`
+* `transaction`
 
-#### skip_transaction
+#### transaction
 
-`skip_transaction` is useful if you need to run some SQL which cannot be executed from within a transaction. For example, altering an enum type to add a value. Example:
+`transaction` is useful if you need to run some SQL which cannot be executed from within a transaction. For example, you can disable transactions for migrations that alter an enum type to add a value:
 
 ```sql
--- migrate:up skip_transaction:true
+-- migrate:up transaction:false
 ALTER TYPE colors ADD VALUE 'orange' AFTER 'red';
 ALTER TYPE colors ADD VALUE 'yellow' AFTER 'orange';
 ```
 
-`skip_transaction` defaults to `false`.
+`transaction` will default to `true` for if your database supports it.
 
 ### Schema File
 

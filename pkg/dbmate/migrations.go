@@ -8,15 +8,15 @@ import (
 
 // MigrationOptions is an interface for accessing migration options
 type MigrationOptions interface {
-	SkipTransaction() bool
+	Transaction() bool
 }
 
 type migrationOptions map[string]string
 
-// SkipTransaction returns true if the migration is to run outside a transaction
-// Defaults to false.
-func (m migrationOptions) SkipTransaction() bool {
-	return m["skip_transaction"] == "true"
+// Transaction returns whether or not this migration should run in a transaction
+// Defaults to true.
+func (m migrationOptions) Transaction() bool {
+	return m["transaction"] != "false"
 }
 
 // Migration contains the migration contents and options
