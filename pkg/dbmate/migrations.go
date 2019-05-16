@@ -19,11 +19,6 @@ func (m migrateOptions) SkipTransaction() bool {
 	return m["skip_transaction"] == "true"
 }
 
-// NewMigrateOptions returns a MigrateOptions interface
-func NewMigrateOptions() MigrateOptions {
-	return make(migrateOptions)
-}
-
 // Migrate contains 'up' or 'down' migration commands and options
 type Migrate struct {
 	Direction string
@@ -50,8 +45,8 @@ func parseMigration(path string) (Migrate, Migrate, error) {
 	return up, down, nil
 }
 
-var reup = regexp.MustCompile(`(?m)^-- migrate:up\s+(.+)*$`)
-var redown = regexp.MustCompile(`(?m)^-- migrate:down\s+(.+)*$`)
+var upRegExp = regexp.MustCompile(`(?m)^-- migrate:up\s+(.+)*$`)
+var downRegExp = regexp.MustCompile(`(?m)^-- migrate:down\s+(.+)*$`)
 
 // parseMigrationContents parses the string contents of a migration.
 // It will return two Migrate objects, the first representing the "up"
@@ -65,8 +60,8 @@ func parseMigrationContents(contents string) (Migrate, Migrate) {
 	up := NewMigrate("up")
 	down := NewMigrate("down")
 
-	upMatch := reup.FindStringSubmatchIndex(contents)
-	downMatch := redown.FindStringSubmatchIndex(contents)
+	upMatch := upRegExp.FindStringSubmatchIndex(contents)
+	downMatch := downRegExp.FindStringSubmatchIndex(contents)
 
 	onlyDefinedUpBlock := len(upMatch) != 0 && len(downMatch) == 0
 	onlyDefinedDownBlock := len(upMatch) == 0 && len(downMatch) != 0
@@ -100,8 +95,8 @@ func parseMigrationContents(contents string) (Migrate, Migrate) {
 	return up, down
 }
 
-var whitespace = regexp.MustCompile(`\s+`)
-var optionSeparator = regexp.MustCompile(`:`)
+var whitespaceRegExp = regexp.MustCompile(`\s+`)
+var optionSeparatorRegExp = regexp.MustCompile(`:`)
 
 // parseMigrationOptions parses the options portion of a migration
 // block into an object that satisfies the MigrateOptions interface,
@@ -121,9 +116,9 @@ func parseMigrateOptions(contents string, begin, end int) MigrateOptions {
 
 	optionsString := strings.TrimSpace(contents[begin:end])
 
-	optionGroups := whitespace.Split(optionsString, -1)
+	optionGroups := whitespaceRegExp.Split(optionsString, -1)
 	for _, group := range optionGroups {
-		pair := optionSeparator.Split(group, -1)
+		pair := optionSeparatorRegExp.Split(group, -1)
 		if len(pair) == 2 {
 			mOpts[pair[0]] = pair[1]
 		}
