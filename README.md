@@ -205,6 +205,24 @@ Rolling back: 20151127184807_create_users_table.sql
 Writing: ./db/schema.sql
 ```
 
+### Migration Options
+
+dbmate supports options passed to a migration block in the form of `key:value` pairs. List of supported options:
+
+* `skip_transaction`
+
+#### skip_transaction
+
+`skip_transaction` is useful if you need to run some SQL which cannot be executed from within a transaction. For example, altering an enum type to add a value. Example:
+
+```sql
+-- migrate:up skip_transaction:true
+ALTER TYPE colors ADD VALUE 'orange' AFTER 'red';
+ALTER TYPE colors ADD VALUE 'yellow' AFTER 'orange';
+```
+
+`skip_transaction` defaults to `false`.
+
 ### Schema File
 
 When you run the `up`, `migrate`, or `rollback` commands, dbmate will automatically create a `./db/schema.sql` file containing a complete representation of your database schema. Dbmate keeps this file up to date for you, so you should not manually edit it.
