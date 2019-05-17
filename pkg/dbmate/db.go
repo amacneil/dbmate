@@ -253,21 +253,29 @@ func (db *DB) Migrate() error {
 
 		fmt.Printf("Applying: %s\n", filename)
 
-		migration, err := parseMigration(filepath.Join(db.MigrationsDir, filename))
+		up, _, err := parseMigration(filepath.Join(db.MigrationsDir, filename))
 		if err != nil {
 			return err
 		}
 
-		// begin transaction
-		err = doTransaction(sqlDB, func(tx Transaction) error {
+		execMigration := func(tx Transaction) error {
 			// run actual migration
-			if _, err := tx.Exec(migration["up"]); err != nil {
+			if _, err := tx.Exec(up.Contents); err != nil {
 				return err
 			}
 
 			// record migration
 			return drv.InsertMigration(tx, ver)
-		})
+		}
+
+		if up.Options.Transaction() {
+			// begin transaction
+			err = doTransaction(sqlDB, execMigration)
+		} else {
+			// run outside of transaction
+			err = execMigration(sqlDB)
+		}
+
 		if err != nil {
 			return err
 		}
@@ -331,43 +339,6 @@ func migrationVersion(filename string) string {
 	return regexp.MustCompile(`^\d+`).FindString(filename)
 }
 
-// parseMigration reads a migration file into a map with up/down keys
-// implementation is similar to regexp.Split()
-func parseMigration(path string) (map[string]string, error) {
-	// read migration file into string
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	contents := string(data)
-
-	// split string on our trigger comment
-	separatorRegexp := regexp.MustCompile(`(?m)^-- migrate:(.*)$`)
-	matches := separatorRegexp.FindAllStringSubmatchIndex(contents, -1)
-
-	migrations := map[string]string{}
-	direction := ""
-	beg := 0
-	end := 0
-
-	for _, match := range matches {
-		end = match[0]
-		if direction != "" {
-			// write previous direction to output map
-			migrations[direction] = contents[beg:end]
-		}
-
-		// each match records the start of a new direction
-		direction = contents[match[2]:match[3]]
-		beg = match[1]
-	}
-
-	// write final direction to output map
-	migrations[direction] = contents[beg:]
-
-	return migrations, nil
-}
-
 // Rollback rolls back the most recent migration
 func (db *DB) Rollback() error {
 	drv, sqlDB, err := db.openDatabaseForMigration()
@@ -397,21 +368,29 @@ func (db *DB) Rollback() error {
 
 	fmt.Printf("Rolling back: %s\n", filename)
 
-	migration, err := parseMigration(filepath.Join(db.MigrationsDir, filename))
+	_, down, err := parseMigration(filepath.Join(db.MigrationsDir, filename))
 	if err != nil {
 		return err
 	}
 
-	// begin transaction
-	err = doTransaction(sqlDB, func(tx Transaction) error {
+	execMigration := func(tx Transaction) error {
 		// rollback migration
-		if _, err := tx.Exec(migration["down"]); err != nil {
+		if _, err := tx.Exec(down.Contents); err != nil {
 			return err
 		}
 
 		// remove migration record
 		return drv.DeleteMigration(tx, latest)
-	})
+	}
+
+	if down.Options.Transaction() {
+		// begin transaction
+		err = doTransaction(sqlDB, execMigration)
+	} else {
+		// run outside of transaction
+		err = execMigration(sqlDB)
+	}
+
 	if err != nil {
 		return err
 	}

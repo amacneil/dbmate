@@ -205,6 +205,24 @@ Rolling back: 20151127184807_create_users_table.sql
 Writing: ./db/schema.sql
 ```
 
+### Migration Options
+
+dbmate supports options passed to a migration block in the form of `key:value` pairs. List of supported options:
+
+* `transaction`
+
+#### transaction
+
+`transaction` is useful if you need to run some SQL which cannot be executed from within a transaction. For example, in Postgres, you would need to disable transactions for migrations that alter an enum type to add a value:
+
+```sql
+-- migrate:up transaction:false
+ALTER TYPE colors ADD VALUE 'orange' AFTER 'red';
+ALTER TYPE colors ADD VALUE 'yellow' AFTER 'orange';
+```
+
+`transaction` will default to `true` for if your database supports it.
+
 ### Schema File
 
 When you run the `up`, `migrate`, or `rollback` commands, dbmate will automatically create a `./db/schema.sql` file containing a complete representation of your database schema. Dbmate keeps this file up to date for you, so you should not manually edit it.
