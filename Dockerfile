@@ -1,5 +1,5 @@
 # build image
-FROM golang:1.11 as build
+FROM golang:1.12 as build
 
 # required to force cgo (for sqlite driver) with cross compile
 ENV CGO_ENABLED 1
@@ -14,7 +14,7 @@ RUN apt-get update \
 
 # development dependencies
 RUN curl -fsSL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
-	| sh -s v1.12.3
+	| sh -s v1.16.0
 
 # copy source files
 COPY . /src
