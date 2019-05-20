@@ -1,6 +1,7 @@
 package dbmate
 
 import (
+	"fmt"
 	"io/ioutil"
 	"regexp"
 	"strings"
@@ -36,37 +37,33 @@ func parseMigration(path string) (Migration, Migration, error) {
 	if err != nil {
 		return NewMigration(), NewMigration(), err
 	}
-	up, down := parseMigrationContents(string(data))
-	return up, down, nil
+	up, down, err := parseMigrationContents(string(data))
+	return up, down, err
 }
 
-var upRegExp = regexp.MustCompile(`(?m)^-- migrate:up\s+(.+)*$`)
-var downRegExp = regexp.MustCompile(`(?m)^-- migrate:down\s+(.+)*$`)
+var upRegExp = regexp.MustCompile(`(?m)^--\s*migrate:up\s+(.+)*$`)
+var downRegExp = regexp.MustCompile(`(?m)^--\s*migrate:down\s+(.+)*$`)
 
 // parseMigrationContents parses the string contents of a migration.
 // It will return two Migration objects, the first representing the "up"
-// block and the second representing the "down" block.
-//
-// Note that with the way this is currently defined, it is possible to
-// correctly parse a migration that does not define an "up" block or a
-// "down" block, or one that defines neither. This behavior is, in part,
-// to preserve backwards compatibility.
-func parseMigrationContents(contents string) (Migration, Migration) {
+// block and the second representing the "down" block. This function
+// requires that at least an up block was defined and will otherwise
+// return an error.
+func parseMigrationContents(contents string) (Migration, Migration, error) {
 	up := NewMigration()
 	down := NewMigration()
 
 	upMatch := upRegExp.FindStringSubmatchIndex(contents)
 	downMatch := downRegExp.FindStringSubmatchIndex(contents)
 
+	didNotDefineUpBlock := len(upMatch) == 0
 	onlyDefinedUpBlock := len(upMatch) != 0 && len(downMatch) == 0
-	onlyDefinedDownBlock := len(upMatch) == 0 && len(downMatch) != 0
 
-	if onlyDefinedUpBlock {
+	if didNotDefineUpBlock {
+		return up, down, fmt.Errorf("dbmate requires each migration to define an up bock with '-- migrate:up'")
+	} else if onlyDefinedUpBlock {
 		up.Contents = strings.TrimSpace(contents)
 		up.Options = parseMigrationOptions(contents, upMatch[2], upMatch[3])
-	} else if onlyDefinedDownBlock {
-		down.Contents = strings.TrimSpace(contents)
-		down.Options = parseMigrationOptions(contents, downMatch[2], downMatch[3])
 	} else {
 		upStart := upMatch[0]
 		downStart := downMatch[0]
@@ -87,7 +84,7 @@ func parseMigrationContents(contents string) (Migration, Migration) {
 		down.Options = parseMigrationOptions(contents, downMatch[2], downMatch[3])
 	}
 
-	return up, down
+	return up, down, nil
 }
 
 var whitespaceRegExp = regexp.MustCompile(`\s+`)

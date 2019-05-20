@@ -218,10 +218,9 @@ dbmate supports options passed to a migration block in the form of `key:value` p
 ```sql
 -- migrate:up transaction:false
 ALTER TYPE colors ADD VALUE 'orange' AFTER 'red';
-ALTER TYPE colors ADD VALUE 'yellow' AFTER 'orange';
 ```
 
-`transaction` will default to `true` for if your database supports it.
+`transaction` will default to `true` if your database supports it.
 
 ### Schema File
 
