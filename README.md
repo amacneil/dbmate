@@ -29,7 +29,6 @@ For a comparison between dbmate and other popular database schema migration tool
 Install using Homebrew:
 
 ```sh
-$ brew tap amacneil/dbmate
 $ brew install dbmate
 ```
 
