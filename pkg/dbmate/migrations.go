@@ -41,8 +41,13 @@ func parseMigration(path string) (Migration, Migration, error) {
 	return up, down, err
 }
 
-var upRegExp = regexp.MustCompile(`(?m)^--\s*migrate:up\s+(.+)*$`)
-var downRegExp = regexp.MustCompile(`(?m)^--\s*migrate:down\s+(.+)*$`)
+var upRegExp = regexp.MustCompile(`(?m)^--\s*migrate:up(\s*$|\s+\S+)`)
+var downRegExp = regexp.MustCompile(`(?m)^--\s*migrate:down(\s*$|\s+\S+)$`)
+var emptyLineRegExp = regexp.MustCompile(`^\s*$`)
+var commentLineRegExp = regexp.MustCompile(`^\s*--`)
+var whitespaceRegExp = regexp.MustCompile(`\s+`)
+var optionSeparatorRegExp = regexp.MustCompile(`:`)
+var blockDirectiveRegExp = regexp.MustCompile(`^--\s*migrate:[up|down]]`)
 
 // parseMigrationContents parses the string contents of a migration.
 // It will return two Migration objects, the first representing the "up"
@@ -53,68 +58,143 @@ func parseMigrationContents(contents string) (Migration, Migration, error) {
 	up := NewMigration()
 	down := NewMigration()
 
-	upMatch := upRegExp.FindStringSubmatchIndex(contents)
-	downMatch := downRegExp.FindStringSubmatchIndex(contents)
+	upDirectiveStart, upDirectiveEnd, hasDefinedUpBlock := getMatchPositions(contents, upRegExp)
+	downDirectiveStart, downDirectiveEnd, hasDefinedDownBlock := getMatchPositions(contents, downRegExp)
 
-	didNotDefineUpBlock := len(upMatch) == 0
-	onlyDefinedUpBlock := len(upMatch) != 0 && len(downMatch) == 0
-
-	if didNotDefineUpBlock {
+	if !hasDefinedUpBlock {
 		return up, down, fmt.Errorf("dbmate requires each migration to define an up bock with '-- migrate:up'")
-	} else if onlyDefinedUpBlock {
-		up.Contents = strings.TrimSpace(contents)
-		up.Options = parseMigrationOptions(contents, upMatch[2], upMatch[3])
-	} else {
-		upStart := upMatch[0]
-		downStart := downMatch[0]
-
-		upEnd := downMatch[0]
-		downEnd := len(contents)
-
-		// If migrate:down was defined above migrate:up, correct the end indices
-		if upMatch[0] > downMatch[0] {
-			upEnd = downEnd
-			downEnd = upMatch[0]
-		}
-
-		up.Contents = strings.TrimSpace(contents[upStart:upEnd])
-		up.Options = parseMigrationOptions(contents, upMatch[2], upMatch[3])
-
-		down.Contents = strings.TrimSpace(contents[downStart:downEnd])
-		down.Options = parseMigrationOptions(contents, downMatch[2], downMatch[3])
+	} else if statementsPrecedeMigrateBlocks(contents, upDirectiveStart, downDirectiveStart) {
+		return up, down, fmt.Errorf("dbmate does not support statements defined outside of the '-- migrate:up' or '-- migrate:down' blocks")
 	}
+
+	upEnd := len(contents)
+	downEnd := len(contents)
+
+	if hasDefinedDownBlock && upDirectiveStart < downDirectiveStart {
+		upEnd = downDirectiveStart
+	} else if hasDefinedDownBlock && upDirectiveStart > downDirectiveStart {
+		downEnd = upDirectiveStart
+	} else {
+		downEnd = -1
+	}
+
+	upDirective := substring(contents, upDirectiveStart, upDirectiveEnd)
+	downDirective := substring(contents, downDirectiveStart, downDirectiveEnd)
+
+	up.Options = parseMigrationOptions(upDirective)
+	up.Contents = substring(contents, upDirectiveStart, upEnd)
+
+	down.Options = parseMigrationOptions(downDirective)
+	down.Contents = substring(contents, downDirectiveStart, downEnd)
 
 	return up, down, nil
 }
 
-var whitespaceRegExp = regexp.MustCompile(`\s+`)
-var optionSeparatorRegExp = regexp.MustCompile(`:`)
-
-// parseMigrationOptions parses the options portion of a migration
-// block into an object that satisfies the MigrationOptions interface,
-// i.e., the 'transaction:false' piece of the following:
+// parseMigrationOptions parses the migration options out of a block
+// directive into an object that implements the MigrationOptions interface.
 //
-//     -- migrate:up transaction:false
-//     create table users (id serial, name string);
-//     -- migrate:down
-//     drop table users;
+// For example:
 //
-func parseMigrationOptions(contents string, begin, end int) MigrationOptions {
-	mOpts := make(migrationOptions)
+//     fmt.Printf("%#v", parseMigrationOptions("-- migrate:up transaction:false"))
+//     // migrationOptions{"transaction": "false"}
+//
+func parseMigrationOptions(contents string) MigrationOptions {
+	options := make(migrationOptions)
 
-	if begin == -1 || end == -1 {
-		return mOpts
+	// strip away the -- migrate:[up|down] part
+	contents = blockDirectiveRegExp.ReplaceAllString(contents, "")
+
+	// remove leading and trailing whitespace
+	contents = strings.TrimSpace(contents)
+
+	// return empty options if nothing is left to parse
+	if contents == "" {
+		return options
 	}
 
-	optionsString := strings.TrimSpace(contents[begin:end])
+	// split the options string into pairs, e.g. "transaction:false foo:bar" -> []string{"transaction:false", "foo:bar"}
+	stringPairs := whitespaceRegExp.Split(contents, -1)
 
-	optionGroups := whitespaceRegExp.Split(optionsString, -1)
-	for _, group := range optionGroups {
-		pair := optionSeparatorRegExp.Split(group, -1)
+	for _, stringPair := range stringPairs {
+		// split stringified pair into key and value pairs, e.g. "transaction:false" -> []string{"transaction", "false"}
+		pair := optionSeparatorRegExp.Split(stringPair, -1)
+
+		// if the syntax is well-formed, then store the key and value pair in options
 		if len(pair) == 2 {
-			mOpts[pair[0]] = pair[1]
+			options[pair[0]] = pair[1]
 		}
 	}
 
-	return mOpts
+	return options
+}
+
+// statementsPrecedeMigrateBlocks inspects the contents between the first character
+// of a string and the index of the first block directive to see if there are any statements
+// defined outside of the block directive. It'll return true if it finds any such statements.
+//
+// For example:
+//
+// This will return false:
+//
+// statementsPrecedeMigrateBlocks(`-- migrate:up
+// create table users (id serial);
+// `, 0, -1)
+//
+// This will return true:
+//
+// statementsPrecedeMigrateBlocks(`create type status_type as enum('active', 'inactive');
+// -- migrate:up
+// create table users (id serial, status status_type);
+// `, 54, -1)
+//
+func statementsPrecedeMigrateBlocks(contents string, upDirectiveStart, downDirectiveStart int) bool {
+	until := upDirectiveStart
+
+	if downDirectiveStart > -1 {
+		until = min(upDirectiveStart, downDirectiveStart)
+	}
+
+	lines := strings.Split(contents[0:until], "\n")
+
+	for _, line := range lines {
+		if isEmptyLine(line) || isCommentLine(line) {
+			continue
+		}
+		return true
+	}
+
+	return false
+}
+
+// isEmptyLine will return true if the line has no
+// characters or if all the characters are whitespace characters
+func isEmptyLine(s string) bool {
+	return emptyLineRegExp.MatchString(s)
+}
+
+// isCommentLine will return true if the line is a SQL comment
+func isCommentLine(s string) bool {
+	return commentLineRegExp.MatchString(s)
+}
+
+func getMatchPositions(s string, re *regexp.Regexp) (int, int, bool) {
+	match := re.FindStringIndex(s)
+	if match == nil {
+		return -1, -1, false
+	}
+	return match[0], match[1], true
+}
+
+func substring(s string, begin, end int) string {
+	if begin == -1 || end == -1 {
+		return ""
+	}
+	return s[begin:end]
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
