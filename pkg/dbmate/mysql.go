@@ -35,7 +35,9 @@ func normalizeMySQLURL(u *url.URL) string {
 	normalizedURL.RawQuery = query.Encode()
 
 	str := normalizedURL.String()
-	return strings.TrimLeft(str, "/")
+	decodedValue, _ := url.QueryUnescape(str)
+
+	return strings.TrimLeft(decodedValue, "/")
 }
 
 // Open creates a new database connection
