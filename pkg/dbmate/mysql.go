@@ -19,25 +19,25 @@ type MySQLDriver struct {
 }
 
 func normalizeMySQLURL(u *url.URL) string {
-	// set default port
-	host := u.Host
+	temporaryURL := *u // make a copy of u
 
-	if u.Port() == "" {
+	// set default port
+	host := temporaryURL.Host
+
+	if temporaryURL.Port() == "" {
 		host = fmt.Sprintf("%s:3306", host)
 	}
 
 	// host format required by go-sql-driver/mysql
 	host = fmt.Sprintf("tcp(%s)", host)
 
-	query := u.Query()
+	query := temporaryURL.Query()
 	query.Set("multiStatements", "true")
 
-	// I reutilized u, is this good practice?
-	// Should we make a copy of u and then work on it instead?
-	u.RawQuery = query.Encode()
+	temporaryURL.RawQuery = query.Encode()
 
 	// Get decoded user:pass
-	userPassEncoded := u.User.String()
+	userPassEncoded := temporaryURL.User.String()
 	userPass, _ := url.QueryUnescape(userPassEncoded)
 
 	// Build DSN w/ user:pass percent-decoded
@@ -48,7 +48,7 @@ func normalizeMySQLURL(u *url.URL) string {
 	}
 
 	normalizedString = fmt.Sprintf("%s%s%s", normalizedString,
-		host, u.RequestURI())
+		host, temporaryURL.RequestURI())
 
 	return normalizedString
 }
