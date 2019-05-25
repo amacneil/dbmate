@@ -19,25 +19,23 @@ type MySQLDriver struct {
 }
 
 func normalizeMySQLURL(u *url.URL) string {
-	temporaryURL := *u // make a copy of u
-
 	// set default port
-	host := temporaryURL.Host
+	host := u.Host
 
-	if temporaryURL.Port() == "" {
+	if u.Port() == "" {
 		host = fmt.Sprintf("%s:3306", host)
 	}
 
 	// host format required by go-sql-driver/mysql
 	host = fmt.Sprintf("tcp(%s)", host)
 
-	query := temporaryURL.Query()
+	query := u.Query()
 	query.Set("multiStatements", "true")
 
-	temporaryURL.RawQuery = query.Encode()
+	queryString := query.Encode()
 
 	// Get decoded user:pass
-	userPassEncoded := temporaryURL.User.String()
+	userPassEncoded := u.User.String()
 	userPass, _ := url.QueryUnescape(userPassEncoded)
 
 	// Build DSN w/ user:pass percent-decoded
@@ -47,8 +45,8 @@ func normalizeMySQLURL(u *url.URL) string {
 		normalizedString = userPass + "@"
 	}
 
-	normalizedString = fmt.Sprintf("%s%s%s", normalizedString,
-		host, temporaryURL.RequestURI())
+	normalizedString = fmt.Sprintf("%s%s%s?%s", normalizedString,
+		host, u.Path, queryString)
 
 	return normalizedString
 }
