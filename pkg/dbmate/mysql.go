@@ -19,23 +19,36 @@ type MySQLDriver struct {
 }
 
 func normalizeMySQLURL(u *url.URL) string {
-	normalizedURL := *u
-	normalizedURL.Scheme = ""
-
 	// set default port
-	if normalizedURL.Port() == "" {
-		normalizedURL.Host = fmt.Sprintf("%s:3306", normalizedURL.Host)
+	host := u.Host
+
+	if u.Port() == "" {
+		host = fmt.Sprintf("%s:3306", host)
 	}
 
 	// host format required by go-sql-driver/mysql
-	normalizedURL.Host = fmt.Sprintf("tcp(%s)", normalizedURL.Host)
+	host = fmt.Sprintf("tcp(%s)", host)
 
-	query := normalizedURL.Query()
+	query := u.Query()
 	query.Set("multiStatements", "true")
-	normalizedURL.RawQuery = query.Encode()
 
-	str := normalizedURL.String()
-	return strings.TrimLeft(str, "/")
+	queryString := query.Encode()
+
+	// Get decoded user:pass
+	userPassEncoded := u.User.String()
+	userPass, _ := url.QueryUnescape(userPassEncoded)
+
+	// Build DSN w/ user:pass percent-decoded
+	normalizedString := ""
+
+	if userPass != "" { // user:pass can be empty
+		normalizedString = userPass + "@"
+	}
+
+	normalizedString = fmt.Sprintf("%s%s%s?%s", normalizedString,
+		host, u.Path, queryString)
+
+	return normalizedString
 }
 
 // Open creates a new database connection
