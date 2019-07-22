@@ -319,6 +319,7 @@ Why another database schema migration tool? Dbmate was inspired by many other to
 |Support for saving schema dump files||||:white_check_mark:||:white_check_mark:|
 |Timestamp-versioned migration files|:white_check_mark:|||:white_check_mark:|:white_check_mark:|:white_check_mark:|
 |Ability to wait for database to become ready||||||:white_check_mark:|
+|Dry Run||:white_check_mark:||||||
 |Database connection string loaded from environment variables||||||:white_check_mark:|
 |Automatically load .env file||||||:white_check_mark:|
 |No separate configuration file||||:white_check_mark:|:white_check_mark:|:white_check_mark:|
