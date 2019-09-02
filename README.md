@@ -46,7 +46,13 @@ $ sudo chmod +x /usr/local/bin/dbmate
 You can run dbmate using the official docker image:
 
 ```sh
-$ docker run --rm amacneil/dbmate --help
+$ docker run --rm -it amacneil/dbmate --help
+```
+
+If you wish to create or apply migrations, you will need to use Docker's [bind mount](https://docs.docker.com/storage/bind-mounts/) feature to make your local working directory available inside the dbmate container:
+
+```sh
+$ docker run --rm -it -v "$(pwd)"/db:/db amacneil/dbmate new create_users_table
 ```
 
 **Heroku**
