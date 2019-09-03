@@ -1,5 +1,5 @@
 # build image
-FROM golang:1.12 as build
+FROM golang:1.12-stretch as build
 
 # required to force cgo (for sqlite driver) with cross compile
 ENV CGO_ENABLED 1
@@ -7,7 +7,7 @@ ENV CGO_ENABLED 1
 # install database clients
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends \
-		mysql-client \
+		default-mysql-client \
 		postgresql-client \
 		sqlite3 \
 	&& rm -rf /var/lib/apt/lists/*
