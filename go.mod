@@ -1,5 +1,7 @@
 module github.com/amacneil/dbmate
 
+go 1.13
+
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-sql-driver/mysql v1.4.1

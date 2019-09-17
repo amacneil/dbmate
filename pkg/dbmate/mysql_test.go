@@ -133,8 +133,10 @@ func TestMySQLDumpSchema(t *testing.T) {
 	u.Path = "/fakedb"
 	schema, err = drv.DumpSchema(u, db)
 	require.Nil(t, schema)
-	require.EqualError(t, err, "mysqldump: Got error: 1049: "+
-		"\"Unknown database 'fakedb'\" when selecting the database")
+	require.EqualError(t, err, "mysqldump: [Warning] Using a password "+
+		"on the command line interface can be insecure.\n"+
+		"mysqldump: Got error: 1049: "+
+		"Unknown database 'fakedb' when selecting the database")
 }
 
 func TestMySQLDatabaseExists(t *testing.T) {
