@@ -177,11 +177,25 @@ func (drv PostgresDriver) DeleteMigration(db Transaction, version string) error 
 // Ping verifies a connection to the database server. It does not verify whether the
 // specified database exists.
 func (drv PostgresDriver) Ping(u *url.URL) error {
-	db, err := drv.openPostgresDB(u)
+	// attempt connection to primary database, not "postgres" database
+	// to support servers with no "postgres" database
+	// (see https://github.com/amacneil/dbmate/issues/78)
+	db, err := drv.Open(u)
 	if err != nil {
 		return err
 	}
 	defer mustClose(db)
 
-	return db.Ping()
+	err = db.Ping()
+	if err == nil {
+		return nil
+	}
+
+	// ignore 'database "foo" does not exist' error
+	pqErr, ok := err.(*pq.Error)
+	if ok && pqErr.Code == "3D000" {
+		return nil
+	}
+
+	return err
 }
