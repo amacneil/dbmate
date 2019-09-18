@@ -1,27 +1,34 @@
 # build image
-FROM golang:1.12-stretch as build
+FROM techknowlogick/xgo:go-1.13.x as build
+WORKDIR /src
+ENTRYPOINT []
+CMD ["/bin/bash"]
 
-# required to force cgo (for sqlite driver) with cross compile
+# enable cgo to build sqlite
 ENV CGO_ENABLED 1
 
 # install database clients
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends \
-		default-mysql-client \
+	&& apt-get install -qq --no-install-recommends \
+		curl \
+		mysql-client \
 		postgresql-client \
 		sqlite3 \
 	&& rm -rf /var/lib/apt/lists/*
 
-# development dependencies
-RUN curl -fsSL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
-	| sh -s v1.16.0
+# golangci-lint
+RUN curl -fsSL -o /tmp/lint-install.sh https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
+	&& chmod +x /tmp/lint-install.sh \
+	&& /tmp/lint-install.sh -b /usr/local/bin v1.18.0 \
+	&& rm -f /tmp/lint-install.sh
 
-# copy source files
-COPY . /src
-WORKDIR /src
+# download modules
+COPY go.* ./
+RUN go mod download
 
 # build
-RUN make build
+COPY . ./
+RUN make build-linux
 
 # runtime image
 FROM gcr.io/distroless/base
