@@ -18,7 +18,7 @@ wait:
 
 .PHONY: clean
 clean:
-	rm -rf dist
+	rm -rf dist/*
 
 .PHONY: build
 build: clean build-linux build-macos build-windows
