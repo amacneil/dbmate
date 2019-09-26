@@ -13,7 +13,7 @@ For a comparison between dbmate and other popular database schema migration tool
 ## Features
 
 * Supports MySQL, PostgreSQL, and SQLite.
-* Powerful, [purpose-built DSL](https://en.wikipedia.org/wiki/SQL#Data_definition) for writing schema migrations.
+* Uses plain SQL for writing schema migrations.
 * Migrations are timestamp-versioned, to avoid version number conflicts with multiple developers.
 * Migrations are run atomically inside a transaction.
 * Supports creating and dropping databases (handy in development/test).
