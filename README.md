@@ -79,7 +79,7 @@ $ heroku run bin/dbmate-heroku up
 Dbmate can be installed directly using `go get`:
 
 ```sh
-$ go get -u github.com/amacneil/dbmate
+$ GO111MODULE=on go get -u github.com/amacneil/dbmate
 ```
 
 ## Commands
