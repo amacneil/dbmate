@@ -50,6 +50,10 @@ func NewApp() *cli.App {
 			Name:  "no-dump-schema",
 			Usage: "don't update the schema file on migrate/rollback",
 		},
+		cli.BoolFlag{
+			Name:  "wait",
+			Usage: "wait for the db to become available before executing the subsequent command",
+		},
 	}
 
 	app.Commands = []cli.Command{
@@ -139,6 +143,7 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 		db.AutoDumpSchema = !c.GlobalBool("no-dump-schema")
 		db.MigrationsDir = c.GlobalString("migrations-dir")
 		db.SchemaFile = c.GlobalString("schema-file")
+		db.WaitBefore = c.GlobalBool("wait")
 
 		return f(db, c)
 	}

@@ -38,6 +38,7 @@ func TestNew(t *testing.T) {
 	require.Equal(t, u.String(), db.DatabaseURL.String())
 	require.Equal(t, "./db/migrations", db.MigrationsDir)
 	require.Equal(t, "./db/schema.sql", db.SchemaFile)
+	require.False(t, db.WaitBefore)
 	require.Equal(t, time.Second, db.WaitInterval)
 	require.Equal(t, 60*time.Second, db.WaitTimeout)
 }
@@ -148,6 +149,55 @@ func TestAutoDumpSchema(t *testing.T) {
 	schema, err = ioutil.ReadFile(db.SchemaFile)
 	require.NoError(t, err)
 	require.Contains(t, string(schema), "-- PostgreSQL database dump")
+}
+
+func checkWaitCalled(t *testing.T, u *url.URL, command func() error) {
+	oldHost := u.Host
+	u.Host = "postgres:404"
+	err := command()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unable to connect to database: dial tcp")
+	require.Contains(t, err.Error(), "connect: connection refused")
+	u.Host = oldHost
+}
+
+func TestWaitBefore(t *testing.T) {
+	u := postgresTestURL(t)
+	db := newTestDB(t, u)
+	db.WaitBefore = true
+	// so that checkWaitCalled returns quickly
+	db.WaitInterval = time.Millisecond
+	db.WaitTimeout = 5 * time.Millisecond
+
+	// drop database
+	err := db.Drop()
+	require.NoError(t, err)
+	checkWaitCalled(t, u, db.Drop)
+
+	// create
+	err = db.Create()
+	require.NoError(t, err)
+	checkWaitCalled(t, u, db.Create)
+
+	// create and migrate
+	err = db.CreateAndMigrate()
+	require.NoError(t, err)
+	checkWaitCalled(t, u, db.CreateAndMigrate)
+
+	// migrate
+	err = db.Migrate()
+	require.NoError(t, err)
+	checkWaitCalled(t, u, db.Migrate)
+
+	// rollback
+	err = db.Rollback()
+	require.NoError(t, err)
+	checkWaitCalled(t, u, db.Rollback)
+
+	// dump
+	err = db.DumpSchema()
+	require.NoError(t, err)
+	checkWaitCalled(t, u, db.DumpSchema)
 }
 
 func testURLs(t *testing.T) []*url.URL {
