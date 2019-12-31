@@ -30,6 +30,7 @@ type DB struct {
 	DatabaseURL    *url.URL
 	MigrationsDir  string
 	SchemaFile     string
+	WaitBefore	   bool
 	WaitInterval   time.Duration
 	WaitTimeout    time.Duration
 }
@@ -41,6 +42,7 @@ func New(databaseURL *url.URL) *DB {
 		DatabaseURL:    databaseURL,
 		MigrationsDir:  DefaultMigrationsDir,
 		SchemaFile:     DefaultSchemaFile,
+		WaitBefore:     false,
 		WaitInterval:   DefaultWaitInterval,
 		WaitTimeout:    DefaultWaitTimeout,
 	}
@@ -87,6 +89,12 @@ func (db *DB) Wait() error {
 
 // CreateAndMigrate creates the database (if necessary) and runs migrations
 func (db *DB) CreateAndMigrate() error {
+	if db.WaitBefore {
+		err := db.Wait()
+		if err != nil {
+			return err
+		}
+	}
 	drv, err := db.GetDriver()
 	if err != nil {
 		return err
@@ -108,6 +116,13 @@ func (db *DB) CreateAndMigrate() error {
 
 // Create creates the current database
 func (db *DB) Create() error {
+	if db.WaitBefore {
+		err := db.Wait()
+		if err != nil {
+			return err
+		}
+	}
+
 	drv, err := db.GetDriver()
 	if err != nil {
 		return err
@@ -118,6 +133,13 @@ func (db *DB) Create() error {
 
 // Drop drops the current database (if it exists)
 func (db *DB) Drop() error {
+	if db.WaitBefore {
+		err := db.Wait()
+		if err != nil {
+			return err
+		}
+	}
+
 	drv, err := db.GetDriver()
 	if err != nil {
 		return err
@@ -128,6 +150,13 @@ func (db *DB) Drop() error {
 
 // DumpSchema writes the current database schema to a file
 func (db *DB) DumpSchema() error {
+	if db.WaitBefore {
+		err := db.Wait()
+		if err != nil {
+			return err
+		}
+	}
+
 	drv, sqlDB, err := db.openDatabaseForMigration()
 	if err != nil {
 		return err
@@ -233,6 +262,13 @@ func (db *DB) Migrate() error {
 		return fmt.Errorf("no migration files found")
 	}
 
+	if db.WaitBefore {
+		err := db.Wait()
+		if err != nil {
+			return err
+		}
+	}
+	
 	drv, sqlDB, err := db.openDatabaseForMigration()
 	if err != nil {
 		return err
@@ -341,6 +377,12 @@ func migrationVersion(filename string) string {
 
 // Rollback rolls back the most recent migration
 func (db *DB) Rollback() error {
+	if db.WaitBefore {
+		err := db.Wait()
+		if err != nil {
+			return err
+		}
+	}
 	drv, sqlDB, err := db.openDatabaseForMigration()
 	if err != nil {
 		return err
