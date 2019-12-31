@@ -271,6 +271,13 @@ Waiting for database....
 Creating: myapp_development
 ```
 
+Alternatively you can use the `--wait` flag:
+```sh
+$ dbmate --wait up
+Waiting for database....
+Creating: myapp_development
+```
+
 If the database is still not available after 60 seconds, the command will return an error:
 
 ```sh
@@ -289,6 +296,7 @@ The following command line options are available with all commands. You must use
 * `--migrations-dir, -d "./db/migrations"` - where to keep the migration files.
 * `--schema-file, -s "./db/schema.sql"` - a path to keep the schema.sql file.
 * `--no-dump-schema` - don't auto-update the schema.sql file on migrate/rollback
+* `--wait` - wait for the db to become available before executing the subsequent command
 
 For example, before running your test suite, you may wish to drop and recreate the test database. One easy way to do this is to store your test database connection URL in the `TEST_DATABASE_URL` environment variable:
 
