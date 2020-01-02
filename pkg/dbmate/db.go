@@ -279,7 +279,6 @@ func (db *DB) Migrate() error {
 		if err != nil {
 			return err
 		}
-
 	}
 
 	// automatically update schema file, silence errors

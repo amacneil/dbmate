@@ -7,6 +7,10 @@ all: test lint build
 test:
 	go test -v ./...
 
+.PHONY: fix
+fix:
+	golangci-lint run --fix
+
 .PHONY: lint
 lint:
 	golangci-lint run

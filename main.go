@@ -6,9 +6,10 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/amacneil/dbmate/pkg/dbmate"
 	"github.com/joho/godotenv"
 	"github.com/urfave/cli"
+
+	"github.com/amacneil/dbmate/pkg/dbmate"
 )
 
 func main() {
