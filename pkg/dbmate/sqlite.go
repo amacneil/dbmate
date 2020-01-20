@@ -124,6 +124,14 @@ func (drv SQLiteDriver) CreateMigrationsTable(db *sql.DB) error {
 	return err
 }
 
+// CreateRepeatablesTable creates the schema_repeatables table
+func (drv SQLiteDriver) CreateRepeatablesTable(db *sql.DB) error {
+	_, err := db.Exec("create table if not exists schema_repeatables " +
+		"(filePath varchar(255) primary key, checksum varchar(255))")
+
+	return err
+}
+
 // SelectMigrations returns a list of applied migrations
 // with an optional limit (in descending order)
 func (drv SQLiteDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
@@ -149,6 +157,37 @@ func (drv SQLiteDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool
 	}
 
 	return migrations, nil
+}
+
+// SelectRepeatables returns a list of applied repeatables
+func (drv SQLiteDriver) SelectRepeatables(db *sql.DB) (map[string]string, error) {
+	query := "select filePath, checksum from schema_repeatables"
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+
+	defer mustClose(rows)
+
+	repeatables := map[string]string{}
+	for rows.Next() {
+		var filePath string
+		var checksum string
+		if err := rows.Scan(&filePath, &checksum); err != nil {
+			return nil, err
+		}
+
+		repeatables[filePath] = checksum
+	}
+
+	return repeatables, nil
+}
+
+// UpdateRepeatable adds a new repeatable record
+func (drv SQLiteDriver) UpdateRepeatable(db Transaction, filePath string, checksum string) error {
+	_, err := db.Exec("INSERT INTO schema_repeatables(filePath, checksum) VALUES(?, ?) ON CONFLICT(filePath) DO UPDATE SET checksum=?", filePath, checksum, checksum)
+
+	return err
 }
 
 // InsertMigration adds a new migration record

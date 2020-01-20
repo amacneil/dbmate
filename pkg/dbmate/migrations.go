@@ -41,13 +41,24 @@ func parseMigration(path string) (Migration, Migration, error) {
 	return up, down, err
 }
 
+// parseRepeatable reads a migration file and returns (repeatable Migration, error)
+func parseRepeatable(path string) (Migration, error) {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return NewMigration(), err
+	}
+	repeatable, err := parseRepeatableContents(string(data))
+	return repeatable, err
+}
+
 var upRegExp = regexp.MustCompile(`(?m)^--\s*migrate:up(\s*$|\s+\S+)`)
 var downRegExp = regexp.MustCompile(`(?m)^--\s*migrate:down(\s*$|\s+\S+)$`)
+var repeatableRegExp = regexp.MustCompile(`(?m)^--\s*migrate:repeatable(\s*$|\s+\S+)$`)
 var emptyLineRegExp = regexp.MustCompile(`^\s*$`)
 var commentLineRegExp = regexp.MustCompile(`^\s*--`)
 var whitespaceRegExp = regexp.MustCompile(`\s+`)
 var optionSeparatorRegExp = regexp.MustCompile(`:`)
-var blockDirectiveRegExp = regexp.MustCompile(`^--\s*migrate:[up|down]]`)
+var blockDirectiveRegExp = regexp.MustCompile(`^--\s*migrate:[up|down|repeatable]]`)
 
 // parseMigrationContents parses the string contents of a migration.
 // It will return two Migration objects, the first representing the "up"
@@ -88,6 +99,24 @@ func parseMigrationContents(contents string) (Migration, Migration, error) {
 	down.Contents = substring(contents, downDirectiveStart, downEnd)
 
 	return up, down, nil
+}
+
+// parseRepeatableContents parses the string contents of a repeatable.
+func parseRepeatableContents(contents string) (Migration, error) {
+	repeatable := NewMigration()
+
+	repeatableDirectiveStart, repeatableDirectiveEnd, hasDefinedRepeatableBlock := getMatchPositions(contents, repeatableRegExp)
+
+	if !hasDefinedRepeatableBlock {
+		return repeatable, fmt.Errorf("dbmate requires each repeatable to define an up bock with '-- migrate:repeatable'")
+	}
+
+	repeatableDirective := substring(contents, repeatableDirectiveStart, repeatableDirectiveEnd)
+
+	repeatable.Options = parseMigrationOptions(repeatableDirective)
+	repeatable.Contents = substring(contents, repeatableDirectiveEnd, len(contents))
+
+	return repeatable, nil
 }
 
 // parseMigrationOptions parses the migration options out of a block

@@ -14,10 +14,13 @@ type Driver interface {
 	DropDatabase(*url.URL) error
 	DumpSchema(*url.URL, *sql.DB) ([]byte, error)
 	CreateMigrationsTable(*sql.DB) error
+	CreateRepeatablesTable(*sql.DB) error
 	SelectMigrations(*sql.DB, int) (map[string]bool, error)
 	InsertMigration(Transaction, string) error
 	DeleteMigration(Transaction, string) error
 	Ping(*url.URL) error
+	SelectRepeatables(*sql.DB) (map[string]string, error)
+	UpdateRepeatable(Transaction, string, string) error
 }
 
 var drivers = map[string]Driver{}

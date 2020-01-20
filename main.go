@@ -54,6 +54,11 @@ func NewApp() *cli.App {
 			Name:  "wait",
 			Usage: "wait for the db to become available before executing the subsequent command",
 		},
+		cli.StringFlag{
+			Name:  "repeatables-dir, r",
+			Value: dbmate.DefaultRepeatablesDir,
+			Usage: "specify the directory containing repeatable files",
+		},
 	}
 
 	app.Commands = []cli.Command{
@@ -116,6 +121,13 @@ func NewApp() *cli.App {
 				return db.Wait()
 			}),
 		},
+		{
+			Name:  "repeatables",
+			Usage: "Load repeatable SQL files into the database",
+			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				return db.Repeatables()
+			}),
+		},
 	}
 
 	return app
@@ -144,6 +156,7 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 		db.MigrationsDir = c.GlobalString("migrations-dir")
 		db.SchemaFile = c.GlobalString("schema-file")
 		db.WaitBefore = c.GlobalBool("wait")
+		db.RepeatablesDir = c.GlobalString("repeatables-dir")
 
 		return f(db, c)
 	}

@@ -133,6 +133,14 @@ func (drv PostgresDriver) CreateMigrationsTable(db *sql.DB) error {
 	return err
 }
 
+// CreateRepeatablesTable creates the schema_repeatables table
+func (drv PostgresDriver) CreateRepeatablesTable(db *sql.DB) error {
+	_, err := db.Exec("create table if not exists public.schema_repeatables " +
+		"(filePath varchar(255) primary key, checksum varchar(255))")
+
+	return err
+}
+
 // SelectMigrations returns a list of applied migrations
 // with an optional limit (in descending order)
 func (drv PostgresDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
@@ -158,6 +166,37 @@ func (drv PostgresDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bo
 	}
 
 	return migrations, nil
+}
+
+// SelectRepeatables returns a list of applied repeatables
+func (drv PostgresDriver) SelectRepeatables(db *sql.DB) (map[string]string, error) {
+	query := "select filePath, checksum from public.schema_repeatables"
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+
+	defer mustClose(rows)
+
+	repeatables := map[string]string{}
+	for rows.Next() {
+		var filePath string
+		var checksum string
+		if err := rows.Scan(&filePath, &checksum); err != nil {
+			return nil, err
+		}
+
+		repeatables[filePath] = checksum
+	}
+
+	return repeatables, nil
+}
+
+// UpdateRepeatable adds a new repeatable record
+func (drv PostgresDriver) UpdateRepeatable(db Transaction, filePath string, checksum string) error {
+	_, err := db.Exec("INSERT INTO public.schema_repeatables(filePath, checksum) VALUES ($1, $2) ON CONFLICT (filePath) DO UPDATE SET checksum = $3", filePath, checksum, checksum)
+
+	return err
 }
 
 // InsertMigration adds a new migration record

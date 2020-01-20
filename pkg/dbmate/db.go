@@ -1,9 +1,13 @@
 package dbmate
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"log"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -24,11 +28,15 @@ const DefaultWaitInterval = time.Second
 // DefaultWaitTimeout specifies maximum time for connection attempts
 const DefaultWaitTimeout = 60 * time.Second
 
+// DefaultRepeatablesDir specifies default directory to find repeatable files
+const DefaultRepeatablesDir = "./db/repeatables"
+
 // DB allows dbmate actions to be performed on a specified database
 type DB struct {
 	AutoDumpSchema bool
 	DatabaseURL    *url.URL
 	MigrationsDir  string
+	RepeatablesDir string
 	SchemaFile     string
 	WaitBefore     bool
 	WaitInterval   time.Duration
@@ -45,6 +53,7 @@ func New(databaseURL *url.URL) *DB {
 		WaitBefore:     false,
 		WaitInterval:   DefaultWaitInterval,
 		WaitTimeout:    DefaultWaitTimeout,
+		RepeatablesDir: DefaultRepeatablesDir,
 	}
 }
 
@@ -112,7 +121,13 @@ func (db *DB) CreateAndMigrate() error {
 	}
 
 	// migrate
-	return db.Migrate()
+	err = db.Migrate()
+	if err != nil {
+		return err
+	}
+
+	// Load repeatables
+	return db.Repeatables()
 }
 
 // Create creates the current database
@@ -251,10 +266,29 @@ func (db *DB) openDatabaseForMigration() (Driver, *sql.DB, error) {
 	return drv, sqlDB, nil
 }
 
+func (db *DB) openDatabaseForRepeatables() (Driver, *sql.DB, error) {
+	drv, err := db.GetDriver()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	sqlDB, err := drv.Open(db.DatabaseURL)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if err := drv.CreateRepeatablesTable(sqlDB); err != nil {
+		mustClose(sqlDB)
+		return nil, nil, err
+	}
+
+	return drv, sqlDB, nil
+}
+
 // Migrate migrates database to the latest version
 func (db *DB) Migrate() error {
 	re := regexp.MustCompile(`^\d.*\.sql$`)
-	files, err := findMigrationFiles(db.MigrationsDir, re)
+	files, err := findSQLFiles(db.MigrationsDir, re)
 	if err != nil {
 		return err
 	}
@@ -326,10 +360,85 @@ func (db *DB) Migrate() error {
 	return nil
 }
 
-func findMigrationFiles(dir string, re *regexp.Regexp) ([]string, error) {
+// Repeatables Calculate the versions for all the repeatable files and load them.
+func (db *DB) Repeatables() error {
+	re := regexp.MustCompile(`^.*\.sql$`)
+	files, err := findSQLFiles(db.RepeatablesDir, re)
+	if err != nil {
+		return err
+	}
+
+	if len(files) == 0 {
+		return fmt.Errorf("no repeatable files found")
+	}
+
+	if db.WaitBefore {
+		err := db.Wait()
+		if err != nil {
+			return err
+		}
+	}
+
+	drv, sqlDB, err := db.openDatabaseForRepeatables()
+	if err != nil {
+		return err
+	}
+	defer mustClose(sqlDB)
+
+	applied, err := drv.SelectRepeatables(sqlDB)
+	if err != nil {
+		return err
+	}
+
+	for _, filename := range files {
+		filePath := filepath.Join(db.RepeatablesDir, filename)
+		checksum := sha256File(filePath)
+		if checksum == applied[filePath] {
+			// current file version already applied
+			continue
+		}
+
+		fmt.Printf("Applying: %s\n", filePath)
+		repeatable, err := parseRepeatable(filePath)
+		if err != nil {
+			return err
+		}
+
+		execRepeatable := func(tx Transaction) error {
+			// run actual migration
+			if _, err := tx.Exec(repeatable.Contents); err != nil {
+				return err
+			}
+
+			// record migration
+			return drv.UpdateRepeatable(tx, filePath, checksum)
+		}
+
+		if repeatable.Options.Transaction() {
+			// begin transaction
+			err = doTransaction(sqlDB, execRepeatable)
+		} else {
+			// run outside of transaction
+			err = execRepeatable(sqlDB)
+		}
+
+		if err != nil {
+			return err
+		}
+	}
+
+	// automatically update schema file, silence errors
+	if db.AutoDumpSchema {
+		_ = db.DumpSchema()
+	}
+
+	return nil
+}
+
+func findSQLFiles(dir string, re *regexp.Regexp) ([]string, error) {
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
-		return nil, fmt.Errorf("could not find migrations directory `%s`", dir)
+		return nil, fmt.Errorf("could not find directory `%s`", dir)
 	}
 
 	matches := []string{}
@@ -359,7 +468,7 @@ func findMigrationFile(dir string, ver string) (string, error) {
 	ver = regexp.QuoteMeta(ver)
 	re := regexp.MustCompile(fmt.Sprintf(`^%s.*\.sql$`, ver))
 
-	files, err := findMigrationFiles(dir, re)
+	files, err := findSQLFiles(dir, re)
 	if err != nil {
 		return "", err
 	}
@@ -373,6 +482,21 @@ func findMigrationFile(dir string, ver string) (string, error) {
 
 func migrationVersion(filename string) string {
 	return regexp.MustCompile(`^\d+`).FindString(filename)
+}
+
+func sha256File(filePath string) string {
+	f, err := os.Open(filePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		log.Fatal(err)
+	}
+
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 // Rollback rolls back the most recent migration

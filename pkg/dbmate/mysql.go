@@ -198,6 +198,14 @@ func (drv MySQLDriver) CreateMigrationsTable(db *sql.DB) error {
 	return err
 }
 
+// CreateRepeatablesTable creates the schema_repeatables table
+func (drv MySQLDriver) CreateRepeatablesTable(db *sql.DB) error {
+	_, err := db.Exec("create table if not exists schema_repeatables " +
+		"(filePath varchar(255) primary key, checksum varchar(255))")
+
+	return err
+}
+
 // SelectMigrations returns a list of applied migrations
 // with an optional limit (in descending order)
 func (drv MySQLDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
@@ -225,6 +233,30 @@ func (drv MySQLDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool,
 	return migrations, nil
 }
 
+// SelectRepeatables returns a list of applied repeatables
+func (drv MySQLDriver) SelectRepeatables(db *sql.DB) (map[string]string, error) {
+	query := "select filePath, checksum from schema_repeatables"
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+
+	defer mustClose(rows)
+
+	repeatables := map[string]string{}
+	for rows.Next() {
+		var filePath string
+		var checksum string
+		if err := rows.Scan(&filePath, &checksum); err != nil {
+			return nil, err
+		}
+
+		repeatables[filePath] = checksum
+	}
+
+	return repeatables, nil
+}
+
 // InsertMigration adds a new migration record
 func (drv MySQLDriver) InsertMigration(db Transaction, version string) error {
 	_, err := db.Exec("insert into schema_migrations (version) values (?)", version)
@@ -235,6 +267,13 @@ func (drv MySQLDriver) InsertMigration(db Transaction, version string) error {
 // DeleteMigration removes a migration record
 func (drv MySQLDriver) DeleteMigration(db Transaction, version string) error {
 	_, err := db.Exec("delete from schema_migrations where version = ?", version)
+
+	return err
+}
+
+// UpdateRepeatable adds a new repeatable record
+func (drv MySQLDriver) UpdateRepeatable(db Transaction, filePath string, checksum string) error {
+	_, err := db.Exec("insert into schema_repeatables (filePath, checksum) values (?, ?) ON DUPLICATE KEY UPDATE checksum = ?", filePath, checksum, checksum)
 
 	return err
 }

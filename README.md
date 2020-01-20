@@ -16,9 +16,10 @@ For a comparison between dbmate and other popular database schema migration tool
 * Uses plain SQL for writing schema migrations.
 * Migrations are timestamp-versioned, to avoid version number conflicts with multiple developers.
 * Migrations are run atomically inside a transaction.
+* Supports repeatable script runs(triggered on file hash change).
 * Supports creating and dropping databases (handy in development/test).
 * Supports saving a `schema.sql` file to easily diff schema changes in git.
-* Database connection URL is definied using an environment variable (`DATABASE_URL` by default), or specified on the command line.
+* Database connection URL is defined using an environment variable (`DATABASE_URL` by default), or specified on the command line.
 * Built-in support for reading environment variables from your `.env` file.
 * Easy to distribute, single self-contained binary.
 
@@ -85,16 +86,17 @@ $ GO111MODULE=on go get -u github.com/amacneil/dbmate
 ## Commands
 
 ```sh
-dbmate           # print help
-dbmate new       # generate a new migration file
-dbmate up        # create the database (if it does not already exist) and run any pending migrations
-dbmate create    # create the database
-dbmate drop      # drop the database
-dbmate migrate   # run any pending migrations
-dbmate rollback  # roll back the most recent migration
-dbmate down      # alias for rollback
-dbmate dump      # write the database schema.sql file
-dbmate wait      # wait for the database server to become available
+dbmate             # print help
+dbmate new         # generate a new migration file
+dbmate up          # create the database (if it does not already exist) and run any pending migrations
+dbmate create      # create the database
+dbmate drop        # drop the database
+dbmate migrate     # run any pending migrations
+dbmate rollback    # roll back the most recent migration
+dbmate down        # alias for rollback
+dbmate dump        # write the database schema.sql file
+dbmate wait        # wait for the database server to become available
+dbmate repeatables # run any pending repeatables
 ```
 
 ## Usage
@@ -210,7 +212,30 @@ Rolling back: 20151127184807_create_users_table.sql
 Writing: ./db/schema.sql
 ```
 
-### Migration Options
+### Creating Repeatables
+
+To create a new repeatable, simply create a file named `<your unique file name>.sql` in your repeatables directory with a `migrate:repeatable` section:
+
+```sql
+-- migrate:repeatable
+CREATE PROCEDURE add_user(id integer, user varchar)
+LANGUAGE SQL
+AS $$
+    insert into users (id, name) values (id, user);
+$$;
+```
+
+### Running Repeatables
+
+Run `dbmate repeatables` to run any pending repeatables.
+
+```sh
+$ dbmate repeatable
+Applying: db/repeatables/stored_procedure_creation.sql
+Writing: ./db/schema.sql
+```
+
+### Migration/Repeatable Options
 
 dbmate supports options passed to a migration block in the form of `key:value` pairs. List of supported options:
 
@@ -229,7 +254,7 @@ ALTER TYPE colors ADD VALUE 'orange' AFTER 'red';
 
 ### Schema File
 
-When you run the `up`, `migrate`, or `rollback` commands, dbmate will automatically create a `./db/schema.sql` file containing a complete representation of your database schema. Dbmate keeps this file up to date for you, so you should not manually edit it.
+When you run the `up`, `migrate`, `repeatable`, or `rollback` commands, dbmate will automatically create a `./db/schema.sql` file containing a complete representation of your database schema. Dbmate keeps this file up to date for you, so you should not manually edit it.
 
 It is recommended to check this file into source control, so that you can easily review changes to the schema in commits or pull requests. It's also possible to use this file when you want to quickly load a database schema, without running each migration sequentially (for example in your test harness). However, if you do not wish to save this file, you could add it to `.gitignore`, or pass the `--no-dump-schema` command line option.
 
@@ -297,6 +322,7 @@ The following command line options are available with all commands. You must use
 * `--schema-file, -s "./db/schema.sql"` - a path to keep the schema.sql file.
 * `--no-dump-schema` - don't auto-update the schema.sql file on migrate/rollback
 * `--wait` - wait for the db to become available before executing the subsequent command
+* `--repeatables-dir, -r "./db/repeatables"` - where to keep the repeatable files.
 
 For example, before running your test suite, you may wish to drop and recreate the test database. One easy way to do this is to store your test database connection URL in the `TEST_DATABASE_URL` environment variable:
 
