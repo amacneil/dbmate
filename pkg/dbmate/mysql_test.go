@@ -2,6 +2,7 @@ package dbmate
 
 import (
 	"database/sql"
+	"fmt"
 	"net/url"
 	"testing"
 
@@ -282,4 +283,68 @@ func TestMySQLPing(t *testing.T) {
 	err = drv.Ping(u)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "connect: connection refused")
+}
+
+func TestMySQLCreateRepeatablesTable(t *testing.T) {
+	drv := MySQLDriver{}
+	db := prepTestMySQLDB(t)
+	defer mustClose(db)
+
+	// repeatables table should not exist
+	count := 0
+	err := db.QueryRow("select count(*) from schema_repeatables").Scan(&count)
+	require.Regexp(t, "Error 1146: Table 'dbmate.schema_repeatables' doesn't exist", err.Error())
+
+	// create table
+	err = drv.CreateRepeatablesTable(db)
+	require.NoError(t, err)
+
+	// repeatables table should exist
+	err = db.QueryRow("select count(*) from schema_repeatables").Scan(&count)
+	require.NoError(t, err)
+
+	// create table should be idempotent
+	err = drv.CreateRepeatablesTable(db)
+	require.NoError(t, err)
+}
+
+func TestMySQLSelectRepeatables(t *testing.T) {
+	drv := MySQLDriver{}
+	db := prepTestMySQLDB(t)
+	defer mustClose(db)
+
+	err := drv.CreateRepeatablesTable(db)
+	require.NoError(t, err)
+
+	_, err = db.Exec(`INSERT INTO schema_repeatables(filePath, checksum) VALUES('db\\test\\test.sql', '1234')`)
+	_, err = db.Exec(`INSERT INTO schema_repeatables(filePath, checksum) VALUES('db\\test\\test1.sql', 'ABCD1234')`)
+	require.NoError(t, err)
+
+	migrations, err := drv.SelectRepeatables(db)
+	fmt.Println(migrations)
+	require.NoError(t, err)
+	require.Equal(t, "1234", migrations["db\\test\\test.sql"])
+	require.Equal(t, "ABCD1234", migrations["db\\test\\test1.sql"])
+}
+
+func TestMySQLUpdateRepeatables(t *testing.T) {
+	drv := MySQLDriver{}
+	db := prepTestMySQLDB(t)
+	defer mustClose(db)
+
+	err := drv.CreateRepeatablesTable(db)
+	require.NoError(t, err)
+
+	_, err = db.Exec(`INSERT INTO schema_repeatables(filePath, checksum) VALUES('db\\test\\test.sql', '1234')`)
+	require.NoError(t, err)
+
+	migrations, err := drv.SelectRepeatables(db)
+	require.NoError(t, err)
+	require.Equal(t, "1234", migrations["db\\test\\test.sql"])
+
+	err = drv.UpdateRepeatable(db, "db\\test\\test.sql", "54321")
+	require.NoError(t, err)
+	migrations, err = drv.SelectRepeatables(db)
+	require.NoError(t, err)
+	require.Equal(t, "54321", migrations["db\\test\\test.sql"])
 }

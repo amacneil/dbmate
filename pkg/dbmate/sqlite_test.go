@@ -246,3 +246,66 @@ func TestSQLitePing(t *testing.T) {
 	err = drv.Ping(u)
 	require.EqualError(t, err, "unable to open database file")
 }
+
+func TestSQLiteCreateRepeatablesTable(t *testing.T) {
+	drv := SQLiteDriver{}
+	db := prepTestSQLiteDB(t)
+	defer mustClose(db)
+
+	// repeatables table should not exist
+	count := 0
+	err := db.QueryRow("select count(*) from schema_repeatables").Scan(&count)
+	require.Regexp(t, "no such table: schema_repeatables", err.Error())
+
+	// create table
+	err = drv.CreateRepeatablesTable(db)
+	require.NoError(t, err)
+
+	// repeatables table should exist
+	err = db.QueryRow("select count(*) from schema_repeatables").Scan(&count)
+	require.NoError(t, err)
+
+	// create table should be idempotent
+	err = drv.CreateRepeatablesTable(db)
+	require.NoError(t, err)
+}
+
+func TestSQLiteSelectRepeatables(t *testing.T) {
+	drv := SQLiteDriver{}
+	db := prepTestSQLiteDB(t)
+	defer mustClose(db)
+
+	err := drv.CreateRepeatablesTable(db)
+	require.NoError(t, err)
+
+	_, err = db.Exec(`INSERT INTO schema_repeatables(filePath, checksum) VALUES('db\test\test.sql', '1234')`)
+	_, err = db.Exec(`INSERT INTO schema_repeatables(filePath, checksum) VALUES('db\test\test1.sql', 'ABCD1234')`)
+	require.NoError(t, err)
+
+	migrations, err := drv.SelectRepeatables(db)
+	require.NoError(t, err)
+	require.Equal(t, "1234", migrations["db\\test\\test.sql"])
+	require.Equal(t, "ABCD1234", migrations["db\\test\\test1.sql"])
+}
+
+func TestSQLiteUpdateRepeatables(t *testing.T) {
+	drv := SQLiteDriver{}
+	db := prepTestSQLiteDB(t)
+	defer mustClose(db)
+
+	err := drv.CreateRepeatablesTable(db)
+	require.NoError(t, err)
+
+	_, err = db.Exec(`INSERT INTO schema_repeatables(filePath, checksum) VALUES('db\test\test.sql', '1234')`)
+	require.NoError(t, err)
+
+	migrations, err := drv.SelectRepeatables(db)
+	require.NoError(t, err)
+	require.Equal(t, "1234", migrations["db\\test\\test.sql"])
+
+	err = drv.UpdateRepeatable(db, "db\\test\\test.sql", "54321")
+	require.NoError(t, err)
+	migrations, err = drv.SelectRepeatables(db)
+	require.NoError(t, err)
+	require.Equal(t, "54321", migrations["db\\test\\test.sql"])
+}
