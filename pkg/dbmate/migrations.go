@@ -114,7 +114,7 @@ func parseRepeatableContents(contents string) (Migration, error) {
 	repeatableDirective := substring(contents, repeatableDirectiveStart, repeatableDirectiveEnd)
 
 	repeatable.Options = parseMigrationOptions(repeatableDirective)
-	repeatable.Contents = substring(contents, repeatableDirectiveEnd, len(contents))
+	repeatable.Contents = substring(contents, repeatableDirectiveStart, len(contents))
 
 	return repeatable, nil
 }

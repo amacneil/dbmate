@@ -130,3 +130,31 @@ ADD COLUMN status status_type DEFAULT 'active';
 	require.NotNil(t, err)
 	require.Equal(t, "dbmate requires each migration to define an up bock with '-- migrate:up'", err.Error())
 }
+
+func TestParseRepeatableContents(t *testing.T) {
+	// It supports the typical use case.
+	migration := `-- migrate:repeatable
+CREATE OR REPLACE FUNCTION add_user (integer, text) RETURNS void AS $$
+    insert into users (id, name) values ($1, $2);
+$$ LANGUAGE SQL;
+`
+
+	repeatable, err := parseRepeatableContents(migration)
+	require.Nil(t, err)
+
+	require.Equal(t, "-- migrate:repeatable\nCREATE OR REPLACE FUNCTION add_user (integer, text) RETURNS void AS $$\n    insert into users (id, name) values ($1, $2);\n$$ LANGUAGE SQL;\n", repeatable.Contents)
+	require.Equal(t, true, repeatable.Options.Transaction())
+
+}
+
+func TestParseRepeatableContents_NoRepeatable(t *testing.T) {
+	// It supports the typical use case.
+	migration := `CREATE OR REPLACE FUNCTION add_user (integer, text) RETURNS void AS $$
+    insert into users (id, name) values ($1, $2);
+$$ LANGUAGE SQL;
+`
+
+	_, err := parseRepeatableContents(migration)
+	require.NotNil(t, err)
+	require.Equal(t, "dbmate requires each repeatable to define an up bock with '-- migrate:repeatable'", err.Error())
+}
