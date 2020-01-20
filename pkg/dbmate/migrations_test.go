@@ -144,7 +144,6 @@ $$ LANGUAGE SQL;
 
 	require.Equal(t, "-- migrate:repeatable\nCREATE OR REPLACE FUNCTION add_user (integer, text) RETURNS void AS $$\n    insert into users (id, name) values ($1, $2);\n$$ LANGUAGE SQL;\n", repeatable.Contents)
 	require.Equal(t, true, repeatable.Options.Transaction())
-
 }
 
 func TestParseRepeatableContents_NoRepeatable(t *testing.T) {

@@ -286,7 +286,7 @@ func TestPostgresSelectRepeatables(t *testing.T) {
 	err := drv.CreateRepeatablesTable(db)
 	require.NoError(t, err)
 
-	_, err = db.Exec(`INSERT INTO schema_repeatables(filePath, checksum) VALUES('db\test\test.sql', '1234')`)
+	_, _ = db.Exec(`INSERT INTO schema_repeatables(filePath, checksum) VALUES('db\test\test.sql', '1234')`)
 	_, err = db.Exec(`INSERT INTO schema_repeatables(filePath, checksum) VALUES('db\test\test1.sql', 'ABCD1234')`)
 	require.NoError(t, err)
 
