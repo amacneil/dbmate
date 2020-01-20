@@ -365,11 +365,13 @@ func (db *DB) Repeatables() error {
 	re := regexp.MustCompile(`^.*\.sql$`)
 	files, err := findSQLFiles(db.RepeatablesDir, re)
 	if err != nil {
-		return err
+		fmt.Printf("Could not find repeatables directory %s.", db.RepeatablesDir)
+		return nil
 	}
 
 	if len(files) == 0 {
-		return fmt.Errorf("no repeatable files found")
+		fmt.Printf("No repeatables found in directory %s.", db.RepeatablesDir)
+		return nil
 	}
 
 	if db.WaitBefore {

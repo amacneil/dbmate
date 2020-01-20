@@ -28,6 +28,14 @@ func newTestDB(t *testing.T, u *url.URL) *DB {
 	db := New(u)
 	db.AutoDumpSchema = false
 
+	if u.Scheme == "postgres" {
+		db.RepeatablesDir = "db/repeatables/postgresql"
+	} else if u.Scheme == "mysql" {
+		db.RepeatablesDir = "db/repeatables/mysql"
+	} else if u.Scheme == "sqlite" {
+		db.RepeatablesDir = "db/repeatables/sqlite"
+	}
+
 	return db
 }
 
