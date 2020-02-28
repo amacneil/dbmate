@@ -298,6 +298,9 @@ func testRollbackURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
 
+	err = sqlDB.QueryRow("select count(*) from posts").Scan(&count)
+	require.Nil(t, err)
+
 	// rollback
 	err = db.Rollback()
 	require.NoError(t, err)
@@ -305,9 +308,9 @@ func testRollbackURL(t *testing.T, u *url.URL) {
 	// verify rollback
 	err = sqlDB.QueryRow("select count(*) from schema_migrations").Scan(&count)
 	require.NoError(t, err)
-	require.Equal(t, 0, count)
+	require.Equal(t, 1, count)
 
-	err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
+	err = sqlDB.QueryRow("select count(*) from posts").Scan(&count)
 	require.NotNil(t, err)
 	require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
 }
@@ -315,5 +318,55 @@ func testRollbackURL(t *testing.T, u *url.URL) {
 func TestRollback(t *testing.T) {
 	for _, u := range testURLs(t) {
 		testRollbackURL(t, u)
+	}
+}
+
+func testStatusUrl(t *testing.T, u *url.URL) {
+	db := newTestDB(t, u)
+
+	// drop, recreate, and migrate database
+	err := db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
+
+	// verify migration
+	sqlDB, err := GetDriverOpen(u)
+	require.NoError(t, err)
+	defer mustClose(sqlDB)
+
+	// two pending
+	results, err := checkMigrationsStatus(db)
+	require.NoError(t, err)
+	require.Len(t, results, 2)
+	require.False(t, results[0].applied)
+	require.False(t, results[1].applied)
+
+	// run migrations
+	err = db.Migrate()
+	require.NoError(t, err)
+
+	// two applied
+	results, err = checkMigrationsStatus(db)
+	require.NoError(t, err)
+	require.Len(t, results, 2)
+	require.True(t, results[0].applied)
+	require.True(t, results[1].applied)
+
+	// rollback last migration
+	err = db.Rollback()
+	require.NoError(t, err)
+
+	// one applied, one pending
+	results, err = checkMigrationsStatus(db)
+	require.NoError(t, err)
+	require.Len(t, results, 2)
+	require.True(t, results[0].applied)
+	require.False(t, results[1].applied)
+}
+
+func TestStatus(t *testing.T) {
+	for _, u := range testURLs(t) {
+		testStatusUrl(t, u)
 	}
 }

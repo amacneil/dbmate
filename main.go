@@ -103,6 +103,13 @@ func NewApp() *cli.App {
 			}),
 		},
 		{
+			Name:  "status",
+			Usage: "List applied and pending migrations",
+			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				return db.Status()
+			}),
+		},
+		{
 			Name:  "dump",
 			Usage: "Write the database schema to disk",
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
