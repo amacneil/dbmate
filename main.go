@@ -116,6 +116,13 @@ func NewApp() *cli.App {
 				return db.Wait()
 			}),
 		},
+		{
+			Name:  "status",
+			Usage: "Show the status of all migrations",
+			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				return db.Status()
+			}),
+		},
 	}
 
 	return app

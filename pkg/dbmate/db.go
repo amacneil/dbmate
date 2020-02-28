@@ -35,6 +35,11 @@ type DB struct {
 	WaitTimeout    time.Duration
 }
 
+type statusResult struct {
+	filename string
+	applied  bool
+}
+
 // New initializes a new dbmate database
 func New(databaseURL *url.URL) *DB {
 	return &DB{
@@ -442,6 +447,71 @@ func (db *DB) Rollback() error {
 	if db.AutoDumpSchema {
 		_ = db.DumpSchema()
 	}
+
+	return nil
+}
+
+func checkMigrationsStatus(db *DB) ([]statusResult, error) {
+	re := regexp.MustCompile(`^\d.*\.sql$`)
+	files, err := findMigrationFiles(db.MigrationsDir, re)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(files) == 0 {
+		return nil, fmt.Errorf("no migration files found")
+	}
+
+	drv, sqlDB, err := db.openDatabaseForMigration()
+	if err != nil {
+		return nil, err
+	}
+	defer mustClose(sqlDB)
+
+	applied, err := drv.SelectMigrations(sqlDB, -1)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []statusResult
+
+	for _, filename := range files {
+		ver := migrationVersion(filename)
+		res := statusResult{filename: filename}
+		if ok := applied[ver]; ok {
+			res.applied = true
+		} else {
+			res.applied = false
+		}
+
+		results = append(results, res)
+	}
+
+	return results, nil
+}
+
+// Status show the status of all migrations
+func (db *DB) Status() error {
+	results, err := checkMigrationsStatus(db)
+	if err != nil {
+		return err
+	}
+
+	var totalApplied int
+
+	for _, res := range results {
+		if res.applied {
+			fmt.Println("[X]", res.filename)
+			totalApplied++
+		} else {
+			fmt.Println("[ ]", res.filename)
+		}
+	}
+
+	fmt.Println()
+
+	fmt.Printf("Up-to-date: %d\n", totalApplied)
+	fmt.Printf("Pending: %d\n", len(results)-totalApplied)
 
 	return nil
 }
