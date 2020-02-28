@@ -139,7 +139,7 @@ func TestPostgresDatabaseExists_Error(t *testing.T) {
 	u.User = url.User("invalid")
 
 	exists, err := drv.DatabaseExists(u)
-	require.Equal(t, "pq: role \"invalid\" does not exist", err.Error())
+	require.Equal(t, "pq: password authentication failed for user \"invalid\"", err.Error())
 	require.Equal(t, false, exists)
 }
 
