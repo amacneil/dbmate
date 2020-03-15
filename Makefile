@@ -45,7 +45,12 @@ build-windows:
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc-posix CXX=x86_64-w64-mingw32-g++-posix \
 	     go build $(LDFLAGS) -o dist/dbmate-windows-amd64.exe .
 
-.PHONY: docker
-docker:
+.PHONY: docker-all
+docker-all:
+	docker-compose build
+	docker-compose run --rm dbmate make
+
+.PHONY: docker-bash
+docker-bash:
 	docker-compose build
 	docker-compose run --rm dbmate make

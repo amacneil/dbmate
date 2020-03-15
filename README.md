@@ -353,11 +353,11 @@ Dbmate is written in Go, pull requests are welcome.
 Tests are run against a real database using docker-compose. To build a docker image and run the tests:
 
 ```sh
-$ make docker
+$ make docker-all
 ```
 
 To start a development shell:
 
 ```sh
-$ docker-compose run --rm dbmate bash
+$ make docker-bash
 ```
