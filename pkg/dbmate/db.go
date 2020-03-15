@@ -492,26 +492,33 @@ func checkMigrationsStatus(db *DB) ([]statusResult, error) {
 }
 
 // Status shows the status of all migrations
-func (db *DB) Status() error {
+func (db *DB) Status(quiet bool) (int, error) {
 	results, err := checkMigrationsStatus(db)
 	if err != nil {
-		return err
+		return -1, err
 	}
 
 	var totalApplied int
+	var line string
 
 	for _, res := range results {
 		if res.applied {
-			fmt.Println("[X]", res.filename)
+			line = fmt.Sprintf("[X] %s", res.filename)
 			totalApplied++
 		} else {
-			fmt.Println("[ ]", res.filename)
+			line = fmt.Sprintf("[ ] %s", res.filename)
+		}
+		if !quiet {
+			fmt.Println(line)
 		}
 	}
 
-	fmt.Println()
-	fmt.Printf("Applied: %d\n", totalApplied)
-	fmt.Printf("Pending: %d\n", len(results)-totalApplied)
+	totalPending := len(results) - totalApplied
+	if !quiet {
+		fmt.Println()
+		fmt.Printf("Applied: %d\n", totalApplied)
+		fmt.Printf("Pending: %d\n", totalPending)
+	}
 
-	return nil
+	return totalPending, nil
 }

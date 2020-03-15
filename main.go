@@ -17,9 +17,10 @@ func main() {
 
 	app := NewApp()
 	err := app.Run(os.Args)
+
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Error: %s\n", err)
-		os.Exit(1)
+		os.Exit(2)
 	}
 }
 
@@ -105,8 +106,33 @@ func NewApp() *cli.App {
 		{
 			Name:  "status",
 			Usage: "List applied and pending migrations",
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "exit-code",
+					Usage: "return 1 if there are pending migrations",
+				},
+				cli.BoolFlag{
+					Name:  "quiet",
+					Usage: "don't output any text (implies --exit-code)",
+				},
+			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
-				return db.Status()
+				setExitCode := c.Bool("exit-code")
+				quiet := c.Bool("quiet")
+				if quiet {
+					setExitCode = true
+				}
+
+				pending, err := db.Status(quiet)
+				if err != nil {
+					return err
+				}
+
+				if pending > 0 && setExitCode {
+					return cli.NewExitError("", 1)
+				}
+
+				return nil
 			}),
 		},
 		{
