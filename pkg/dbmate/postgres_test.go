@@ -236,6 +236,31 @@ func TestPostgresDeleteMigration(t *testing.T) {
 	require.Equal(t, 1, count)
 }
 
+func TestPostgresAcquireAndReleaseChangeLock(t *testing.T) {
+	drv := PostgresDriver{}
+	db := prepTestPostgresDB(t)
+	defer mustClose(db)
+
+	hasLockBeforeAcquire, err := drv.HasAChangeLock(db)
+	require.NoError(t, err)
+	require.False(t, hasLockBeforeAcquire)
+
+	result1, err := drv.AcquireChangeLock(db)
+	require.NoError(t, err)
+	require.True(t, result1)
+
+	hasLock, err := drv.HasAChangeLock(db)
+	require.NoError(t, err)
+	require.True(t, hasLock)
+
+	err = drv.ReleaseChangeLock(db)
+	require.NoError(t, err)
+
+	hasLockAfterRelease, err := drv.HasAChangeLock(db)
+	require.NoError(t, err)
+	require.False(t, hasLockAfterRelease)
+}
+
 func TestPostgresPing(t *testing.T) {
 	drv := PostgresDriver{}
 	u := postgresTestURL(t)

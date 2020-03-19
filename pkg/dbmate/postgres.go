@@ -174,6 +174,43 @@ func (drv PostgresDriver) DeleteMigration(db Transaction, version string) error 
 	return err
 }
 
+// The sum of all charCodes in the string "dbmate" :)
+const advisoryLockKey = 621
+
+// Acquires a change lock by setting a
+// [pg advisory lock](https://www.postgresql.org/docs/9.4/explicit-locking.html#ADVISORY-LOCKS). NB! Locks are
+// reference counted and hence you must call `ReleaseChangeLock` the same number of times you call `AcquireChangeLock`
+func (drv PostgresDriver) AcquireChangeLock(db *sql.DB) (bool, error) {
+	var result string
+	err := db.QueryRow(fmt.Sprintf("select pg_try_advisory_lock(%d)", advisoryLockKey)).Scan(&result)
+	if err != nil {
+		return false, err
+	}
+
+	return result == "true", nil
+}
+
+// Releases a change lock acquired by `AcquireChangeLock`
+func (drv PostgresDriver) ReleaseChangeLock(db *sql.DB) error {
+	res, err := db.Query(fmt.Sprintf("select pg_advisory_unlock(%d)", advisoryLockKey))
+	if err != nil {
+		return err
+	}
+	err = res.Close()
+	return err
+}
+
+// Checks whether at least a change lock exists in any session (including this session)
+func (drv PostgresDriver) HasAChangeLock(db *sql.DB) (bool, error) {
+	var locksCount int
+	err := db.QueryRow(fmt.Sprintf("select count(*) from pg_locks where objid = %d and locktype = 'advisory'", advisoryLockKey)).Scan(&locksCount)
+	if err != nil {
+		return false, err
+	}
+
+	return locksCount > 0, nil
+}
+
 // Ping verifies a connection to the database server. It does not verify whether the
 // specified database exists.
 func (drv PostgresDriver) Ping(u *url.URL) error {

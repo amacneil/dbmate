@@ -239,6 +239,39 @@ func (drv MySQLDriver) DeleteMigration(db Transaction, version string) error {
 	return err
 }
 
+// Acquires a change lock by setting an
+// [exclusive lock](https://dev.mysql.com/doc/refman/5.7/en/locking-functions.html#function_get-lock). NB! Locks are
+// reference counted and hence you must call `ReleaseChangeLock` the same number of times you call `AcquireChangeLock`
+func (drv MySQLDriver) AcquireChangeLock(db *sql.DB) (bool, error) {
+	var result int8
+	err := db.QueryRow("select get_lock('dbmate', -1)").Scan(&result)
+	if err != nil {
+		return false, err
+	}
+
+	return result == 1, nil
+}
+
+// Releases a change lock acquired by `AcquireChangeLock`
+func (drv MySQLDriver) ReleaseChangeLock(db *sql.DB) error {
+	result, err := db.Query("select release_lock('dbmate')")
+	if err != nil {
+		return err
+	}
+	return result.Close()
+}
+
+// Checks whether at least a change lock exists in any session (including this session)
+func (drv MySQLDriver) HasAChangeLock(db *sql.DB) (bool, error) {
+	var isUnusedLock bool
+	err := db.QueryRow("select is_used_lock('dbmate') is null").Scan(&isUnusedLock)
+	if err != nil {
+		return false, err
+	}
+
+	return !isUnusedLock, nil
+}
+
 // Ping verifies a connection to the database server. It does not verify whether the
 // specified database exists.
 func (drv MySQLDriver) Ping(u *url.URL) error {
