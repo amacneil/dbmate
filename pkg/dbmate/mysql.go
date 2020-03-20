@@ -244,7 +244,7 @@ func (drv MySQLDriver) DeleteMigration(db Transaction, version string) error {
 // reference counted and hence you must call `ReleaseChangeLock` the same number of times you call `AcquireChangeLock`
 func (drv MySQLDriver) AcquireChangeLock(db *sql.DB) (bool, error) {
 	var result int8
-	err := db.QueryRow("select get_lock('dbmate', -1)").Scan(&result)
+	err := db.QueryRow("select get_lock('dbmate', 0)").Scan(&result)
 	if err != nil {
 		return false, err
 	}
