@@ -180,6 +180,7 @@ const advisoryLockKey = 621
 // Acquires a change lock by setting a
 // [pg advisory lock](https://www.postgresql.org/docs/9.4/explicit-locking.html#ADVISORY-LOCKS). NB! Locks are
 // reference counted and hence you must call `ReleaseChangeLock` the same number of times you call `AcquireChangeLock`
+// successfully
 func (drv PostgresDriver) AcquireChangeLock(db *sql.DB) (bool, error) {
 	var result string
 	err := db.QueryRow(fmt.Sprintf("select pg_try_advisory_lock(%d)", advisoryLockKey)).Scan(&result)

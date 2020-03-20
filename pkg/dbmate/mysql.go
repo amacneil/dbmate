@@ -242,6 +242,7 @@ func (drv MySQLDriver) DeleteMigration(db Transaction, version string) error {
 // Acquires a change lock by setting an
 // [exclusive lock](https://dev.mysql.com/doc/refman/5.7/en/locking-functions.html#function_get-lock). NB! Locks are
 // reference counted and hence you must call `ReleaseChangeLock` the same number of times you call `AcquireChangeLock`
+// successfully
 func (drv MySQLDriver) AcquireChangeLock(db *sql.DB) (bool, error) {
 	var result int8
 	err := db.QueryRow("select get_lock('dbmate', 0)").Scan(&result)
