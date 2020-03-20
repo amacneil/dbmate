@@ -201,17 +201,6 @@ func (drv PostgresDriver) ReleaseChangeLock(db *sql.DB) error {
 	return err
 }
 
-// Checks whether at least a change lock exists in any session (including this session)
-func (drv PostgresDriver) HasAChangeLock(db *sql.DB) (bool, error) {
-	var locksCount int
-	err := db.QueryRow(fmt.Sprintf("select count(*) from pg_locks where objid = %d and locktype = 'advisory'", advisoryLockKey)).Scan(&locksCount)
-	if err != nil {
-		return false, err
-	}
-
-	return locksCount > 0, nil
-}
-
 // Ping verifies a connection to the database server. It does not verify whether the
 // specified database exists.
 func (drv PostgresDriver) Ping(u *url.URL) error {

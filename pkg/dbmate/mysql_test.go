@@ -270,7 +270,17 @@ func TestMySQLAcquireAndReleaseChangeLock(t *testing.T) {
 	db := prepTestMySQLDB(t)
 	defer mustClose(db)
 
-	hasLockBeforeAcquire, err := drv.HasAChangeLock(db)
+	hasAChangeLock := func(db *sql.DB) (bool, error) {
+		var isUnusedLock bool
+		err := db.QueryRow("select is_used_lock('dbmate') is null").Scan(&isUnusedLock)
+		if err != nil {
+			return false, err
+		}
+
+		return !isUnusedLock, nil
+	}
+
+	hasLockBeforeAcquire, err := hasAChangeLock(db)
 	require.NoError(t, err)
 	require.False(t, hasLockBeforeAcquire)
 
@@ -278,14 +288,14 @@ func TestMySQLAcquireAndReleaseChangeLock(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, result1)
 
-	hasLock, err := drv.HasAChangeLock(db)
+	hasLock, err := hasAChangeLock(db)
 	require.NoError(t, err)
 	require.True(t, hasLock)
 
 	err = drv.ReleaseChangeLock(db)
 	require.NoError(t, err)
 
-	hasLockAfterRelease, err := drv.HasAChangeLock(db)
+	hasLockAfterRelease, err := hasAChangeLock(db)
 	require.NoError(t, err)
 	require.False(t, hasLockAfterRelease)
 }

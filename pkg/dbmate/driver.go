@@ -19,7 +19,6 @@ type Driver interface {
 	DeleteMigration(Transaction, string) error
 	AcquireChangeLock(*sql.DB) (bool, error)
 	ReleaseChangeLock(*sql.DB) error
-	HasAChangeLock(*sql.DB) (bool, error)
 	Ping(*url.URL) error
 }
 

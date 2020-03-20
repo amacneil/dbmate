@@ -262,17 +262,6 @@ func (drv MySQLDriver) ReleaseChangeLock(db *sql.DB) error {
 	return result.Close()
 }
 
-// Checks whether at least a change lock exists in any session (including this session)
-func (drv MySQLDriver) HasAChangeLock(db *sql.DB) (bool, error) {
-	var isUnusedLock bool
-	err := db.QueryRow("select is_used_lock('dbmate') is null").Scan(&isUnusedLock)
-	if err != nil {
-		return false, err
-	}
-
-	return !isUnusedLock, nil
-}
-
 // Ping verifies a connection to the database server. It does not verify whether the
 // specified database exists.
 func (drv MySQLDriver) Ping(u *url.URL) error {

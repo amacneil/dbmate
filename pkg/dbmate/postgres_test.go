@@ -2,6 +2,7 @@ package dbmate
 
 import (
 	"database/sql"
+	"fmt"
 	"net/url"
 	"testing"
 
@@ -241,7 +242,17 @@ func TestPostgresAcquireAndReleaseChangeLock(t *testing.T) {
 	db := prepTestPostgresDB(t)
 	defer mustClose(db)
 
-	hasLockBeforeAcquire, err := drv.HasAChangeLock(db)
+	hasAChangeLock := func(db *sql.DB) (bool, error) {
+		var locksCount int
+		err := db.QueryRow(fmt.Sprintf("select count(*) from pg_locks where objid = %d and locktype = 'advisory'", advisoryLockKey)).Scan(&locksCount)
+		if err != nil {
+			return false, err
+		}
+
+		return locksCount > 0, nil
+	}
+
+	hasLockBeforeAcquire, err := hasAChangeLock(db)
 	require.NoError(t, err)
 	require.False(t, hasLockBeforeAcquire)
 
@@ -249,14 +260,14 @@ func TestPostgresAcquireAndReleaseChangeLock(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, result1)
 
-	hasLock, err := drv.HasAChangeLock(db)
+	hasLock, err := hasAChangeLock(db)
 	require.NoError(t, err)
 	require.True(t, hasLock)
 
 	err = drv.ReleaseChangeLock(db)
 	require.NoError(t, err)
 
-	hasLockAfterRelease, err := drv.HasAChangeLock(db)
+	hasLockAfterRelease, err := hasAChangeLock(db)
 	require.NoError(t, err)
 	require.False(t, hasLockAfterRelease)
 }

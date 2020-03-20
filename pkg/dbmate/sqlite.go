@@ -177,10 +177,6 @@ func (drv SQLiteDriver) ReleaseChangeLock(db *sql.DB) error {
 	return nil
 }
 
-func (drv SQLiteDriver) HasAChangeLock(db *sql.DB) (bool, error) {
-	return false, nil
-}
-
 // Ping verifies a connection to the database. Due to the way SQLite works, by
 // testing whether the database is valid, it will automatically create the database
 // if it does not already exist.
