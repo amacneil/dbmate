@@ -213,51 +213,6 @@ func TestSQLiteDeleteMigration(t *testing.T) {
 	require.Equal(t, 1, count)
 }
 
-//func TestSQLiteCreateMigrationsChangeLockTable(t *testing.T) {
-//	drv := SQLiteDriver{}
-//	db := prepTestSQLiteDB(t)
-//	defer mustClose(db)
-//
-//	// migrations change lock table should not exist
-//	count := 0
-//	err := db.QueryRow("select count(*) from schema_migrations_change_lock").Scan(&count)
-//	require.Regexp(t, "no such table: schema_migrations_change_lock", err.Error())
-//
-//	// create table
-//	err = drv.CreateMigrationsChangeLockTable(db)
-//	require.NoError(t, err)
-//
-//	// migrations change lock table should exist
-//	err = db.QueryRow("select count(*) from schema_migrations_change_lock").Scan(&count)
-//	require.NoError(t, err)
-//
-//	// create table should be idempotent
-//	err = drv.CreateMigrationsChangeLockTable(db)
-//	require.NoError(t, err)
-//}
-//
-//func TestSQLiteSelectAcquiredChangeLock(t *testing.T) {
-//	drv := SQLiteDriver{}
-//	db := prepTestSQLiteDB(t)
-//	defer mustClose(db)
-//
-//	err := drv.CreateMigrationsChangeLockTable(db)
-//	require.NoError(t, err)
-//
-//	// no lock
-//	lock, err := drv.SelectAcquiredChangeLock(db)
-//	require.NoError(t, err)
-//	require.Empty(t, lock)
-//
-//	// with lock
-//	_, err = db.Exec("insert into schema_migrations_change_lock (hostname, locked_at) " +
-//		"values ('my-super-server', current_timestamp)")
-//	require.NoError(t, err)
-//	lock, err = drv.SelectAcquiredChangeLock(db)
-//	require.NoError(t, err)
-//	require.Equal(t, "my-super-server", lock)
-//}
-
 func TestSQLitePing(t *testing.T) {
 	drv := SQLiteDriver{}
 	u := sqliteTestURL(t)

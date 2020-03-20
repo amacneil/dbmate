@@ -181,34 +181,6 @@ func (drv SQLiteDriver) HasAChangeLock(db *sql.DB) (bool, error) {
 	return false, nil
 }
 
-//// Creates the schema_migrations_change_lock table
-//func (drv SQLiteDriver) CreateMigrationsChangeLockTable(db *sql.DB) error {
-//	_, err := db.Exec("create table if not exists schema_migrations_change_lock " +
-//		"(hostname varchar(255) primary key, locked_at timestamp)")
-//
-//	return err
-//}
-//
-//// Selects the hostname of any acquired change lock, or empty if not locked
-//func (drv SQLiteDriver) SelectAcquiredChangeLock(db *sql.DB) (string, error) {
-//	const query = "select hostname from schema_migrations_change_lock limit 1"
-//
-//	var hostname string
-//	rows, err := db.Query(query)
-//	if err != nil {
-//		return "", err
-//	}
-//	defer mustClose(rows)
-//	if rows.Next() {
-//		err = rows.Scan(&hostname)
-//		if err != nil {
-//			return "", err
-//		}
-//	}
-//
-//	return hostname, nil
-//}
-
 // Ping verifies a connection to the database. Due to the way SQLite works, by
 // testing whether the database is valid, it will automatically create the database
 // if it does not already exist.
