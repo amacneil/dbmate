@@ -177,11 +177,11 @@ func (drv PostgresDriver) DeleteMigration(db Transaction, version string) error 
 // The sum of all charCodes in the string "dbmate" :)
 const advisoryLockKey = 621
 
-// Acquires a change lock by setting a
+// Acquires a migration lock by setting a
 // [pg advisory lock](https://www.postgresql.org/docs/9.4/explicit-locking.html#ADVISORY-LOCKS). NB! Locks are
-// reference counted and hence you must call `ReleaseChangeLock` the same number of times you call `AcquireChangeLock`
-// successfully
-func (drv PostgresDriver) AcquireChangeLock(db *sql.DB) (bool, error) {
+// reference counted and hence you must call `ReleaseMigrationLock` the same number of times you call `AcquireMigrationLock`
+// successfully. All locks are released by Postgres on session/connection termination.
+func (drv PostgresDriver) AcquireMigrationLock(db *sql.DB) (bool, error) {
 	var result string
 	err := db.QueryRow(fmt.Sprintf("select pg_try_advisory_lock(%d)", advisoryLockKey)).Scan(&result)
 	if err != nil {
@@ -191,8 +191,8 @@ func (drv PostgresDriver) AcquireChangeLock(db *sql.DB) (bool, error) {
 	return result == "true", nil
 }
 
-// Releases a change lock acquired by `AcquireChangeLock`
-func (drv PostgresDriver) ReleaseChangeLock(db *sql.DB) error {
+// Releases a migration lock acquired by `AcquireMigrationLock`
+func (drv PostgresDriver) ReleaseMigrationLock(db *sql.DB) error {
 	res, err := db.Query(fmt.Sprintf("select pg_advisory_unlock(%d)", advisoryLockKey))
 	if err != nil {
 		return err

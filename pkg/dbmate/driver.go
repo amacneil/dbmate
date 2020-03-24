@@ -17,8 +17,8 @@ type Driver interface {
 	SelectMigrations(*sql.DB, int) (map[string]bool, error)
 	InsertMigration(Transaction, string) error
 	DeleteMigration(Transaction, string) error
-	AcquireChangeLock(*sql.DB) (bool, error)
-	ReleaseChangeLock(*sql.DB) error
+	AcquireMigrationLock(*sql.DB) (bool, error)
+	ReleaseMigrationLock(*sql.DB) error
 	Ping(*url.URL) error
 }
 

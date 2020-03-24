@@ -166,14 +166,14 @@ func (drv SQLiteDriver) DeleteMigration(db Transaction, version string) error {
 }
 
 // Does nothing currently
-func (drv SQLiteDriver) AcquireChangeLock(db *sql.DB) (bool, error) {
-	// FIXME use change locking for this driver also?
+func (drv SQLiteDriver) AcquireMigrationLock(db *sql.DB) (bool, error) {
+	// FIXME use migration locking for this driver also?
 	fmt.Println("Skipping migration locking because database driver is SQLite")
 	return true, nil
 }
 
-func (drv SQLiteDriver) ReleaseChangeLock(db *sql.DB) error {
-	// FIXME use change locking for this driver also?
+func (drv SQLiteDriver) ReleaseMigrationLock(db *sql.DB) error {
+	// FIXME use migration locking for this driver also?
 	return nil
 }
 

@@ -265,12 +265,12 @@ func TestMySQLDeleteMigration(t *testing.T) {
 	require.Equal(t, 1, count)
 }
 
-func TestMySQLAcquireAndReleaseChangeLock(t *testing.T) {
+func TestMySQLAcquireAndReleaseMigrationLock(t *testing.T) {
 	drv := MySQLDriver{}
 	db := prepTestMySQLDB(t)
 	defer mustClose(db)
 
-	hasAChangeLock := func(db *sql.DB) (bool, error) {
+	hasALock := func(db *sql.DB) (bool, error) {
 		var isUnusedLock bool
 		err := db.QueryRow("select is_used_lock('dbmate') is null").Scan(&isUnusedLock)
 		if err != nil {
@@ -280,22 +280,22 @@ func TestMySQLAcquireAndReleaseChangeLock(t *testing.T) {
 		return !isUnusedLock, nil
 	}
 
-	hasLockBeforeAcquire, err := hasAChangeLock(db)
+	hasLockBeforeAcquire, err := hasALock(db)
 	require.NoError(t, err)
 	require.False(t, hasLockBeforeAcquire)
 
-	result1, err := drv.AcquireChangeLock(db)
+	result1, err := drv.AcquireMigrationLock(db)
 	require.NoError(t, err)
 	require.True(t, result1)
 
-	hasLock, err := hasAChangeLock(db)
+	hasLock, err := hasALock(db)
 	require.NoError(t, err)
 	require.True(t, hasLock)
 
-	err = drv.ReleaseChangeLock(db)
+	err = drv.ReleaseMigrationLock(db)
 	require.NoError(t, err)
 
-	hasLockAfterRelease, err := hasAChangeLock(db)
+	hasLockAfterRelease, err := hasALock(db)
 	require.NoError(t, err)
 	require.False(t, hasLockAfterRelease)
 }

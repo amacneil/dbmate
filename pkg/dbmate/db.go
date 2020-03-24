@@ -283,7 +283,7 @@ func (db *DB) Migrate() error {
 	}
 	defer mustClose(sqlDB)
 
-	err = waitForOthersChangeLockToReleaseAndAcquireChangeLock(drv, sqlDB)
+	err = waitForOtherLockToReleaseAndAcquireMigrationLock(drv, sqlDB)
 	if err != nil {
 		return err
 	}
@@ -335,7 +335,7 @@ func (db *DB) Migrate() error {
 		_ = db.DumpSchema()
 	}
 
-	err = drv.ReleaseChangeLock(sqlDB)
+	err = drv.ReleaseMigrationLock(sqlDB)
 	if err != nil {
 		return err
 	}
@@ -463,20 +463,20 @@ func (db *DB) Rollback() error {
 	return nil
 }
 
-func waitForOthersChangeLockToReleaseAndAcquireChangeLock(drv Driver, sqlDB *sql.DB) error {
+func waitForOtherLockToReleaseAndAcquireMigrationLock(drv Driver, sqlDB *sql.DB) error {
 	counter := 0
-	for { // FIXME should we have a timeout for change locks? Or no?
-		acquiredChangeLock, err := drv.AcquireChangeLock(sqlDB)
+	for {
+		successfullyAcquiredLock, err := drv.AcquireMigrationLock(sqlDB)
 		if err != nil {
 			return err
 		}
 
-		if acquiredChangeLock {
+		if successfullyAcquiredLock {
 			break
 		}
 
 		if counter == 0 {
-			fmt.Print("Waiting other for database change lock to release")
+			fmt.Print("Waiting other for database migration lock to release")
 		} else {
 			fmt.Print(".")
 		}

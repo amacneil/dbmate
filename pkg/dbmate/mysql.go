@@ -239,11 +239,11 @@ func (drv MySQLDriver) DeleteMigration(db Transaction, version string) error {
 	return err
 }
 
-// Acquires a change lock by setting an
+// Acquires a migration lock by setting an
 // [exclusive lock](https://dev.mysql.com/doc/refman/5.7/en/locking-functions.html#function_get-lock). NB! Locks are
-// reference counted and hence you must call `ReleaseChangeLock` the same number of times you call `AcquireChangeLock`
-// successfully
-func (drv MySQLDriver) AcquireChangeLock(db *sql.DB) (bool, error) {
+// reference counted and hence you must call `ReleaseMigrationLock` the same number of times you call `AcquireMigrationLock`
+// successfully. All locks are released by MySQL on session/connection termination.
+func (drv MySQLDriver) AcquireMigrationLock(db *sql.DB) (bool, error) {
 	var result int8
 	err := db.QueryRow("select get_lock('dbmate', 0)").Scan(&result)
 	if err != nil {
@@ -253,8 +253,8 @@ func (drv MySQLDriver) AcquireChangeLock(db *sql.DB) (bool, error) {
 	return result == 1, nil
 }
 
-// Releases a change lock acquired by `AcquireChangeLock`
-func (drv MySQLDriver) ReleaseChangeLock(db *sql.DB) error {
+// Releases a migration lock acquired by `AcquireMigrationLock`
+func (drv MySQLDriver) ReleaseMigrationLock(db *sql.DB) error {
 	result, err := db.Query("select release_lock('dbmate')")
 	if err != nil {
 		return err

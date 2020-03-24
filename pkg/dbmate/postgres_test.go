@@ -237,12 +237,12 @@ func TestPostgresDeleteMigration(t *testing.T) {
 	require.Equal(t, 1, count)
 }
 
-func TestPostgresAcquireAndReleaseChangeLock(t *testing.T) {
+func TestPostgresAcquireAndReleaseMigrationLock(t *testing.T) {
 	drv := PostgresDriver{}
 	db := prepTestPostgresDB(t)
 	defer mustClose(db)
 
-	hasAChangeLock := func(db *sql.DB) (bool, error) {
+	hasALock := func(db *sql.DB) (bool, error) {
 		var locksCount int
 		err := db.QueryRow(fmt.Sprintf("select count(*) from pg_locks where objid = %d and locktype = 'advisory'", advisoryLockKey)).Scan(&locksCount)
 		if err != nil {
@@ -252,22 +252,22 @@ func TestPostgresAcquireAndReleaseChangeLock(t *testing.T) {
 		return locksCount > 0, nil
 	}
 
-	hasLockBeforeAcquire, err := hasAChangeLock(db)
+	hasLockBeforeAcquire, err := hasALock(db)
 	require.NoError(t, err)
 	require.False(t, hasLockBeforeAcquire)
 
-	result1, err := drv.AcquireChangeLock(db)
+	result1, err := drv.AcquireMigrationLock(db)
 	require.NoError(t, err)
 	require.True(t, result1)
 
-	hasLock, err := hasAChangeLock(db)
+	hasLock, err := hasALock(db)
 	require.NoError(t, err)
 	require.True(t, hasLock)
 
-	err = drv.ReleaseChangeLock(db)
+	err = drv.ReleaseMigrationLock(db)
 	require.NoError(t, err)
 
-	hasLockAfterRelease, err := hasAChangeLock(db)
+	hasLockAfterRelease, err := hasALock(db)
 	require.NoError(t, err)
 	require.False(t, hasLockAfterRelease)
 }
