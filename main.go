@@ -55,6 +55,11 @@ func NewApp() *cli.App {
 			Name:  "wait",
 			Usage: "wait for the db to become available before executing the subsequent command",
 		},
+		cli.DurationFlag{
+			Name:  "wait-timeout",
+			Usage: "timeout for --wait flag",
+			Value: dbmate.DefaultWaitTimeout,
+		},
 	}
 
 	app.Commands = []cli.Command{
@@ -177,6 +182,10 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 		db.MigrationsDir = c.GlobalString("migrations-dir")
 		db.SchemaFile = c.GlobalString("schema-file")
 		db.WaitBefore = c.GlobalBool("wait")
+		overrideTimeout := c.GlobalDuration("wait-timeout")
+		if overrideTimeout != 0 {
+			db.WaitTimeout = overrideTimeout
+		}
 
 		return f(db, c)
 	}

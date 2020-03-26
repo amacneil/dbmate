@@ -284,12 +284,12 @@ Waiting for database....
 Creating: myapp_development
 ```
 
-If the database is still not available after 60 seconds, the command will return an error:
+You can customize the timeout using `--wait-timeout` (default 60s). If the database is still not available, the command will return an error:
 
 ```sh
-$ dbmate wait
-Waiting for database............................................................
-Error: unable to connect to database: pq: role "foobar" does not exist
+$ dbmate --wait-timeout=5s wait
+Waiting for database.....
+Error: unable to connect to database: dial tcp 127.0.0.1:5432: connect: connection refused
 ```
 
 Please note that the `wait` command does not verify whether your specified database exists, only that the server is available and ready (so it will return success if the database server is available, but your database has not yet been created).
