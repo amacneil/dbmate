@@ -12,7 +12,7 @@ For a comparison between dbmate and other popular database schema migration tool
 
 ## Features
 
-* Supports MySQL, PostgreSQL, and SQLite.
+* Supports MySQL, PostgreSQL, SQLite, and ClickHouse.
 * Uses plain SQL for writing schema migrations.
 * Migrations are timestamp-versioned, to avoid version number conflicts with multiple developers.
 * Migrations are run atomically inside a transaction.
@@ -117,7 +117,7 @@ DATABASE_URL="postgres://postgres@127.0.0.1:5432/myapp_development?sslmode=disab
 protocol://username:password@host:port/database_name?options
 ```
 
-* `protocol` must be one of `mysql`, `postgres`, `postgresql`, `sqlite`, `sqlite3`
+* `protocol` must be one of `mysql`, `postgres`, `postgresql`, `sqlite`, `sqlite3`, `clickhouse`
 * `host` can be either a hostname or IP address
 * `options` are driver-specific (refer to the underlying Go SQL drivers if you wish to use these)
 
@@ -159,6 +159,12 @@ To specify an absolute path, add an additional forward slash to the path. The fo
 
 ```sh
 DATABASE_URL="sqlite:////tmp/database_name.sqlite3"
+```
+
+**ClickHouse**
+
+```sh
+DATABASE_URL="clickhouse://127.0.0.1:9000?username=username&password=password&database=database_name"
 ```
 
 ### Creating Migrations
@@ -333,7 +339,7 @@ Why another database schema migration tool? Dbmate was inspired by many other to
 
 | | [goose](https://bitbucket.org/liamstask/goose/) | [sql-migrate](https://github.com/rubenv/sql-migrate) | [golang-migrate/migrate](https://github.com/golang-migrate/migrate) | [activerecord](http://guides.rubyonrails.org/active_record_migrations.html) | [sequelize](http://docs.sequelizejs.com/manual/tutorial/migrations.html) | [dbmate](https://github.com/amacneil/dbmate) |
 | --- |:---:|:---:|:---:|:---:|:---:|:---:|
-| **Features** |||||||
+| **Features** |
 |Plain SQL migration files|:white_check_mark:|:white_check_mark:|:white_check_mark:|||:white_check_mark:|
 |Support for creating and dropping databases||||:white_check_mark:||:white_check_mark:|
 |Support for saving schema dump files||||:white_check_mark:||:white_check_mark:|
@@ -343,10 +349,11 @@ Why another database schema migration tool? Dbmate was inspired by many other to
 |Automatically load .env file||||||:white_check_mark:|
 |No separate configuration file||||:white_check_mark:|:white_check_mark:|:white_check_mark:|
 |Language/framework independent|:eight_pointed_black_star:|:eight_pointed_black_star:|:eight_pointed_black_star:|||:white_check_mark:|
-| **Drivers** |||||||
+| **Drivers** |
 |PostgreSQL|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
 |MySQL|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
 |SQLite|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
+|ClikHouse|||:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
 
 > :eight_pointed_black_star: In theory these tools could be used with other languages, but a Go development environment is required because binary builds are not provided.
 

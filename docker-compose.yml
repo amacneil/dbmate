@@ -7,9 +7,11 @@ services:
     depends_on:
       - mysql
       - postgres
+      - clickhouse
     environment:
       MYSQL_URL: mysql://root:root@mysql/dbmate
       POSTGRESQL_URL: postgres://postgres:postgres@postgres/dbmate?sslmode=disable
+      CLICKHOUSE_URL: clickhouse://clickhouse:9000?database=dbmate
 
   mysql:
     image: mysql:5.7
@@ -20,3 +22,6 @@ services:
     image: postgres:10
     environment:
       POSTGRES_PASSWORD: postgres
+
+  clickhouse:
+    image: yandex/clickhouse-server:19.16

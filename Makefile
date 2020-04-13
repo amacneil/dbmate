@@ -19,6 +19,7 @@ lint:
 wait:
 	dist/dbmate-linux-amd64 -e MYSQL_URL wait
 	dist/dbmate-linux-amd64 -e POSTGRESQL_URL wait
+	dist/dbmate-linux-amd64 -e CLICKHOUSE_URL wait
 
 .PHONY: clean
 clean:
@@ -52,4 +53,5 @@ docker-all:
 
 .PHONY: docker-bash
 docker-bash:
-	-docker-compose run --rm dbmate bash
+	docker-compose build
+	docker-compose run --rm dbmate bash
