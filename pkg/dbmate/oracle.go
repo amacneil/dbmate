@@ -111,6 +111,13 @@ func (drv OracleDriver) DatabaseExists(u *url.URL) (bool, error) {
 
 // CreateMigrationsTable creates the schema_migrations table
 func (drv OracleDriver) CreateMigrationsTable(db *sql.DB) error {
+	var count int
+
+	check := db.QueryRow("select count(*) from schema_migrations").Scan(&count)
+	if check == nil {
+		return check
+	}
+
 	_, err := db.Exec("create table schema_migrations " +
 		"(version varchar2(255), primary key(version))")
 
@@ -151,14 +158,14 @@ func (drv OracleDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool
 
 // InsertMigration adds a new migration record
 func (drv OracleDriver) InsertMigration(db Transaction, version string) error {
-	_, err := db.Exec("insert into schema_migrations (version) values ($1)", version)
+	_, err := db.Exec("insert into schema_migrations (version) values (:v)", version)
 
 	return err
 }
 
 // DeleteMigration removes a migration record
 func (drv OracleDriver) DeleteMigration(db Transaction, version string) error {
-	_, err := db.Exec("delete from schema_migrations where version = $1", version)
+	_, err := db.Exec("delete from schema_migrations where version = :v", version)
 
 	return err
 }
