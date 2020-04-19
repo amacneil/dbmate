@@ -120,16 +120,17 @@ func (drv OracleDriver) CreateMigrationsTable(db *sql.DB) error {
 // SelectMigrations returns a list of applied migrations
 // with an optional limit (in descending order)
 func (drv OracleDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
-	var query string
-	baseQuery := "select version from schema_migrations"
-	orderClause := "order by version desc"
+	baseQuery := "select version from schema_migrations %s order by version desc"
+	limitClause := ""
+	limitParam := make([]interface{}, 0)
 
 	if limit >= 0 {
-		query = fmt.Sprintf("%s where rownum < %d %s", baseQuery, limit+1, orderClause)
-	} else {
-		query = fmt.Sprintf("%s %s", baseQuery, orderClause)
+		limitClause = "where rownum < :limit"
+		limitParam = append(limitParam, limit+1)
 	}
-	rows, err := db.Query(query)
+
+	query := fmt.Sprintf(baseQuery, limitClause)
+	rows, err := db.Query(query, limitParam...)
 	if err != nil {
 		return nil, err
 	}
