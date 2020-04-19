@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+
+	"gopkg.in/rana/ora.v4"
 )
 
 func init() {
@@ -16,9 +18,11 @@ type OracleDriver struct {
 }
 
 // Open creates a new database connection. In oracle connecting to a database means connecting to a user
-// which is also a schema
+// which is also a schema. Connection string format is oracle://user:password@host:port/service
 func (drv OracleDriver) Open(u *url.URL) (*sql.DB, error) {
-	return sql.Open("oracle", u.String())
+	secret, _ := u.User.Password()
+	conn := fmt.Sprintf("%s/%s@%s%s", u.User.Username(), secret, u.Host, u.Path)
+	return sql.Open(ora.Name, conn)
 }
 
 func (drv OracleDriver) openOracleDB(u *url.URL) (*sql.DB, error) {
@@ -178,5 +182,6 @@ func (drv OracleDriver) Ping(u *url.URL) error {
 		return nil
 	}
 
+	fmt.Println(err)
 	return err
 }
