@@ -111,8 +111,10 @@ func (drv OracleDriver) CreateMigrationsTable(db *sql.DB) error {
 		return check
 	}
 
-	_, err := db.Exec("create table schema_migrations " +
-		"(version varchar2(255), primary key(version))")
+	_, err := db.Exec(`create table schema_migrations (
+		version varchar2(255),
+		primary key(version)
+	)`)
 
 	return err
 }
