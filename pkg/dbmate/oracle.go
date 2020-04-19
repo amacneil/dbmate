@@ -132,7 +132,7 @@ func (drv OracleDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool
 	orderClause := "order by version desc"
 
 	if limit >= 0 {
-		query = fmt.Sprintf("%s where rownum < %d %s", baseQuery, limit, orderClause)
+		query = fmt.Sprintf("%s where rownum < %d %s", baseQuery, limit+1, orderClause)
 	} else {
 		query = fmt.Sprintf("%s %s", baseQuery, orderClause)
 	}
