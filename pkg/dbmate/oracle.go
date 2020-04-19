@@ -17,20 +17,15 @@ func init() {
 type OracleDriver struct {
 }
 
+func normalizeOracleURL(u *url.URL) string {
+	secret, _ := u.User.Password()
+	return fmt.Sprintf("%s/%s@%s%s", u.User.Username(), secret, u.Host, u.Path)
+}
+
 // Open creates a new database connection. In oracle connecting to a database means connecting to a user
 // which is also a schema. Connection string format is oracle://user:password@host:port/service
 func (drv OracleDriver) Open(u *url.URL) (*sql.DB, error) {
-	secret, _ := u.User.Password()
-	conn := fmt.Sprintf("%s/%s@%s%s", u.User.Username(), secret, u.Host, u.Path)
-	return sql.Open(ora.Name, conn)
-}
-
-func (drv OracleDriver) openOracleDB(u *url.URL) (*sql.DB, error) {
-	// connect to postgres database
-	oracleURL := *u
-	oracleURL.Path = "oracle"
-
-	return drv.Open(&oracleURL)
+	return sql.Open(ora.Name, normalizeOracleURL(u))
 }
 
 func oracleQuoteIdentifier(str string) string {
@@ -46,7 +41,7 @@ func (drv OracleDriver) CreateDatabase(u *url.URL) error {
 	password, _ := u.User.Password()
 	fmt.Printf("Creating schema: %s\n", name)
 
-	db, err := drv.openOracleDB(u)
+	db, err := drv.Open(u)
 	if err != nil {
 		return err
 	}
@@ -74,7 +69,7 @@ func (drv OracleDriver) DropDatabase(u *url.URL) error {
 	name := u.User.Username()
 	fmt.Printf("Dropping: %s\n", name)
 
-	db, err := drv.openOracleDB(u)
+	db, err := drv.Open(u)
 	if err != nil {
 		return err
 	}
@@ -98,20 +93,20 @@ func (drv OracleDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
 
 // DatabaseExists determines whether the database exists
 func (drv OracleDriver) DatabaseExists(u *url.URL) (bool, error) {
-	db, err := drv.openOracleDB(u)
+	db, err := drv.Open(u)
 	if err != nil {
 		return false, err
 	}
 	defer mustClose(db)
 
-	exists := false
-	err = db.QueryRow("select 1 from dual").
-		Scan(&exists)
-	if err == sql.ErrNoRows {
-		return false, nil
+	var exists int8
+	err = db.QueryRow("select 1 from dual").Scan(&exists)
+
+	if err == nil {
+		return true, nil
 	}
 
-	return exists, err
+	return false, err
 }
 
 // CreateMigrationsTable creates the schema_migrations table
