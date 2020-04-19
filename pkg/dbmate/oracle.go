@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"net/url"
-	"strings"
 
 	"gopkg.in/rana/ora.v4"
 )
@@ -26,12 +25,6 @@ func normalizeOracleURL(u *url.URL) string {
 // which is also a schema. Connection string format is oracle://user:password@host:port/service
 func (drv OracleDriver) Open(u *url.URL) (*sql.DB, error) {
 	return sql.Open(ora.Name, normalizeOracleURL(u))
-}
-
-func oracleQuoteIdentifier(str string) string {
-	str = strings.Replace(str, "\"", "\\\"", -1)
-
-	return fmt.Sprintf("\"%s\"", str)
 }
 
 // CreateDatabase creates a new user/schema and assigns connection, create session and granting privileges
