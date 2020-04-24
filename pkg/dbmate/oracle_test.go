@@ -2,6 +2,7 @@ package dbmate
 
 import (
 	"database/sql"
+	"gopkg.in/rana/ora.v4"
 	"net/url"
 	"testing"
 
@@ -39,7 +40,7 @@ func prepTestOracleDB(t *testing.T) *sql.DB {
 	require.NoError(t, err)
 
 	// connect database
-	db, err := sql.Open("ora", normalizeOracleURL(appUrl))
+	db, err := sql.Open(ora.Name, normalizeOracleURL(appUrl))
 	require.NoError(t, err)
 
 	return db
