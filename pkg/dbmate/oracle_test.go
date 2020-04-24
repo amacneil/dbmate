@@ -74,34 +74,33 @@ func TestOracleDumpSchema(t *testing.T) {
 
 func TestOracleDatabaseExists(t *testing.T) {
 	drv := OracleDriver{}
-	adminUrl := oracleAdminTestURL(t)
-	appUrl := oracleAppTestURL(t)
+	u := oracleAdminTestURL(t)
 
 	// drop any existing database
-	err := drv.DropDatabase(adminUrl)
+	err := drv.DropDatabase(u)
 
 	// DatabaseExists should return false
-	exists, err := drv.DatabaseExists(appUrl)
+	exists, err := drv.DatabaseExists(u)
 	require.NoError(t, err)
 	require.Equal(t, false, exists)
 
 	// create database
-	err = drv.CreateDatabase(adminUrl)
+	err = drv.CreateDatabase(u)
 	require.NoError(t, err)
 
 	// DatabaseExists should return true
-	exists, err = drv.DatabaseExists(appUrl)
+	exists, err = drv.DatabaseExists(u)
 	require.NoError(t, err)
 	require.Equal(t, true, exists)
 }
 
 func TestOracleDatabaseExists_Error(t *testing.T) {
 	drv := OracleDriver{}
-	u := oracleAppTestURL(t)
-	u.User = url.User("user-without-password")
+	u := oracleAdminTestURL(t)
+	u.RawQuery = "schema=doesnt_exist&passwd=doesnt_matter&privileges="
 
 	exists, err := drv.DatabaseExists(u)
-	require.Contains(t, err.Error(), "ORA-01005: null password given; logon denied")
+	require.Nil(t, err)
 	require.Equal(t, false, exists)
 }
 
