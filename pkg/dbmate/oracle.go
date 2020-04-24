@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"gopkg.in/rana/ora.v4"
 )
@@ -33,7 +34,7 @@ func (drv OracleDriver) Open(u *url.URL) (*sql.DB, error) {
 func (drv OracleDriver) CreateDatabase(u *url.URL) error {
 	defaultPrivileges := []string{"connect", "create session"}
 
-	name := u.Query()["schema"][0]
+	name := strings.ToUpper(u.Query()["schema"][0])
 	password := u.Query()["passwd"][0]
 	privileges := u.Query()["privileges"]
 
@@ -64,7 +65,7 @@ func (drv OracleDriver) CreateDatabase(u *url.URL) error {
 
 // DropDatabase drops the specified user/schema and all objects contained in it
 func (drv OracleDriver) DropDatabase(u *url.URL) error {
-	name := u.Query()["schema"][0]
+	name := strings.ToUpper(u.Query()["schema"][0])
 	fmt.Printf("Dropping: %s\n", name)
 
 	db, err := drv.Open(u)
@@ -92,7 +93,7 @@ func (drv OracleDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
 
 // DatabaseExists determines whether the database exists. This requires select privilege on all_users metadata view
 func (drv OracleDriver) DatabaseExists(u *url.URL) (bool, error) {
-	name := u.Query()["schema"][0]
+	name := strings.ToUpper(u.Query()["schema"][0])
 
 	db, err := drv.Open(u)
 	if err != nil {
