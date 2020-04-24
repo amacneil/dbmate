@@ -136,13 +136,13 @@ func TestOracleSelectMigrations(t *testing.T) {
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
-	_, err = db.Exec(`insert into schema_migrations (version) values ('abc2')`)
-	require.NoError(t, err)
-
-	_, err = db.Exec(`insert into schema_migrations (version) values ('abc1')`)
-	require.NoError(t, err)
-
-	_, err = db.Exec(`insert into schema_migrations (version) values ('abc3')`)
+	_, err = db.Exec(`
+		insert all
+			into schema_migrations (version) values ('abc2')
+			into schema_migrations (version) values ('abc1')
+			into schema_migrations (version) values ('abc3')
+		select * from dual
+	`)
 	require.NoError(t, err)
 
 	migrations, err := drv.SelectMigrations(db, -1)
@@ -189,9 +189,12 @@ func TestOracleDeleteMigration(t *testing.T) {
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
-	_, err = db.Exec(`insert into schema_migrations (version) values ('abc1')`)
-	require.NoError(t, err)
-	_, err = db.Exec(`insert into schema_migrations (version) values ('abc2')`)
+	_, err = db.Exec(`
+		insert all
+			into schema_migrations (version) values ('abc1')
+			into schema_migrations (version) values ('abc2')
+		select * from dual
+	`)
 	require.NoError(t, err)
 
 	err = drv.DeleteMigration(db, "abc2")
