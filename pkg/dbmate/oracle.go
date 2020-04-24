@@ -27,11 +27,16 @@ func (drv OracleDriver) Open(u *url.URL) (*sql.DB, error) {
 	return sql.Open(ora.Name, normalizeOracleURL(u))
 }
 
-// CreateDatabase creates a new user/schema and assigns connection, create session and granting privileges
-// this requires that the creating user, as specified in URL, has `create user` privilege
+// CreateDatabase creates a new user/schema and assigns connection and create session privileges along with
+// the privileges specified in URL params.
+// This requires that the creating user, as specified in URL, has `create user` privilege
 func (drv OracleDriver) CreateDatabase(u *url.URL) error {
-	name := u.User.Username()
-	password, _ := u.User.Password()
+	defaultPrivileges := []string{"connect", "create session"}
+
+	name := u.Query()["schema"][0]
+	password := u.Query()["passwd"][0]
+	privileges := u.Query()["privileges"]
+
 	fmt.Printf("Creating schema: %s\n", name)
 
 	db, err := drv.Open(u)
@@ -40,26 +45,26 @@ func (drv OracleDriver) CreateDatabase(u *url.URL) error {
 	}
 	defer mustClose(db)
 
-	_, err = db.Exec(fmt.Sprintf("create user %s identified by %s;", name, password))
+	_, err = db.Exec(`alter session set "_oracle_script"=true`)
 
+	_, err = db.Exec(fmt.Sprintf("create user %s identified by %s", name, password))
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec(fmt.Sprintf("grant connect to %s;", name))
-
-	if err != nil {
-		return err
+	for _, privilege := range append(defaultPrivileges, privileges...) {
+		_, err = db.Exec(fmt.Sprintf("grant %s to %s", privilege, name))
+		if err != nil {
+			return err
+		}
 	}
 
-	_, err = db.Exec(fmt.Sprintf("grant create session grant any privilege to %s;", name))
-
-	return err
+	return nil
 }
 
 // DropDatabase drops the specified user/schema and all objects contained in it
 func (drv OracleDriver) DropDatabase(u *url.URL) error {
-	name := u.User.Username()
+	name := u.Query()["schema"][0]
 	fmt.Printf("Dropping: %s\n", name)
 
 	db, err := drv.Open(u)
@@ -68,6 +73,7 @@ func (drv OracleDriver) DropDatabase(u *url.URL) error {
 	}
 	defer mustClose(db)
 
+	_, err = db.Exec(`alter session set "_oracle_script"=true`)
 	_, err = db.Exec(fmt.Sprintf("drop user %s cascade", name))
 
 	return err
@@ -84,8 +90,10 @@ func (drv OracleDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
 	return nil, nil
 }
 
-// DatabaseExists determines whether the database exists
+// DatabaseExists determines whether the database exists. This requires select privilege on all_users metadata view
 func (drv OracleDriver) DatabaseExists(u *url.URL) (bool, error) {
+	name := u.Query()["schema"][0]
+
 	db, err := drv.Open(u)
 	if err != nil {
 		return false, err
@@ -93,13 +101,12 @@ func (drv OracleDriver) DatabaseExists(u *url.URL) (bool, error) {
 	defer mustClose(db)
 
 	var exists int8
-	err = db.QueryRow("select 1 from dual").Scan(&exists)
-
-	if err == nil {
-		return true, nil
+	err = db.QueryRow("select 1 from all_users where username = :u", name).Scan(&exists)
+	if err == sql.ErrNoRows {
+		return false, nil
 	}
 
-	return false, err
+	return exists == 1, err
 }
 
 // CreateMigrationsTable creates the schema_migrations table
@@ -132,11 +139,11 @@ func (drv OracleDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool
 	}
 
 	query := fmt.Sprintf(baseQuery, limitClause)
+
 	rows, err := db.Query(query, limitParam...)
 	if err != nil {
 		return nil, err
 	}
-
 	defer mustClose(rows)
 
 	migrations := map[string]bool{}
