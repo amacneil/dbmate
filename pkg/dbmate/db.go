@@ -58,7 +58,7 @@ func New(databaseURL *url.URL) *DB {
 		WaitBefore:     false,
 		WaitInterval:   DefaultWaitInterval,
 		WaitTimeout:    DefaultWaitTimeout,
-		NativeEngine:   false,
+		NativeEngine:   true,
 	}
 }
 
