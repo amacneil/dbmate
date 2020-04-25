@@ -64,7 +64,7 @@ func TestOracleDropDatabase(t *testing.T) {
 	require.NoError(t, err)
 
 	err = db.Ping()
-	require.NotNil(t, err)
+	require.Error(t, err)
 	require.Contains(t, err.Error(), "ORA-01017: invalid username/password; logon denied")
 }
 
@@ -112,6 +112,7 @@ func TestOracleCreateMigrationsTable(t *testing.T) {
 	// migrations table should not exist
 	count := 0
 	err := db.QueryRow("select count(*) from schema_migrations").Scan(&count)
+	require.Error(t, err)
 	require.Contains(t, err.Error(), "ORA-00942: table or view does not exist")
 
 	// create table
