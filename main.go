@@ -55,6 +55,10 @@ func NewApp() *cli.App {
 			Name:  "wait",
 			Usage: "wait for the db to become available before executing the subsequent command",
 		},
+		cli.BoolFlag{
+			Name:  "dbmate-engine",
+			Usage: "use DBMate engine for scripts execution (experimental)",
+		},
 	}
 
 	app.Commands = []cli.Command{
@@ -177,6 +181,7 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 		db.MigrationsDir = c.GlobalString("migrations-dir")
 		db.SchemaFile = c.GlobalString("schema-file")
 		db.WaitBefore = c.GlobalBool("wait")
+		db.NativeEngine = !c.GlobalBool("dbmate-engine")
 
 		return f(db, c)
 	}
