@@ -32,10 +32,10 @@ func prepTestOracleDB(t *testing.T) *sql.DB {
 	appUrl := oracleAppTestURL(t)
 
 	// drop any existing database
-	err := drv.DropDatabase(adminUrl)
+	_ = drv.DropDatabase(adminUrl)
 
 	// create database
-	err = drv.CreateDatabase(adminUrl)
+	err := drv.CreateDatabase(adminUrl)
 	require.NoError(t, err)
 
 	// connect database
@@ -77,7 +77,7 @@ func TestOracleDatabaseExists(t *testing.T) {
 	u := oracleAdminTestURL(t)
 
 	// drop any existing database
-	err := drv.DropDatabase(u)
+	_ = drv.DropDatabase(u)
 
 	// DatabaseExists should return false
 	exists, err := drv.DatabaseExists(u)
