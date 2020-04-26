@@ -1,5 +1,6 @@
 .DS_Store
 .env
+.idea
 /dbmate
 /dist
 /testdata/db/schema.sql

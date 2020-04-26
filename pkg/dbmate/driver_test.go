@@ -20,6 +20,13 @@ func TestGetDriver_MySQL(t *testing.T) {
 	require.Equal(t, true, ok)
 }
 
+func TestGetDriver_Oracle(t *testing.T) {
+	drv, err := GetDriver("oracle")
+	require.NoError(t, err)
+	_, ok := drv.(OracleDriver)
+	require.Equal(t, true, ok)
+}
+
 func TestGetDriver_Error(t *testing.T) {
 	drv, err := GetDriver("foo")
 	require.EqualError(t, err, "unsupported driver: foo")

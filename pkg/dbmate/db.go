@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
+	"text/scanner"
 	"time"
 )
 
@@ -24,6 +26,8 @@ const DefaultWaitInterval = time.Second
 // DefaultWaitTimeout specifies maximum time for connection attempts
 const DefaultWaitTimeout = 60 * time.Second
 
+const endOfStatement = ';'
+
 // DB allows dbmate actions to be performed on a specified database
 type DB struct {
 	AutoDumpSchema bool
@@ -33,6 +37,7 @@ type DB struct {
 	WaitBefore     bool
 	WaitInterval   time.Duration
 	WaitTimeout    time.Duration
+	NativeEngine   bool
 }
 
 // migrationFileRegexp pattern for valid migration files
@@ -53,6 +58,7 @@ func New(databaseURL *url.URL) *DB {
 		WaitBefore:     false,
 		WaitInterval:   DefaultWaitInterval,
 		WaitTimeout:    DefaultWaitTimeout,
+		NativeEngine:   true,
 	}
 }
 
@@ -259,6 +265,66 @@ func (db *DB) openDatabaseForMigration() (Driver, *sql.DB, error) {
 	return drv, sqlDB, nil
 }
 
+func parseStatements(script string) []string {
+	var (
+		s          scanner.Scanner
+		statement  string
+		statements []string
+		parsedLast bool
+	)
+
+	s.Init(strings.NewReader(script))
+	s.Whitespace ^= 1<<' ' | 1<<'\t' | 1<<'\n'
+	s.IsIdentRune = func(ch rune, i int) bool {
+		return false
+	}
+	s.Error = nil
+	s.Mode ^= scanner.ScanChars
+
+	for tok := s.Scan(); !parsedLast; tok = s.Scan() {
+		if tok == scanner.EOF {
+			parsedLast = true
+		}
+
+		switch tok {
+		case endOfStatement, scanner.EOF:
+			if strings.TrimSpace(statement) != "" {
+				statements = append(statements, statement)
+			}
+			//restart
+			statement = ""
+		default:
+			statement += s.TokenText()
+		}
+	}
+
+	return statements
+}
+
+func executeScript(tx Transaction, script string, nativeEngine bool) error {
+	var err error
+
+	if nativeEngine {
+		fmt.Println("Executing script on native engine")
+	} else {
+		fmt.Println("Executing script on DBMate engine")
+	}
+
+	if nativeEngine {
+		_, err = tx.Exec(script)
+		return err
+	}
+
+	for _, statement := range parseStatements(script) {
+		_, err = tx.Exec(statement)
+		if err != nil {
+			return err
+		}
+	}
+
+	return err
+}
+
 // Migrate migrates database to the latest version
 func (db *DB) Migrate() error {
 	files, err := findMigrationFiles(db.MigrationsDir, migrationFileRegexp)
@@ -283,6 +349,8 @@ func (db *DB) Migrate() error {
 	}
 	defer mustClose(sqlDB)
 
+	useNative := db.NativeEngine && db.DatabaseURL.Scheme != "oracle"
+
 	applied, err := drv.SelectMigrations(sqlDB, -1)
 	if err != nil {
 		return err
@@ -304,7 +372,7 @@ func (db *DB) Migrate() error {
 
 		execMigration := func(tx Transaction) error {
 			// run actual migration
-			if _, err := tx.Exec(up.Contents); err != nil {
+			if err := executeScript(tx, up.Contents, useNative); err != nil {
 				return err
 			}
 
@@ -397,6 +465,8 @@ func (db *DB) Rollback() error {
 	}
 	defer mustClose(sqlDB)
 
+	useNative := db.NativeEngine && db.DatabaseURL.Scheme != "oracle"
+
 	applied, err := drv.SelectMigrations(sqlDB, 1)
 	if err != nil {
 		return err
@@ -425,7 +495,7 @@ func (db *DB) Rollback() error {
 
 	execMigration := func(tx Transaction) error {
 		// rollback migration
-		if _, err := tx.Exec(down.Contents); err != nil {
+		if err := executeScript(tx, down.Contents, useNative); err != nil {
 			return err
 		}
 

@@ -12,7 +12,7 @@ For a comparison between dbmate and other popular database schema migration tool
 
 ## Features
 
-* Supports MySQL, PostgreSQL, and SQLite.
+* Supports MySQL, PostgreSQL, Oracle and SQLite.
 * Uses plain SQL for writing schema migrations.
 * Migrations are timestamp-versioned, to avoid version number conflicts with multiple developers.
 * Migrations are run atomically inside a transaction.
@@ -117,7 +117,7 @@ DATABASE_URL="postgres://postgres@127.0.0.1:5432/myapp_development?sslmode=disab
 protocol://username:password@host:port/database_name?options
 ```
 
-* `protocol` must be one of `mysql`, `postgres`, `postgresql`, `sqlite`, `sqlite3`
+* `protocol` must be one of `mysql`, `postgres`, `postgresql`, `oracle`, `sqlite`, `sqlite3`
 * `host` can be either a hostname or IP address
 * `options` are driver-specific (refer to the underlying Go SQL drivers if you wish to use these)
 
@@ -134,6 +134,60 @@ When connecting to Postgres, you may need to add the `sslmode=disable` option to
 ```sh
 DATABASE_URL="postgres://username:password@127.0.0.1:5432/database_name?sslmode=disable"
 ```
+
+**Oracle**
+
+Oracle driver supports two connection modes:
+* Administrative mode
+* Applicative mode
+
+Depending on how Oracle is designed, the database server can be seen as a container for schemas, which are in some way conceptually
+similar to MySQL or Postgres "databases". A schema is also equivalent to a user.
+Only `system`-like and `dba`-like users (or users with "DBA" grants) can create other users and assign them the 
+grants to connect and create objects (eg. tables).
+
+Due to this there is an administrative mode, whose connection format should be:
+```sh
+DATABASE_URL="oracle://user:password@127.0.0.1:1521/service?schema=aSchema&passwd=aPassword&privileges=privilege1,privilege2,..."
+```
+where
+* User and password refer to an user of oracle server with all of these privileges:
+    * CREATE USER
+    * DROP USER
+    * GRANT ANY PRIVILEGE
+    * SELECT on oracle ALL_TABLES metadata view
+* Host, port and service name/id refer to database host parameters
+* URL parameters are:
+    * `schema` specifying the target user/schema name
+    * `password` specifying the target user/schema password
+    * `privileges` specifying the privileges to assign to target user/schema  
+       
+       Examples of privileges are:
+        * CREATE TABLE (to be specified as `create%20table`)
+        * CREATE SYNONYM (to be specified as `create%20synonym`)
+        * UNLIMITED TABLESPACE (to be specified as `unlimited%tablespace`)
+       
+       Refer to Oracle documentation for a full list of privileges. Remember to quote the values as required for URLs.  
+       The following default privileges are always assigned since they are required to establish 
+       a connection on the schema:
+        * CONNECT
+        * CREATE SESSION
+
+The following DBMate commands require an administrative connection:
+* up
+* create
+* drop
+
+> __*Note*__: Since these tasks are usually managed by a DBA rather than the applicative user, DBMate supports them,
+  but it is highly recommended to keep them out of versioning.  
+  For this reason schema dump does not include schema creation commands (which have also to be 
+  performed by a different user compared to applicative statements, eg. like SELECT and INSERT INTO).
+
+Applicative mode supports, instead, canonical connection strings:
+```sh
+DATABASE_URL="oracle://user:password@127.0.0.1:1521/service"
+```
+and can be applied to all other DBMate commands.
 
 **SQLite**
 
@@ -298,6 +352,8 @@ The following command line options are available with all commands. You must use
 * `--schema-file, -s "./db/schema.sql"` - a path to keep the schema.sql file.
 * `--no-dump-schema` - don't auto-update the schema.sql file on migrate/rollback
 * `--wait` - wait for the db to become available before executing the subsequent command
+* `--dbmate-engine` - switch scripts execution to DBMate engine (experimental). Default is database native engine. 
+On Oracle databases this option is always on, since there is no native scripting engine 
 
 For example, before running your test suite, you may wish to drop and recreate the test database. One easy way to do this is to store your test database connection URL in the `TEST_DATABASE_URL` environment variable:
 
@@ -320,7 +376,7 @@ Applying: 20151127184807_create_users_table.sql
 
 **How do I use dbmate under Alpine linux?**
 
-Alpine linux uses [musl libc](https://www.musl-libc.org/), which is incompatible with how we build SQLite support (using [cgo](https://golang.org/cmd/cgo/)). If you want Alpine linux support, and don't mind sacrificing SQLite support, please use the `dbmate-linux-musl-amd64` build found on the [releases page](https://github.com/amacneil/dbmate/releases).
+Alpine linux uses [musl libc](https://www.musl-libc.org/), which is incompatible with how we build Oracle and SQLite support (using [cgo](https://golang.org/cmd/cgo/)). If you want Alpine linux support, and don't mind sacrificing SQLite support, please use the `dbmate-linux-musl-amd64` build found on the [releases page](https://github.com/amacneil/dbmate/releases).
 
 ## Alternatives
 
@@ -341,6 +397,7 @@ Why another database schema migration tool? Dbmate was inspired by many other to
 | **Drivers** |||||||
 |PostgreSQL|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
 |MySQL|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
+|Oracle| |:white_check_mark:| |:white_check_mark:| |:white_check_mark:|
 |SQLite|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
 
 > :eight_pointed_black_star: In theory these tools could be used with other languages, but a Go development environment is required because binary builds are not provided.
