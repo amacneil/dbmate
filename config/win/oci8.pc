@@ -1,0 +1,9 @@
+prefix=/opt/win
+includedir=${prefix}/include
+libdir=${prefix}/lib
+
+Name: oci8
+Description: Oracle Instant Client
+Version: 19.6
+Cflags: -I${includedir}
+Libs: -L${libdir} -lclntsh
