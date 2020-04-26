@@ -50,6 +50,10 @@ RUN go mod download
 
 # build
 COPY . ./
+ENV PKG_CONFIG_PATH /src/config/linux
+ENV LD_LIBRARY_PATH /opt/linux/lib
+ENV C_INCLUDE_PATH /opt/linux/include
+ENV FORCE_RPATH 1
 RUN make build-linux
 
 # runtime image
