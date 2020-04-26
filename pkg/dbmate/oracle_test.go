@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	adminUrl = "oracle://system:passwd@0.0.0.0:1521/ORCLCDB?schema=orauser&passwd=passwd&privileges=create%20table,unlimited%20tablespace"
-	appUrl   = "oracle://orauser:passwd@0.0.0.0:1521/ORCLCDB"
+	adminUrl = "oracle://system:oracle@oracle:1521/ORCLCDB?schema=orauser&passwd=passwd&privileges=create%20table,unlimited%20tablespace"
+	appUrl   = "oracle://orauser:passwd@oracle:1521/ORCLCDB"
 )
 
 func oracleAdminTestURL(t *testing.T) *url.URL {
@@ -222,7 +222,7 @@ func TestOraclePing(t *testing.T) {
 	require.NoError(t, err)
 
 	// ping invalid host should return error
-	appUrl.Host = "oracle:404"
+	appUrl.Host = "unknown:404"
 	err = drv.Ping(appUrl)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "ORA-12154: TNS:could not resolve the connect identifier specified")
