@@ -30,18 +30,20 @@ build: clean build-linux build-macos build-windows
 
 .PHONY: build-linux
 build-linux:
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=1 \
+	PKG_CONFIG_PATH=/src/config/linux GOOS=linux GOARCH=amd64 CGO_ENABLED=1 \
+	LD_LIBRARY_PATH=/opt/linux/lib C_INCLUDE_PATH=/opt/linux/include \
 	     go build $(LDFLAGS) -o dist/dbmate-linux-amd64 .
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 \
-	     go build $(LDFLAGS) -o dist/dbmate-linux-musl-amd64 .
 
 .PHONY: build-macos
 build-macos:
+	PKG_CONFIG_PATH=/src/config/darwin C_INCLUDE_PATH=/opt/darwin/include \
+	LD_LIBRARY_PATH=/opt/darwin/lib:/osxcross/target/lib \
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 CC=o64-clang CXX=o64-clang++ \
 	     go build $(LDFLAGS) -o dist/dbmate-macos-amd64 .
 
 .PHONY: build-windows
 build-windows:
+	PKG_CONFIG_PATH=/src/config/win LD_LIBRARY_PATH=/opt/win/lib C_INCLUDE_PATH=/opt/win/include \
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc-posix CXX=x86_64-w64-mingw32-g++-posix \
 	     go build $(LDFLAGS) -o dist/dbmate-windows-amd64.exe .
 
@@ -53,4 +55,4 @@ docker-all:
 .PHONY: docker-bash
 docker-bash:
 	docker-compose build
-	docker-compose run --rm dbmate make
+	docker-compose run --rm dbmate
