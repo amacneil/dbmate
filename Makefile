@@ -19,6 +19,7 @@ lint:
 wait:
 	dist/dbmate-linux-amd64 -e MYSQL_URL wait
 	dist/dbmate-linux-amd64 -e POSTGRESQL_URL wait
+	dist/dbmate-linux-amd64 -e ORACLE_URL wait
 
 .PHONY: clean
 clean:
