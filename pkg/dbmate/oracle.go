@@ -77,6 +77,9 @@ func (drv OracleDriver) CreateDatabase(u *url.URL) error {
 	defer mustClose(db)
 
 	_, err = db.Exec(`alter session set "_oracle_script"=true`)
+	if err != nil {
+		return err
+	}
 
 	_, err = db.Exec(fmt.Sprintf("create user %s identified by %s", name, password))
 	if err != nil {
@@ -105,6 +108,10 @@ func (drv OracleDriver) DropDatabase(u *url.URL) error {
 	defer mustClose(db)
 
 	_, err = db.Exec(`alter session set "_oracle_script"=true`)
+	if err != nil {
+		return err
+	}
+
 	_, err = db.Exec(fmt.Sprintf("drop user %s cascade", name))
 
 	return err
