@@ -24,6 +24,4 @@ services:
       POSTGRES_PASSWORD: postgres
 
   oracle:
-    image: csuriano/loki:ora1930
-    environment:
-      ORACLE_PWD: oracle
+    image: csuriano/loki:orase1930
