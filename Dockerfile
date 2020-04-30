@@ -59,4 +59,12 @@ RUN make build-linux
 # runtime image
 FROM gcr.io/distroless/base
 COPY --from=build /src/dist/dbmate-linux-amd64 /dbmate
+COPY --from=build /src/config/linux /config
+COPY --from=build /opt/linux /opt/linux
+COPY --from=build /lib/x86_64-linux-gnu/libaio* /opt/linux/lib/
+ENV PKG_CONFIG_PATH /config
+ENV LD_LIBRARY_PATH /opt/linux/lib
+ENV C_INCLUDE_PATH /opt/linux/include
+ENV FORCE_RPATH 1
+
 ENTRYPOINT ["/dbmate"]
