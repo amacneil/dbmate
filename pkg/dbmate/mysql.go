@@ -21,13 +21,17 @@ type MySQLDriver struct {
 func normalizeMySQLURL(u *url.URL) string {
 	// set default port
 	host := u.Host
+	protocol := "tcp"
 
-	if u.Port() == "" {
+	if u.Query().Get("socket") != "" {
+		protocol = "unix"
+		host = u.Query().Get("socket")
+	} else if u.Port() == "" {
 		host = fmt.Sprintf("%s:3306", host)
 	}
 
 	// host format required by go-sql-driver/mysql
-	host = fmt.Sprintf("tcp(%s)", host)
+	host = fmt.Sprintf("%s(%s)", protocol, host)
 
 	query := u.Query()
 	query.Set("multiStatements", "true")
