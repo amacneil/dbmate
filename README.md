@@ -127,7 +127,7 @@ protocol://username:password@host:port/database_name?options
 DATABASE_URL="mysql://username:password@127.0.0.1:3306/database_name"
 ```
 
-A socket parameter can be specified to connect through an unix socket file:
+A socket parameter can be specified to connect through a unix socket file:
 
 ```sh
 DATABASE_URL="mysql://username:password@localhost/database_name?socket=/var/data/mysql.sock"
