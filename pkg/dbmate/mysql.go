@@ -34,6 +34,7 @@ func normalizeMySQLURL(u *url.URL) string {
 	host = fmt.Sprintf("%s(%s)", protocol, host)
 
 	query := u.Query()
+	query.Del("socket")
 	query.Set("multiStatements", "true")
 
 	queryString := query.Encode()
