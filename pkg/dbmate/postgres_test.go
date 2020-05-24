@@ -34,6 +34,49 @@ func prepTestPostgresDB(t *testing.T) *sql.DB {
 	return db
 }
 
+func TestNormalizePostgresURLDefaults(t *testing.T) {
+	u, err := url.Parse("postgres:///foo")
+	require.NoError(t, err)
+	s := normalizePostgresURL(u)
+	require.Equal(t, "postgres://localhost:5432/foo", s)
+}
+
+func TestNormalizePostgresURLCustom(t *testing.T) {
+	u, err := url.Parse("postgres://bob:secret@myhost:1234/foo?bar=baz")
+	require.NoError(t, err)
+	s := normalizePostgresURL(u)
+	require.Equal(t, "postgres://bob:secret@myhost:1234/foo?bar=baz", s)
+}
+
+func TestNormalizePostgresURLHostPortParams(t *testing.T) {
+	u, err := url.Parse("postgres://bob:secret@myhost:1234/foo?port=9999&bar=baz")
+	require.NoError(t, err)
+	s := normalizePostgresURL(u)
+	require.Equal(t, "postgres://bob:secret@myhost:9999/foo?bar=baz", s)
+
+	u, err = url.Parse("postgres://bob:secret@myhost:1234/foo?host=new&port=9999")
+	require.NoError(t, err)
+	s = normalizePostgresURL(u)
+	require.Equal(t, "postgres://bob:secret@:9999/foo?host=new", s)
+
+	u, err = url.Parse("postgres://bob:secret@myhost:1234/foo?host=/var/run/postgresql")
+	require.NoError(t, err)
+	s = normalizePostgresURL(u)
+	require.Equal(t, "postgres://bob:secret@:1234/foo?host=%2Fvar%2Frun%2Fpostgresql", s)
+}
+
+func TestNormalizePostgresURLSocketParam(t *testing.T) {
+	u, err := url.Parse("postgres://bob:secret@localhost/foo?socket=/var/run/postgresql")
+	require.NoError(t, err)
+	s := normalizePostgresURL(u)
+	require.Equal(t, "postgres://bob:secret@:5432/foo?host=%2Fvar%2Frun%2Fpostgresql", s)
+
+	u, err = url.Parse("postgres:///foo?socket=/var/run/postgresql")
+	require.NoError(t, err)
+	s = normalizePostgresURL(u)
+	require.Equal(t, "postgres://:5432/foo?host=%2Fvar%2Frun%2Fpostgresql", s)
+}
+
 func TestPostgresCreateDropDatabase(t *testing.T) {
 	drv := PostgresDriver{}
 	u := postgresTestURL(t)

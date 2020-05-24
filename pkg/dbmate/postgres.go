@@ -19,9 +19,47 @@ func init() {
 type PostgresDriver struct {
 }
 
+func normalizePostgresURL(u *url.URL) string {
+	hostname := u.Hostname()
+	port := u.Port()
+	query := u.Query()
+
+	// support socket parameter for consistency with mysql
+	if query.Get("socket") != "" {
+		query.Set("host", query.Get("socket"))
+		query.Del("socket")
+	}
+
+	// default hostname
+	if hostname == "" {
+		hostname = "localhost"
+	}
+
+	// host param overrides url hostname
+	if query.Get("host") != "" {
+		hostname = ""
+	}
+
+	// always specify a port
+	if query.Get("port") != "" {
+		port = query.Get("port")
+		query.Del("port")
+	}
+	if port == "" {
+		port = "5432"
+	}
+
+	// generate output URL
+	out, _ := url.Parse(u.String())
+	out.Host = fmt.Sprintf("%s:%s", hostname, port)
+	out.RawQuery = query.Encode()
+
+	return out.String()
+}
+
 // Open creates a new database connection
 func (drv PostgresDriver) Open(u *url.URL) (*sql.DB, error) {
-	return sql.Open("postgres", u.String())
+	return sql.Open("postgres", normalizePostgresURL(u))
 }
 
 func (drv PostgresDriver) openPostgresDB(u *url.URL) (*sql.DB, error) {
@@ -91,7 +129,7 @@ func postgresSchemaMigrationsDump(db *sql.DB) ([]byte, error) {
 func (drv PostgresDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
 	// load schema
 	schema, err := runCommand("pg_dump", "--format=plain", "--encoding=UTF8",
-		"--schema-only", "--no-privileges", "--no-owner", u.String())
+		"--schema-only", "--no-privileges", "--no-owner", normalizePostgresURL(u))
 	if err != nil {
 		return nil, err
 	}

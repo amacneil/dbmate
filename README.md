@@ -127,7 +127,7 @@ protocol://username:password@host:port/database_name?options
 DATABASE_URL="mysql://username:password@127.0.0.1:3306/database_name"
 ```
 
-A socket parameter can be specified to connect through a unix socket file:
+A `socket` parameter can be specified to connect through a unix socket:
 
 ```sh
 DATABASE_URL="mysql://username:password@/database_name?socket=/var/run/mysqld/mysqld.sock"
@@ -139,6 +139,12 @@ When connecting to Postgres, you may need to add the `sslmode=disable` option to
 
 ```sh
 DATABASE_URL="postgres://username:password@127.0.0.1:5432/database_name?sslmode=disable"
+```
+
+A `socket` or `host` parameter can be specified to connect through a unix socket (note: specify the directory only):
+
+```sh
+DATABASE_URL="postgres://username:password@/database_name?socket=/var/run/postgresql"
 ```
 
 **SQLite**

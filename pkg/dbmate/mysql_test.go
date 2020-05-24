@@ -62,12 +62,20 @@ func TestNormalizeMySQLURLCustomSpecialChars(t *testing.T) {
 }
 
 func TestNormalizeMySQLURLSocket(t *testing.T) {
+	// test with no user/pass
 	u, err := url.Parse("mysql:///foo?socket=/var/run/mysqld/mysqld.sock&flag=on")
 	require.NoError(t, err)
 	require.Equal(t, "", u.Host)
 
 	s := normalizeMySQLURL(u)
 	require.Equal(t, "unix(/var/run/mysqld/mysqld.sock)/foo?flag=on&multiStatements=true", s)
+
+	// test with user/pass
+	u, err = url.Parse("mysql://bob:secret@fakehost/foo?socket=/var/run/mysqld/mysqld.sock&flag=on")
+	require.NoError(t, err)
+
+	s = normalizeMySQLURL(u)
+	require.Equal(t, "bob:secret@unix(/var/run/mysqld/mysqld.sock)/foo?flag=on&multiStatements=true", s)
 }
 
 func TestMySQLCreateDropDatabase(t *testing.T) {
