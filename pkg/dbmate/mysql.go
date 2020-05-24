@@ -19,20 +19,20 @@ type MySQLDriver struct {
 }
 
 func normalizeMySQLURL(u *url.URL) string {
-	// set default port
-	host := u.Host
-
-	if u.Port() == "" {
-		host = fmt.Sprintf("%s:3306", host)
-	}
-
-	// host format required by go-sql-driver/mysql
-	host = fmt.Sprintf("tcp(%s)", host)
-
 	query := u.Query()
 	query.Set("multiStatements", "true")
 
-	queryString := query.Encode()
+	host := u.Host
+	protocol := "tcp"
+
+	if query.Get("socket") != "" {
+		protocol = "unix"
+		host = query.Get("socket")
+		query.Del("socket")
+	} else if u.Port() == "" {
+		// set default port
+		host = fmt.Sprintf("%s:3306", host)
+	}
 
 	// Get decoded user:pass
 	userPassEncoded := u.User.String()
@@ -45,8 +45,9 @@ func normalizeMySQLURL(u *url.URL) string {
 		normalizedString = userPass + "@"
 	}
 
-	normalizedString = fmt.Sprintf("%s%s%s?%s", normalizedString,
-		host, u.Path, queryString)
+	// connection string format required by go-sql-driver/mysql
+	normalizedString = fmt.Sprintf("%s%s(%s)%s?%s", normalizedString,
+		protocol, host, u.Path, query.Encode())
 
 	return normalizedString
 }

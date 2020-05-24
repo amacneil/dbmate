@@ -61,6 +61,15 @@ func TestNormalizeMySQLURLCustomSpecialChars(t *testing.T) {
 	require.Equal(t, "duhfsd7s:123!@123!@@tcp(host:123)/foo?flag=on&multiStatements=true", s)
 }
 
+func TestNormalizeMySQLURLSocket(t *testing.T) {
+	u, err := url.Parse("mysql:///foo?socket=/var/run/mysqld/mysqld.sock&flag=on")
+	require.NoError(t, err)
+	require.Equal(t, "", u.Host)
+
+	s := normalizeMySQLURL(u)
+	require.Equal(t, "unix(/var/run/mysqld/mysqld.sock)/foo?flag=on&multiStatements=true", s)
+}
+
 func TestMySQLCreateDropDatabase(t *testing.T) {
 	drv := MySQLDriver{}
 	u := mySQLTestURL(t)

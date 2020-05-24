@@ -127,6 +127,12 @@ protocol://username:password@host:port/database_name?options
 DATABASE_URL="mysql://username:password@127.0.0.1:3306/database_name"
 ```
 
+A socket parameter can be specified to connect through a unix socket file:
+
+```sh
+DATABASE_URL="mysql://username:password@/database_name?socket=/var/run/mysqld/mysqld.sock"
+```
+
 **PostgreSQL**
 
 When connecting to Postgres, you may need to add the `sslmode=disable` option to your connection string, as dbmate by default requires a TLS connection (some other frameworks/languages allow unencrypted connections by default).
