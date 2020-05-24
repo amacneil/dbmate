@@ -52,5 +52,4 @@ docker-all:
 
 .PHONY: docker-bash
 docker-bash:
-	docker-compose build
-	docker-compose run --rm dbmate make
+	-docker-compose run --rm dbmate bash
