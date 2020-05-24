@@ -270,15 +270,8 @@ $ dbmate wait
 Waiting for database....
 ```
 
-You can chain `wait` together with other commands if you sometimes see failures caused by the database not yet being ready:
+You can also use the `--wait` flag with other commands if you sometimes see failures caused by the database not yet being ready:
 
-```sh
-$ dbmate wait && dbmate up
-Waiting for database....
-Creating: myapp_development
-```
-
-Alternatively you can use the `--wait` flag:
 ```sh
 $ dbmate --wait up
 Waiting for database....
