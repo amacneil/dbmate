@@ -1,5 +1,5 @@
 # build image
-FROM techknowlogick/xgo:go-1.13.x as build
+FROM techknowlogick/xgo:go-1.14.x as build
 WORKDIR /src
 ENTRYPOINT []
 CMD ["/bin/bash"]
@@ -19,7 +19,7 @@ RUN apt-get update \
 # golangci-lint
 RUN curl -fsSL -o /tmp/lint-install.sh https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
 	&& chmod +x /tmp/lint-install.sh \
-	&& /tmp/lint-install.sh -b /usr/local/bin v1.22.2 \
+	&& /tmp/lint-install.sh -b /usr/local/bin v1.27.0 \
 	&& rm -f /tmp/lint-install.sh
 
 # download modules
