@@ -37,16 +37,16 @@ $ brew install dbmate
 Download the binary directly:
 
 ```sh
-$ sudo curl -fsSL -o /usr/local/bin/dbmate https://github.com/amacneil/dbmate/releases/download/v1.8.0/dbmate-linux-amd64
+$ sudo curl -fsSL -o /usr/local/bin/dbmate https://github.com/amacneil/dbmate/releases/latest/download/dbmate-linux-amd64
 $ sudo chmod +x /usr/local/bin/dbmate
 ```
 
 **Docker**
 
-You can run dbmate using the official docker image:
+You can run dbmate using the official docker image (remember to set `--network=host` or see [this comment](https://github.com/amacneil/dbmate/issues/128#issuecomment-615924611) for more tips on using dbmate with docker networking):
 
 ```sh
-$ docker run --rm -it amacneil/dbmate --help
+$ docker run --rm --network=host -it amacneil/dbmate --help
 ```
 
 If you wish to create or apply migrations, you will need to use Docker's [bind mount](https://docs.docker.com/storage/bind-mounts/) feature to make your local working directory available inside the dbmate container:
@@ -61,7 +61,7 @@ To use dbmate on Heroku, the easiest method is to store the linux binary in your
 
 ```sh
 $ mkdir -p bin
-$ curl -fsSL -o bin/dbmate-heroku https://github.com/amacneil/dbmate/releases/download/v1.8.0/dbmate-linux-amd64
+$ curl -fsSL -o bin/dbmate-heroku https://github.com/amacneil/dbmate/releases/latest/download/dbmate-linux-amd64
 $ chmod +x bin/dbmate-heroku
 $ git add bin/dbmate-heroku
 $ git commit -m "Add dbmate binary"
