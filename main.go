@@ -56,7 +56,7 @@ func NewApp() *cli.App {
 			Usage: "wait for the db to become available before executing the subsequent command",
 		},
 		cli.BoolFlag{
-			Name: "print-result",
+			Name:  "print-result",
 			Usage: "print the result of each statement execution",
 		},
 		cli.DurationFlag{
