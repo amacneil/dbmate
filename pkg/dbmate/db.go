@@ -30,6 +30,7 @@ type DB struct {
 	DatabaseURL    *url.URL
 	MigrationsDir  string
 	SchemaFile     string
+	PrintResult    bool
 	WaitBefore     bool
 	WaitInterval   time.Duration
 	WaitTimeout    time.Duration
@@ -50,6 +51,7 @@ func New(databaseURL *url.URL) *DB {
 		DatabaseURL:    databaseURL,
 		MigrationsDir:  DefaultMigrationsDir,
 		SchemaFile:     DefaultSchemaFile,
+		PrintResult:    false,
 		WaitBefore:     false,
 		WaitInterval:   DefaultWaitInterval,
 		WaitTimeout:    DefaultWaitTimeout,
@@ -58,7 +60,9 @@ func New(databaseURL *url.URL) *DB {
 
 // GetDriver loads the required database driver
 func (db *DB) GetDriver() (Driver, error) {
-	return GetDriver(db.DatabaseURL.Scheme)
+	drv, err := GetDriver(db.DatabaseURL.Scheme)
+	drv.SetVerbose(db.PrintResult)
+	return drv, err
 }
 
 // Wait blocks until the database server is available. It does not verify that
@@ -304,8 +308,11 @@ func (db *DB) Migrate() error {
 
 		execMigration := func(tx Transaction) error {
 			// run actual migration
-			if _, err := tx.Exec(up.Contents); err != nil {
+			result, err := tx.Exec(up.Contents)
+			if err != nil {
 				return err
+			} else if db.PrintResult {
+				fmt.Println(result)
 			}
 
 			// record migration
@@ -425,8 +432,11 @@ func (db *DB) Rollback() error {
 
 	execMigration := func(tx Transaction) error {
 		// rollback migration
-		if _, err := tx.Exec(down.Contents); err != nil {
+		result, err := tx.Exec(down.Contents)
+		if err != nil {
 			return err
+		} else if db.PrintResult {
+			fmt.Println(result)
 		}
 
 		// remove migration record
