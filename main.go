@@ -56,8 +56,8 @@ func NewApp() *cli.App {
 			Usage: "wait for the db to become available before executing the subsequent command",
 		},
 		cli.BoolFlag{
-			Name:  "verbose, v",
-			Usage: "print result of transaction",
+			Name: "print-result",
+			Usage: "print the result of each statement execution",
 		},
 		cli.DurationFlag{
 			Name:  "wait-timeout",
@@ -182,7 +182,7 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 			return err
 		}
 		db := dbmate.New(u)
-		db.PrintResult = c.GlobalBool("verbose")
+		db.PrintResult = c.GlobalBool("print-result")
 		db.AutoDumpSchema = !c.GlobalBool("no-dump-schema")
 		db.MigrationsDir = c.GlobalString("migrations-dir")
 		db.SchemaFile = c.GlobalString("schema-file")

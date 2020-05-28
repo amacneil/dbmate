@@ -303,7 +303,7 @@ The following command line options are available with all commands. You must use
 * `--schema-file, -s "./db/schema.sql"` - a path to keep the schema.sql file.
 * `--no-dump-schema` - don't auto-update the schema.sql file on migrate/rollback
 * `--wait` - wait for the db to become available before executing the subsequent command
-* `--verbose, -v` - print the result of each statement execution
+* `--print-result` - print the result of each statement execution
 
 For example, before running your test suite, you may wish to drop and recreate the test database. One easy way to do this is to store your test database connection URL in the `TEST_DATABASE_URL` environment variable:
 
