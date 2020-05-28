@@ -56,7 +56,7 @@ func NewApp() *cli.App {
 			Usage: "wait for the db to become available before executing the subsequent command",
 		},
 		cli.BoolFlag{
-			Name: "verbose, v",
+			Name:  "verbose, v",
 			Usage: "print result of transaction",
 		},
 		cli.DurationFlag{
