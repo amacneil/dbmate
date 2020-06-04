@@ -98,7 +98,8 @@ func (drv PostgresDriver) DropDatabase(u *url.URL) error {
 	}
 	defer mustClose(db)
 
-	_, err = db.Exec(fmt.Sprintf("drop database if exists %s", pq.QuoteIdentifier(name)))
+	_, err = db.Exec(fmt.Sprintf("drop database if exists %s",
+		pq.QuoteIdentifier(name)))
 
 	return err
 }

@@ -59,8 +59,7 @@ func New(databaseURL *url.URL) *DB {
 
 // GetDriver loads the required database driver
 func (db *DB) GetDriver() (Driver, error) {
-	drv, err := GetDriver(db.DatabaseURL.Scheme)
-	return drv, err
+	return GetDriver(db.DatabaseURL.Scheme)
 }
 
 // Wait blocks until the database server is available. It does not verify that
