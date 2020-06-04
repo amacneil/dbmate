@@ -55,10 +55,6 @@ func NewApp() *cli.App {
 			Name:  "wait",
 			Usage: "wait for the db to become available before executing the subsequent command",
 		},
-		cli.BoolFlag{
-			Name:  "print-result",
-			Usage: "print the result of each statement execution",
-		},
 		cli.DurationFlag{
 			Name:  "wait-timeout",
 			Usage: "timeout for --wait flag",
@@ -79,7 +75,14 @@ func NewApp() *cli.App {
 		{
 			Name:  "up",
 			Usage: "Create database (if necessary) and migrate to the latest version",
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "verbose, v",
+					Usage: "print the result of each statement execution",
+				},
+			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				db.Verbose = c.Bool("verbose")
 				return db.CreateAndMigrate()
 			}),
 		},
@@ -100,7 +103,14 @@ func NewApp() *cli.App {
 		{
 			Name:  "migrate",
 			Usage: "Migrate to the latest version",
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "verbose, v",
+					Usage: "print the result of each statement execution",
+				},
+			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				db.Verbose = c.Bool("verbose")
 				return db.Migrate()
 			}),
 		},
@@ -108,7 +118,14 @@ func NewApp() *cli.App {
 			Name:    "rollback",
 			Aliases: []string{"down"},
 			Usage:   "Rollback the most recent migration",
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "verbose, v",
+					Usage: "print the result of each statement execution",
+				},
+			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				db.Verbose = c.Bool("verbose")
 				return db.Rollback()
 			}),
 		},
@@ -182,7 +199,6 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 			return err
 		}
 		db := dbmate.New(u)
-		db.PrintResult = c.GlobalBool("print-result")
 		db.AutoDumpSchema = !c.GlobalBool("no-dump-schema")
 		db.MigrationsDir = c.GlobalString("migrations-dir")
 		db.SchemaFile = c.GlobalString("schema-file")

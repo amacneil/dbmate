@@ -21,7 +21,6 @@ func init() {
 
 // SQLiteDriver provides top level database functions
 type SQLiteDriver struct {
-	PrintResult bool
 }
 
 func sqlitePath(u *url.URL) string {
@@ -119,11 +118,8 @@ func (drv SQLiteDriver) DatabaseExists(u *url.URL) (bool, error) {
 
 // CreateMigrationsTable creates the schema_migrations table
 func (drv SQLiteDriver) CreateMigrationsTable(db *sql.DB) error {
-	result, err := db.Exec("create table if not exists schema_migrations " +
+	_, err := db.Exec("create table if not exists schema_migrations " +
 		"(version varchar(255) primary key)")
-	if drv.PrintResult {
-		fmt.Println(result)
-	}
 
 	return err
 }
@@ -157,20 +153,14 @@ func (drv SQLiteDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool
 
 // InsertMigration adds a new migration record
 func (drv SQLiteDriver) InsertMigration(db Transaction, version string) error {
-	result, err := db.Exec("insert into schema_migrations (version) values (?)", version)
-	if drv.PrintResult {
-		fmt.Println(result)
-	}
+	_, err := db.Exec("insert into schema_migrations (version) values (?)", version)
 
 	return err
 }
 
 // DeleteMigration removes a migration record
 func (drv SQLiteDriver) DeleteMigration(db Transaction, version string) error {
-	result, err := db.Exec("delete from schema_migrations where version = ?", version)
-	if drv.PrintResult {
-		fmt.Println(result)
-	}
+	_, err := db.Exec("delete from schema_migrations where version = ?", version)
 
 	return err
 }
@@ -186,9 +176,4 @@ func (drv SQLiteDriver) Ping(u *url.URL) error {
 	defer mustClose(db)
 
 	return db.Ping()
-}
-
-// SetVerbose sets the flag to enable printing of all execution results
-func (drv SQLiteDriver) SetVerbose(verbose bool) {
-	drv.PrintResult = verbose
 }

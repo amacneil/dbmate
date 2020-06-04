@@ -30,7 +30,7 @@ type DB struct {
 	DatabaseURL    *url.URL
 	MigrationsDir  string
 	SchemaFile     string
-	PrintResult    bool
+	Verbose        bool
 	WaitBefore     bool
 	WaitInterval   time.Duration
 	WaitTimeout    time.Duration
@@ -51,7 +51,6 @@ func New(databaseURL *url.URL) *DB {
 		DatabaseURL:    databaseURL,
 		MigrationsDir:  DefaultMigrationsDir,
 		SchemaFile:     DefaultSchemaFile,
-		PrintResult:    false,
 		WaitBefore:     false,
 		WaitInterval:   DefaultWaitInterval,
 		WaitTimeout:    DefaultWaitTimeout,
@@ -61,7 +60,6 @@ func New(databaseURL *url.URL) *DB {
 // GetDriver loads the required database driver
 func (db *DB) GetDriver() (Driver, error) {
 	drv, err := GetDriver(db.DatabaseURL.Scheme)
-	drv.SetVerbose(db.PrintResult)
 	return drv, err
 }
 
@@ -311,8 +309,8 @@ func (db *DB) Migrate() error {
 			result, err := tx.Exec(up.Contents)
 			if err != nil {
 				return err
-			} else if db.PrintResult {
-				fmt.Println(result)
+			} else if db.Verbose {
+				printVerbose(result)
 			}
 
 			// record migration
@@ -435,8 +433,8 @@ func (db *DB) Rollback() error {
 		result, err := tx.Exec(down.Contents)
 		if err != nil {
 			return err
-		} else if db.PrintResult {
-			fmt.Println(result)
+		} else if db.Verbose {
+			printVerbose(result)
 		}
 
 		// remove migration record

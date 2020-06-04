@@ -17,7 +17,6 @@ func init() {
 
 // PostgresDriver provides top level database functions
 type PostgresDriver struct {
-	PrintResult bool
 }
 
 func normalizePostgresURL(u *url.URL) string {
@@ -82,11 +81,8 @@ func (drv PostgresDriver) CreateDatabase(u *url.URL) error {
 	}
 	defer mustClose(db)
 
-	result, err := db.Exec(fmt.Sprintf("create database %s",
+	_, err = db.Exec(fmt.Sprintf("create database %s",
 		pq.QuoteIdentifier(name)))
-	if drv.PrintResult {
-		fmt.Println(result)
-	}
 
 	return err
 }
@@ -102,11 +98,7 @@ func (drv PostgresDriver) DropDatabase(u *url.URL) error {
 	}
 	defer mustClose(db)
 
-	result, err := db.Exec(fmt.Sprintf("drop database if exists %s",
-		pq.QuoteIdentifier(name)))
-	if drv.PrintResult {
-		fmt.Println(result)
-	}
+	_, err = db.Exec(fmt.Sprintf("drop database if exists %s", pq.QuoteIdentifier(name)))
 
 	return err
 }
@@ -172,11 +164,8 @@ func (drv PostgresDriver) DatabaseExists(u *url.URL) (bool, error) {
 
 // CreateMigrationsTable creates the schema_migrations table
 func (drv PostgresDriver) CreateMigrationsTable(db *sql.DB) error {
-	result, err := db.Exec("create table if not exists public.schema_migrations " +
+	_, err := db.Exec("create table if not exists public.schema_migrations " +
 		"(version varchar(255) primary key)")
-	if drv.PrintResult {
-		fmt.Println(result)
-	}
 
 	return err
 }
@@ -210,20 +199,14 @@ func (drv PostgresDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bo
 
 // InsertMigration adds a new migration record
 func (drv PostgresDriver) InsertMigration(db Transaction, version string) error {
-	result, err := db.Exec("insert into public.schema_migrations (version) values ($1)", version)
-	if drv.PrintResult {
-		fmt.Println(result)
-	}
+	_, err := db.Exec("insert into public.schema_migrations (version) values ($1)", version)
 
 	return err
 }
 
 // DeleteMigration removes a migration record
 func (drv PostgresDriver) DeleteMigration(db Transaction, version string) error {
-	result, err := db.Exec("delete from public.schema_migrations where version = $1", version)
-	if drv.PrintResult {
-		fmt.Println(result)
-	}
+	_, err := db.Exec("delete from public.schema_migrations where version = $1", version)
 
 	return err
 }
@@ -252,9 +235,4 @@ func (drv PostgresDriver) Ping(u *url.URL) error {
 	}
 
 	return err
-}
-
-// SetVerbose sets the flag to enable printing of all execution results
-func (drv PostgresDriver) SetVerbose(verbose bool) {
-	drv.PrintResult = verbose
 }

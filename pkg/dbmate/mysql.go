@@ -16,7 +16,6 @@ func init() {
 
 // MySQLDriver provides top level database functions
 type MySQLDriver struct {
-	PrintResult bool
 }
 
 func normalizeMySQLURL(u *url.URL) string {
@@ -83,11 +82,8 @@ func (drv MySQLDriver) CreateDatabase(u *url.URL) error {
 	}
 	defer mustClose(db)
 
-	result, err := db.Exec(fmt.Sprintf("create database %s",
+	_, err = db.Exec(fmt.Sprintf("create database %s",
 		mysqlQuoteIdentifier(name)))
-	if drv.PrintResult {
-		fmt.Println(result)
-	}
 
 	return err
 }
@@ -103,11 +99,8 @@ func (drv MySQLDriver) DropDatabase(u *url.URL) error {
 	}
 	defer mustClose(db)
 
-	result, err := db.Exec(fmt.Sprintf("drop database if exists %s",
+	_, err = db.Exec(fmt.Sprintf("drop database if exists %s",
 		mysqlQuoteIdentifier(name)))
-	if drv.PrintResult {
-		fmt.Println(result)
-	}
 
 	return err
 }
@@ -200,11 +193,8 @@ func (drv MySQLDriver) DatabaseExists(u *url.URL) (bool, error) {
 
 // CreateMigrationsTable creates the schema_migrations table
 func (drv MySQLDriver) CreateMigrationsTable(db *sql.DB) error {
-	result, err := db.Exec("create table if not exists schema_migrations " +
+	_, err := db.Exec("create table if not exists schema_migrations " +
 		"(version varchar(255) primary key)")
-	if drv.PrintResult {
-		fmt.Println(result)
-	}
 
 	return err
 }
@@ -238,20 +228,14 @@ func (drv MySQLDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool,
 
 // InsertMigration adds a new migration record
 func (drv MySQLDriver) InsertMigration(db Transaction, version string) error {
-	result, err := db.Exec("insert into schema_migrations (version) values (?)", version)
-	if drv.PrintResult {
-		fmt.Println(result)
-	}
+	_, err := db.Exec("insert into schema_migrations (version) values (?)", version)
 
 	return err
 }
 
 // DeleteMigration removes a migration record
 func (drv MySQLDriver) DeleteMigration(db Transaction, version string) error {
-	result, err := db.Exec("delete from schema_migrations where version = ?", version)
-	if drv.PrintResult {
-		fmt.Println(result)
-	}
+	_, err := db.Exec("delete from schema_migrations where version = ?", version)
 
 	return err
 }
@@ -266,9 +250,4 @@ func (drv MySQLDriver) Ping(u *url.URL) error {
 	defer mustClose(db)
 
 	return db.Ping()
-}
-
-// SetVerbose sets the flag to enable printing of all execution results
-func (drv MySQLDriver) SetVerbose(verbose bool) {
-	drv.PrintResult = verbose
 }

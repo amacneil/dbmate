@@ -127,3 +127,14 @@ func queryColumn(db *sql.DB, query string) ([]string, error) {
 
 	return result, nil
 }
+
+func printVerbose(result sql.Result) {
+	lastInsertId, err := result.LastInsertId()
+	if err == nil {
+		fmt.Printf("Last insert ID: %d\n", lastInsertId)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err == nil {
+		fmt.Printf("Rows affected: %d\n", rowsAffected)
+	}
+}

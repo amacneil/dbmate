@@ -7,6 +7,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/joho/godotenv v1.3.0
+	github.com/kami-zh/go-capturer v0.0.0-20171211120116-e492ea43421d
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/lib/pq v1.5.2
 	github.com/mattn/go-sqlite3 v1.13.0
