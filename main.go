@@ -75,7 +75,14 @@ func NewApp() *cli.App {
 		{
 			Name:  "up",
 			Usage: "Create database (if necessary) and migrate to the latest version",
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "verbose, v",
+					Usage: "print the result of each statement execution",
+				},
+			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				db.Verbose = c.Bool("verbose")
 				return db.CreateAndMigrate()
 			}),
 		},
@@ -96,7 +103,14 @@ func NewApp() *cli.App {
 		{
 			Name:  "migrate",
 			Usage: "Migrate to the latest version",
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "verbose, v",
+					Usage: "print the result of each statement execution",
+				},
+			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				db.Verbose = c.Bool("verbose")
 				return db.Migrate()
 			}),
 		},
@@ -104,7 +118,14 @@ func NewApp() *cli.App {
 			Name:    "rollback",
 			Aliases: []string{"down"},
 			Usage:   "Rollback the most recent migration",
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "verbose, v",
+					Usage: "print the result of each statement execution",
+				},
+			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				db.Verbose = c.Bool("verbose")
 				return db.Rollback()
 			}),
 		},

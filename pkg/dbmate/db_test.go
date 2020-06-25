@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kami-zh/go-capturer"
 	"github.com/stretchr/testify/require"
 )
 
@@ -161,9 +162,10 @@ func checkWaitCalled(t *testing.T, u *url.URL, command func() error) {
 	u.Host = oldHost
 }
 
-func TestWaitBefore(t *testing.T) {
+func testWaitBefore(t *testing.T, verbose bool) {
 	u := postgresTestURL(t)
 	db := newTestDB(t, u)
+	db.Verbose = verbose
 	db.WaitBefore = true
 	// so that checkWaitCalled returns quickly
 	db.WaitInterval = time.Millisecond
@@ -198,6 +200,24 @@ func TestWaitBefore(t *testing.T) {
 	err = db.DumpSchema()
 	require.NoError(t, err)
 	checkWaitCalled(t, u, db.DumpSchema)
+}
+
+func TestWaitBefore(t *testing.T) {
+	testWaitBefore(t, false)
+}
+
+func TestWaitBeforeVerbose(t *testing.T) {
+	output := capturer.CaptureOutput(func() {
+		testWaitBefore(t, true)
+	})
+	require.Contains(t, output,
+		`Applying: 20151129054053_test_migration.sql
+Rows affected: 1
+Applying: 20200227231541_test_posts.sql
+Rows affected: 0`)
+	require.Contains(t, output,
+		`Rolling back: 20200227231541_test_posts.sql
+Rows affected: 0`)
 }
 
 func testURLs(t *testing.T) []*url.URL {

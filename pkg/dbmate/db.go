@@ -30,6 +30,7 @@ type DB struct {
 	DatabaseURL    *url.URL
 	MigrationsDir  string
 	SchemaFile     string
+	Verbose        bool
 	WaitBefore     bool
 	WaitInterval   time.Duration
 	WaitTimeout    time.Duration
@@ -304,8 +305,11 @@ func (db *DB) Migrate() error {
 
 		execMigration := func(tx Transaction) error {
 			// run actual migration
-			if _, err := tx.Exec(up.Contents); err != nil {
+			result, err := tx.Exec(up.Contents)
+			if err != nil {
 				return err
+			} else if db.Verbose {
+				printVerbose(result)
 			}
 
 			// record migration
@@ -425,8 +429,11 @@ func (db *DB) Rollback() error {
 
 	execMigration := func(tx Transaction) error {
 		// rollback migration
-		if _, err := tx.Exec(down.Contents); err != nil {
+		result, err := tx.Exec(down.Contents)
+		if err != nil {
 			return err
+		} else if db.Verbose {
+			printVerbose(result)
 		}
 
 		// remove migration record
