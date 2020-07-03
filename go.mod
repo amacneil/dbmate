@@ -3,7 +3,7 @@ module github.com/amacneil/dbmate
 go 1.14
 
 require (
-	github.com/ClickHouse/clickhouse-go v1.4.0
+	github.com/ClickHouse/clickhouse-go v1.4.1
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-sql-driver/mysql v1.5.0
