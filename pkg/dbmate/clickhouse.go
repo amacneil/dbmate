@@ -105,7 +105,7 @@ func clickhouseSchemaDump(db *sql.DB, buf *bytes.Buffer, databaseName string) er
 		if err != nil {
 			return err
 		}
-		buf.WriteString(clause + "\n\n")
+		buf.WriteString(clause + ";\n\n")
 	}
 	return nil
 }

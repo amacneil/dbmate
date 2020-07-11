@@ -353,7 +353,7 @@ Why another database schema migration tool? Dbmate was inspired by many other to
 |PostgreSQL|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
 |MySQL|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
 |SQLite|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
-|ClikHouse|||:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
+|CliсkHouse|||:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
 
 > :eight_pointed_black_star: In theory these tools could be used with other languages, but a Go development environment is required because binary builds are not provided.
 
