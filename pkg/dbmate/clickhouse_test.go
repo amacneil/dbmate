@@ -34,6 +34,22 @@ func prepTestClickHouseDB(t *testing.T) *sql.DB {
 	return db
 }
 
+func TestNormalizeClickHouseURLSimplified(t *testing.T) {
+	u, err := url.Parse("clickhouse://user:pass@host/db")
+	require.NoError(t, err)
+
+	s := normalizeClickHouseURL(u).String()
+	require.Equal(t, "tcp://host:9000?database=db&password=pass&username=user", s)
+}
+
+func TestNormalizeClickHouseURLCanonical(t *testing.T) {
+	u, err := url.Parse("clickhouse://host:9000?database=db&password=pass&username=user")
+	require.NoError(t, err)
+
+	s := normalizeClickHouseURL(u).String()
+	require.Equal(t, "tcp://host:9000?database=db&password=pass&username=user", s)
+}
+
 func TestClickHouseCreateDropDatabase(t *testing.T) {
 	drv := ClickHouseDriver{}
 	u := clickhouseTestURL(t)
@@ -107,7 +123,7 @@ func TestClickHouseDumpSchema(t *testing.T) {
 		"    ('abc2');\n")
 
 	// DumpSchema should return error if command fails
-	values, _ := url.ParseQuery(u.RawQuery)
+	values := u.Query()
 	values.Set("database", "fakedb")
 	u.RawQuery = values.Encode()
 	db, err = sql.Open("clickhouse", u.String())
@@ -144,7 +160,7 @@ func TestClickHouseDatabaseExists(t *testing.T) {
 func TestClickHouseDatabaseExists_Error(t *testing.T) {
 	drv := ClickHouseDriver{}
 	u := clickhouseTestURL(t)
-	values, _ := url.ParseQuery(u.RawQuery)
+	values := u.Query()
 	values.Set("username", "invalid")
 	u.RawQuery = values.Encode()
 

@@ -20,24 +20,55 @@ func init() {
 type ClickHouseDriver struct {
 }
 
+func normalizeClickHouseURL(initialURL *url.URL) *url.URL {
+	u := *initialURL
+
+	u.Scheme = "tcp"
+	host := u.Host
+	if u.Port() == "" {
+		host = fmt.Sprintf("%s:9000", host)
+	}
+	u.Host = host
+
+	query := u.Query()
+	if query.Get("username") == "" && u.User.Username() != "" {
+		query.Set("username", u.User.Username())
+	}
+	password, passwordSet := u.User.Password()
+	if query.Get("password") == "" && passwordSet {
+		query.Set("password", password)
+	}
+	u.User = nil
+
+	if query.Get("database") == "" {
+		path := strings.Trim(u.Path, "/")
+		if path != "" {
+			query.Set("database", path)
+			u.Path = ""
+		}
+	}
+	u.RawQuery = query.Encode()
+
+	return &u
+}
+
 // Open creates a new database connection
 func (drv ClickHouseDriver) Open(u *url.URL) (*sql.DB, error) {
-	return sql.Open("clickhouse", u.String())
+	return sql.Open("clickhouse", normalizeClickHouseURL(u).String())
 }
 
 func (drv ClickHouseDriver) openClickHouseDB(u *url.URL) (*sql.DB, error) {
 	// connect to clickhouse database
-	clickhouseURL := *u
-	values, _ := url.ParseQuery(clickhouseURL.RawQuery)
+	clickhouseURL := normalizeClickHouseURL(u)
+	values := clickhouseURL.Query()
 	values.Set("database", "default")
 	clickhouseURL.RawQuery = values.Encode()
 
-	return drv.Open(&clickhouseURL)
+	return drv.Open(clickhouseURL)
 }
 
 func (drv ClickHouseDriver) databaseName(u *url.URL) string {
-	values, _ := url.ParseQuery(u.RawQuery)
-	name := values.Get("database")
+	name := normalizeClickHouseURL(u).Query().Get("database")
 	if name == "" {
 		name = "default"
 	}
