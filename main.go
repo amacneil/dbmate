@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"regexp"
 
 	"github.com/joho/godotenv"
 	"github.com/urfave/cli"
@@ -19,7 +20,8 @@ func main() {
 	err := app.Run(os.Args)
 
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Error: %s\n", err)
+		errText := redactLogString(fmt.Sprintf("Error: %s\n", err))
+		_, _ = fmt.Fprint(os.Stderr, errText)
 		os.Exit(2)
 	}
 }
@@ -218,4 +220,11 @@ func getDatabaseURL(c *cli.Context) (u *url.URL, err error) {
 	value := os.Getenv(env)
 
 	return url.Parse(value)
+}
+
+// redactLogString attempts to redact passwords from errors
+func redactLogString(in string) string {
+	re := regexp.MustCompile("([a-zA-Z]+://[^:]+:)[^@]+@")
+
+	return re.ReplaceAllString(in, "${1}********@")
 }

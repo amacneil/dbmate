@@ -35,3 +35,23 @@ func TestGetDatabaseUrl(t *testing.T) {
 	require.Equal(t, "example.org", u.Host)
 	require.Equal(t, "/db", u.Path)
 }
+
+func TestRedactLogString(t *testing.T) {
+	examples := []struct {
+		in       string
+		expected string
+	}{
+		{"normal string",
+			"normal string"},
+		// malformed URL example (note forward slash in password)
+		{"parse \"mysql://username:otS33+tb/e4=@localhost:3306/database\": invalid",
+			"parse \"mysql://username:********@localhost:3306/database\": invalid"},
+		// invalid port, but probably not a password since there is no @
+		{"parse \"mysql://localhost:abc/database\": invalid",
+			"parse \"mysql://localhost:abc/database\": invalid"},
+	}
+
+	for _, ex := range examples {
+		require.Equal(t, ex.expected, redactLogString(ex.in))
+	}
+}
