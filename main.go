@@ -35,6 +35,11 @@ func NewApp() *cli.App {
 
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
+			Name:    "url",
+			Aliases: []string{"u"},
+			Usage:   "specify the database URL",
+		},
+		&cli.StringFlag{
 			Name:    "env",
 			Aliases: []string{"e"},
 			Value:   "DATABASE_URL",
@@ -220,10 +225,15 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 	}
 }
 
-// getDatabaseURL returns the current environment database url
+// getDatabaseURL returns the current database url from cli flag or environment variable
 func getDatabaseURL(c *cli.Context) (u *url.URL, err error) {
-	env := c.String("env")
-	value := os.Getenv(env)
+	// check --url flag first
+	value := c.String("url")
+	if value == "" {
+		// if empty, default to --env or DATABASE_URL
+		env := c.String("env")
+		value = os.Getenv(env)
+	}
 
 	return url.Parse(value)
 }

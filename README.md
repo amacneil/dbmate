@@ -312,6 +312,7 @@ Please note that the `wait` command does not verify whether your specified datab
 
 The following command line options are available with all commands. You must use command line arguments in the order `dbmate [global options] command [command options]`.
 
+* `--url, -u "protocol://host:port/dbname"` - specify the database url directly.
 * `--env, -e "DATABASE_URL"` - specify an environment variable to read the database connection URL from.
 * `--migrations-dir, -d "./db/migrations"` - where to keep the migration files.
 * `--schema-file, -s "./db/schema.sql"` - a path to keep the schema.sql file.
@@ -334,6 +335,14 @@ $ dbmate -e TEST_DATABASE_URL --no-dump-schema up
 Creating: myapp_test
 Applying: 20151127184807_create_users_table.sql
 ```
+
+Alternatively, you can specify the url directly on the command line:
+
+```sh
+$ dbmate -u "postgres://postgres@127.0.0.1:5432/myapp_test?sslmode=disable" up
+```
+
+The only advantage of using `dbmate -e TEST_DATABASE_URL` over `dbmate -u $TEST_DATABASE_URL` is that the former takes advantage of dbmate's automatic `.env` file loading.
 
 ## FAQ
 
