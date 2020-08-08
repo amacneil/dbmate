@@ -61,9 +61,9 @@ To use dbmate on Heroku, the easiest method is to store the linux binary in your
 
 ```sh
 $ mkdir -p bin
-$ curl -fsSL -o bin/dbmate-heroku https://github.com/amacneil/dbmate/releases/latest/download/dbmate-linux-amd64
-$ chmod +x bin/dbmate-heroku
-$ git add bin/dbmate-heroku
+$ curl -fsSL -o bin/dbmate https://github.com/amacneil/dbmate/releases/latest/download/dbmate-linux-amd64
+$ chmod +x bin/dbmate
+$ git add bin/dbmate
 $ git commit -m "Add dbmate binary"
 $ git push heroku master
 ```
@@ -71,15 +71,7 @@ $ git push heroku master
 You can then run dbmate on heroku:
 
 ```sh
-$ heroku run bin/dbmate-heroku up
-```
-
-**Other**
-
-Dbmate can be installed directly using `go get`:
-
-```sh
-$ GO111MODULE=on go get -u github.com/amacneil/dbmate
+$ heroku run bin/dbmate up
 ```
 
 ## Commands
