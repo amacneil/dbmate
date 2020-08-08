@@ -48,27 +48,32 @@ func NewApp() *cli.App {
 		&cli.StringFlag{
 			Name:    "migrations-dir",
 			Aliases: []string{"d"},
+			EnvVars: []string{"DBMATE_MIGRATIONS_DIR"},
 			Value:   dbmate.DefaultMigrationsDir,
 			Usage:   "specify the directory containing migration files",
 		},
 		&cli.StringFlag{
 			Name:    "schema-file",
 			Aliases: []string{"s"},
+			EnvVars: []string{"DBMATE_SCHEMA_FILE"},
 			Value:   dbmate.DefaultSchemaFile,
 			Usage:   "specify the schema file location",
 		},
 		&cli.BoolFlag{
-			Name:  "no-dump-schema",
-			Usage: "don't update the schema file on migrate/rollback",
+			Name:    "no-dump-schema",
+			EnvVars: []string{"DBMATE_NO_DUMP_SCHEMA"},
+			Usage:   "don't update the schema file on migrate/rollback",
 		},
 		&cli.BoolFlag{
-			Name:  "wait",
-			Usage: "wait for the db to become available before executing the subsequent command",
+			Name:    "wait",
+			EnvVars: []string{"DBMATE_WAIT"},
+			Usage:   "wait for the db to become available before executing the subsequent command",
 		},
 		&cli.DurationFlag{
-			Name:  "wait-timeout",
-			Usage: "timeout for --wait flag",
-			Value: dbmate.DefaultWaitTimeout,
+			Name:    "wait-timeout",
+			EnvVars: []string{"DBMATE_WAIT_TIMEOUT"},
+			Usage:   "timeout for --wait flag",
+			Value:   dbmate.DefaultWaitTimeout,
 		},
 	}
 
@@ -89,6 +94,7 @@ func NewApp() *cli.App {
 				&cli.BoolFlag{
 					Name:    "verbose",
 					Aliases: []string{"v"},
+					EnvVars: []string{"DBMATE_VERBOSE"},
 					Usage:   "print the result of each statement execution",
 				},
 			},
@@ -118,6 +124,7 @@ func NewApp() *cli.App {
 				&cli.BoolFlag{
 					Name:    "verbose",
 					Aliases: []string{"v"},
+					EnvVars: []string{"DBMATE_VERBOSE"},
 					Usage:   "print the result of each statement execution",
 				},
 			},
@@ -134,6 +141,7 @@ func NewApp() *cli.App {
 				&cli.BoolFlag{
 					Name:    "verbose",
 					Aliases: []string{"v"},
+					EnvVars: []string{"DBMATE_VERBOSE"},
 					Usage:   "print the result of each statement execution",
 				},
 			},
