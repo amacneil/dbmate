@@ -8,7 +8,7 @@ import (
 	"regexp"
 
 	"github.com/joho/godotenv"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 
 	"github.com/amacneil/dbmate/pkg/dbmate"
 )
@@ -34,37 +34,40 @@ func NewApp() *cli.App {
 	app.Version = dbmate.Version
 
 	app.Flags = []cli.Flag{
-		cli.StringFlag{
-			Name:  "env, e",
-			Value: "DATABASE_URL",
-			Usage: "specify an environment variable containing the database URL",
+		&cli.StringFlag{
+			Name:    "env",
+			Aliases: []string{"e"},
+			Value:   "DATABASE_URL",
+			Usage:   "specify an environment variable containing the database URL",
 		},
-		cli.StringFlag{
-			Name:  "migrations-dir, d",
-			Value: dbmate.DefaultMigrationsDir,
-			Usage: "specify the directory containing migration files",
+		&cli.StringFlag{
+			Name:    "migrations-dir",
+			Aliases: []string{"d"},
+			Value:   dbmate.DefaultMigrationsDir,
+			Usage:   "specify the directory containing migration files",
 		},
-		cli.StringFlag{
-			Name:  "schema-file, s",
-			Value: dbmate.DefaultSchemaFile,
-			Usage: "specify the schema file location",
+		&cli.StringFlag{
+			Name:    "schema-file",
+			Aliases: []string{"s"},
+			Value:   dbmate.DefaultSchemaFile,
+			Usage:   "specify the schema file location",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "no-dump-schema",
 			Usage: "don't update the schema file on migrate/rollback",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "wait",
 			Usage: "wait for the db to become available before executing the subsequent command",
 		},
-		cli.DurationFlag{
+		&cli.DurationFlag{
 			Name:  "wait-timeout",
 			Usage: "timeout for --wait flag",
 			Value: dbmate.DefaultWaitTimeout,
 		},
 	}
 
-	app.Commands = []cli.Command{
+	app.Commands = []*cli.Command{
 		{
 			Name:    "new",
 			Aliases: []string{"n"},
@@ -78,9 +81,10 @@ func NewApp() *cli.App {
 			Name:  "up",
 			Usage: "Create database (if necessary) and migrate to the latest version",
 			Flags: []cli.Flag{
-				cli.BoolFlag{
-					Name:  "verbose, v",
-					Usage: "print the result of each statement execution",
+				&cli.BoolFlag{
+					Name:    "verbose",
+					Aliases: []string{"v"},
+					Usage:   "print the result of each statement execution",
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
@@ -106,9 +110,10 @@ func NewApp() *cli.App {
 			Name:  "migrate",
 			Usage: "Migrate to the latest version",
 			Flags: []cli.Flag{
-				cli.BoolFlag{
-					Name:  "verbose, v",
-					Usage: "print the result of each statement execution",
+				&cli.BoolFlag{
+					Name:    "verbose",
+					Aliases: []string{"v"},
+					Usage:   "print the result of each statement execution",
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
@@ -121,9 +126,10 @@ func NewApp() *cli.App {
 			Aliases: []string{"down"},
 			Usage:   "Rollback the most recent migration",
 			Flags: []cli.Flag{
-				cli.BoolFlag{
-					Name:  "verbose, v",
-					Usage: "print the result of each statement execution",
+				&cli.BoolFlag{
+					Name:    "verbose",
+					Aliases: []string{"v"},
+					Usage:   "print the result of each statement execution",
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
@@ -135,11 +141,11 @@ func NewApp() *cli.App {
 			Name:  "status",
 			Usage: "List applied and pending migrations",
 			Flags: []cli.Flag{
-				cli.BoolFlag{
+				&cli.BoolFlag{
 					Name:  "exit-code",
 					Usage: "return 1 if there are pending migrations",
 				},
-				cli.BoolFlag{
+				&cli.BoolFlag{
 					Name:  "quiet",
 					Usage: "don't output any text (implies --exit-code)",
 				},
@@ -201,11 +207,11 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 			return err
 		}
 		db := dbmate.New(u)
-		db.AutoDumpSchema = !c.GlobalBool("no-dump-schema")
-		db.MigrationsDir = c.GlobalString("migrations-dir")
-		db.SchemaFile = c.GlobalString("schema-file")
-		db.WaitBefore = c.GlobalBool("wait")
-		overrideTimeout := c.GlobalDuration("wait-timeout")
+		db.AutoDumpSchema = !c.Bool("no-dump-schema")
+		db.MigrationsDir = c.String("migrations-dir")
+		db.SchemaFile = c.String("schema-file")
+		db.WaitBefore = c.Bool("wait")
+		overrideTimeout := c.Duration("wait-timeout")
 		if overrideTimeout != 0 {
 			db.WaitTimeout = overrideTimeout
 		}
@@ -216,7 +222,7 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 
 // getDatabaseURL returns the current environment database url
 func getDatabaseURL(c *cli.Context) (u *url.URL, err error) {
-	env := c.GlobalString("env")
+	env := c.String("env")
 	value := os.Getenv(env)
 
 	return url.Parse(value)

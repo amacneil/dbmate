@@ -13,6 +13,6 @@ require (
 	github.com/lib/pq v1.5.2
 	github.com/mattn/go-sqlite3 v1.13.0
 	github.com/stretchr/testify v1.4.0
-	github.com/urfave/cli v1.22.4
+	github.com/urfave/cli/v2 v2.2.0
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 )
