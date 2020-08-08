@@ -9,10 +9,10 @@ install:
   - docker-compose build
   - docker-compose up -d
 script:
-  - docker-compose run --rm --volume "$PWD/dist:/src/dist" dbmate make build
+  - docker-compose run --rm --volume "$PWD/dist:/src/dist" dbmate make build-all
+  - docker-compose run --rm dbmate make lint
   - docker-compose run --rm dbmate make wait
   - docker-compose run --rm dbmate make test
-  - docker-compose run --rm dbmate make lint
   - docker build -t dbmate .
   - docker run --rm dbmate --help
 deploy:

@@ -1,7 +1,7 @@
 LDFLAGS := -ldflags '-s'
 
 .PHONY: all
-all: test lint build
+all: build lint test
 
 .PHONY: test
 test:
@@ -26,28 +26,28 @@ clean:
 	rm -rf dist/*
 
 .PHONY: build
-build: clean build-linux build-macos build-windows
+build: clean build-linux-amd64
 	ls -lh dist
 
-.PHONY: build-linux
-build-linux:
+.PHONY: build-linux-amd64
+build-linux-amd64:
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=1 \
 	     go build $(LDFLAGS) -o dist/dbmate-linux-amd64 .
+
+.PHONY: build-all
+build-all: clean build-linux-amd64
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 \
 	     go build $(LDFLAGS) -o dist/dbmate-linux-musl-amd64 .
-
-.PHONY: build-macos
-build-macos:
+	GOOS=linux GOARCH=arm64 CGO_ENABLED=1 CC=aarch64-linux-gnu-gcc-5 CXX=aarch64-linux-gnu-g++-5 \
+	     go build $(LDFLAGS) -o dist/dbmate-linux-arm64 .
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 CC=o64-clang CXX=o64-clang++ \
 	     go build $(LDFLAGS) -o dist/dbmate-macos-amd64 .
-
-.PHONY: build-windows
-build-windows:
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc-posix CXX=x86_64-w64-mingw32-g++-posix \
 	     go build $(LDFLAGS) -o dist/dbmate-windows-amd64.exe .
+	ls -lh dist
 
-.PHONY: docker-all
-docker-all:
+.PHONY: docker-make
+docker-make:
 	docker-compose build
 	docker-compose run --rm dbmate make
 

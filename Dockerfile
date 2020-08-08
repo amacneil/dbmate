@@ -28,7 +28,7 @@ RUN go mod download
 
 # build
 COPY . ./
-RUN make build-linux
+RUN make build
 
 # runtime image
 FROM gcr.io/distroless/base
