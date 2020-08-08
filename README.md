@@ -24,7 +24,7 @@ For a comparison between dbmate and other popular database schema migration tool
 
 ## Installation
 
-**OSX**
+**macOS**
 
 Install using Homebrew:
 
@@ -310,14 +310,15 @@ Please note that the `wait` command does not verify whether your specified datab
 
 ### Options
 
-The following command line options are available with all commands. You must use command line arguments in the order `dbmate [global options] command [command options]`.
+The following command line options are available with all commands. You must use command line arguments in the order `dbmate [global options] command [command options]`. Most options can also be configured via environment variables (and loaded from your `.env` file, which is helpful to share configuration between team members).
 
-* `--url, -u "protocol://host:port/dbname"` - specify the database url directly.
+* `--url, -u "protocol://host:port/dbname"` - specify the database url directly. _(env: `$DATABASE_URL`)_
 * `--env, -e "DATABASE_URL"` - specify an environment variable to read the database connection URL from.
-* `--migrations-dir, -d "./db/migrations"` - where to keep the migration files.
-* `--schema-file, -s "./db/schema.sql"` - a path to keep the schema.sql file.
-* `--no-dump-schema` - don't auto-update the schema.sql file on migrate/rollback
-* `--wait` - wait for the db to become available before executing the subsequent command
+* `--migrations-dir, -d "./db/migrations"` - where to keep the migration files. _(env: `$DBMATE_MIGRATIONS_DIR`)_
+* `--schema-file, -s "./db/schema.sql"` - a path to keep the schema.sql file. _(env: `$DBMATE_SCHEMA_FILE`)_
+* `--no-dump-schema` - don't auto-update the schema.sql file on migrate/rollback _(env: `$DBMATE_NO_DUMP_SCHEMA`)_
+* `--wait` - wait for the db to become available before executing the subsequent command _(env: `$DBMATE_WAIT`)_
+* `--wait-timeout 60s` - timeout for --wait flag _(env: `$DBMATE_WAIT_TIMEOUT`)_
 
 For example, before running your test suite, you may wish to drop and recreate the test database. One easy way to do this is to store your test database connection URL in the `TEST_DATABASE_URL` environment variable:
 
