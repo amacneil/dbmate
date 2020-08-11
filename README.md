@@ -337,12 +337,6 @@ $ dbmate -u "postgres://postgres@127.0.0.1:5432/myapp_test?sslmode=disable" up
 
 The only advantage of using `dbmate -e TEST_DATABASE_URL` over `dbmate -u $TEST_DATABASE_URL` is that the former takes advantage of dbmate's automatic `.env` file loading.
 
-## FAQ
-
-**How do I use dbmate under Alpine linux?**
-
-Alpine linux uses [musl libc](https://www.musl-libc.org/), which is incompatible with how we build SQLite support (using [cgo](https://golang.org/cmd/cgo/)). If you want Alpine linux support, and don't mind sacrificing SQLite support, please use the `dbmate-linux-musl-amd64` build found on the [releases page](https://github.com/amacneil/dbmate/releases).
-
 ## Alternatives
 
 Why another database schema migration tool? Dbmate was inspired by many other tools, primarily [Active Record Migrations](http://guides.rubyonrails.org/active_record_migrations.html), with the goals of being trivial to configure, and language & framework independent. Here is a comparison between dbmate and other popular migration tools.

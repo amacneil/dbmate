@@ -1,8 +1,6 @@
 # build image
 FROM techknowlogick/xgo:go-1.14.x as build
 WORKDIR /src
-ENTRYPOINT []
-CMD ["/bin/bash"]
 
 # enable cgo to build sqlite
 ENV CGO_ENABLED 1
@@ -30,7 +28,10 @@ RUN go mod download
 COPY . ./
 RUN make build
 
+ENTRYPOINT []
+CMD ["/bin/bash"]
+
 # runtime image
-FROM gcr.io/distroless/base
+FROM scratch
 COPY --from=build /src/dist/dbmate-linux-amd64 /dbmate
 ENTRYPOINT ["/dbmate"]
