@@ -32,6 +32,10 @@ ENTRYPOINT []
 CMD ["/bin/bash"]
 
 # runtime image
-FROM scratch
-COPY --from=build /src/dist/dbmate-linux-amd64 /dbmate
-ENTRYPOINT ["/dbmate"]
+FROM alpine
+RUN apk add --no-cache \
+        mariadb-client \
+        postgresql-client \
+        sqlite
+COPY --from=build /src/dist/dbmate-linux-amd64 /usr/local/bin/dbmate
+ENTRYPOINT ["dbmate"]
