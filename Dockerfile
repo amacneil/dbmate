@@ -1,5 +1,5 @@
 # build image
-FROM techknowlogick/xgo:go-1.14.x as build
+FROM techknowlogick/xgo:go-1.15.x as build
 WORKDIR /src
 
 # enable cgo to build sqlite
@@ -17,7 +17,7 @@ RUN apt-get update \
 # golangci-lint
 RUN curl -fsSL -o /tmp/lint-install.sh https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
 	&& chmod +x /tmp/lint-install.sh \
-	&& /tmp/lint-install.sh -b /usr/local/bin v1.30.0 \
+	&& /tmp/lint-install.sh -b /usr/local/bin v1.31.0 \
 	&& rm -f /tmp/lint-install.sh
 
 # download modules
