@@ -5,6 +5,7 @@ linters:
     - depguard
     - errcheck
     - goimports
+    - golint
     - gosimple
     - govet
     - ineffassign
