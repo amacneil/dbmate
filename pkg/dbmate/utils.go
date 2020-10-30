@@ -129,9 +129,9 @@ func queryColumn(db *sql.DB, query string) ([]string, error) {
 }
 
 func printVerbose(result sql.Result) {
-	lastInsertId, err := result.LastInsertId()
+	lastInsertID, err := result.LastInsertId()
 	if err == nil {
-		fmt.Printf("Last insert ID: %d\n", lastInsertId)
+		fmt.Printf("Last insert ID: %d\n", lastInsertID)
 	}
 	rowsAffected, err := result.RowsAffected()
 	if err == nil {

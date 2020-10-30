@@ -341,7 +341,7 @@ func TestRollback(t *testing.T) {
 	}
 }
 
-func testStatusUrl(t *testing.T, u *url.URL) {
+func testStatusURL(t *testing.T, u *url.URL) {
 	db := newTestDB(t, u)
 
 	// drop, recreate, and migrate database
@@ -387,6 +387,6 @@ func testStatusUrl(t *testing.T, u *url.URL) {
 
 func TestStatus(t *testing.T) {
 	for _, u := range testURLs(t) {
-		testStatusUrl(t, u)
+		testStatusURL(t, u)
 	}
 }
