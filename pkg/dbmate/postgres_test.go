@@ -15,9 +15,8 @@ func postgresTestURL(t *testing.T) *url.URL {
 	return u
 }
 
-func prepTestPostgresDB(t *testing.T) *sql.DB {
+func prepTestPostgresDB(t *testing.T, u *url.URL) *sql.DB {
 	drv := PostgresDriver{}
-	u := postgresTestURL(t)
 
 	// drop any existing database
 	err := drv.DropDatabase(u)
@@ -130,7 +129,7 @@ func TestPostgresDumpSchema(t *testing.T) {
 	u := postgresTestURL(t)
 
 	// prepare database
-	db := prepTestPostgresDB(t)
+	db := prepTestPostgresDB(t, u)
 	defer mustClose(db)
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
@@ -198,7 +197,8 @@ func TestPostgresDatabaseExists_Error(t *testing.T) {
 
 func TestPostgresCreateMigrationsTable(t *testing.T) {
 	drv := PostgresDriver{}
-	db := prepTestPostgresDB(t)
+	u := postgresTestURL(t)
+	db := prepTestPostgresDB(t, u)
 	defer mustClose(db)
 
 	// migrations table should not exist
@@ -221,7 +221,8 @@ func TestPostgresCreateMigrationsTable(t *testing.T) {
 
 func TestPostgresSelectMigrations(t *testing.T) {
 	drv := PostgresDriver{}
-	db := prepTestPostgresDB(t)
+	u := postgresTestURL(t)
+	db := prepTestPostgresDB(t, u)
 	defer mustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
@@ -247,7 +248,8 @@ func TestPostgresSelectMigrations(t *testing.T) {
 
 func TestPostgresInsertMigration(t *testing.T) {
 	drv := PostgresDriver{}
-	db := prepTestPostgresDB(t)
+	u := postgresTestURL(t)
+	db := prepTestPostgresDB(t, u)
 	defer mustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
@@ -270,7 +272,8 @@ func TestPostgresInsertMigration(t *testing.T) {
 
 func TestPostgresDeleteMigration(t *testing.T) {
 	drv := PostgresDriver{}
-	db := prepTestPostgresDB(t)
+	u := postgresTestURL(t)
+	db := prepTestPostgresDB(t, u)
 	defer mustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
@@ -306,4 +309,57 @@ func TestPostgresPing(t *testing.T) {
 	err = drv.Ping(u)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "connect: connection refused")
+}
+
+func TestMigrationsTableName(t *testing.T) {
+	drv := PostgresDriver{}
+
+	t.Run("default schema", func(t *testing.T) {
+		u := postgresTestURL(t)
+		db := prepTestPostgresDB(t, u)
+		defer mustClose(db)
+
+		name, err := drv.migrationsTableName(db)
+		require.NoError(t, err)
+		require.Equal(t, "public.schema_migrations", name)
+	})
+
+	t.Run("custom schema", func(t *testing.T) {
+		u, err := url.Parse(postgresTestURL(t).String() + "&search_path=foo,bar,public")
+		require.NoError(t, err)
+		db := prepTestPostgresDB(t, u)
+		defer mustClose(db)
+		defer func() {
+			_, _ = db.Exec("drop schema if exists foo")
+		}()
+
+		// if "foo" schema does not exist, current schema should be "public"
+		_, err = db.Exec("drop schema if exists foo")
+		require.NoError(t, err)
+		name, err := drv.migrationsTableName(db)
+		require.NoError(t, err)
+		require.Equal(t, "public.schema_migrations", name)
+
+		// if "foo" schema exists, it should be used
+		_, err = db.Exec("create schema foo")
+		require.NoError(t, err)
+		name, err = drv.migrationsTableName(db)
+		require.NoError(t, err)
+		require.Equal(t, "foo.schema_migrations", name)
+	})
+
+	t.Run("no schema", func(t *testing.T) {
+		u := postgresTestURL(t)
+		db := prepTestPostgresDB(t, u)
+		defer mustClose(db)
+
+		// this is an unlikely edge case, but if for some reason there is
+		// no current schema then we should default to "public"
+		_, err := db.Exec("select pg_catalog.set_config('search_path', '', false)")
+		require.NoError(t, err)
+
+		name, err := drv.migrationsTableName(db)
+		require.NoError(t, err)
+		require.Equal(t, "public.schema_migrations", name)
+	})
 }

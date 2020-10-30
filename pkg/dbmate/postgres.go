@@ -125,20 +125,25 @@ func (drv PostgresDriver) DropDatabase(u *url.URL) error {
 	return err
 }
 
-func postgresSchemaMigrationsDump(db *sql.DB) ([]byte, error) {
-	// load applied migrations
-	migrations, err := queryColumn(db,
-		"select quote_literal(version) from public.schema_migrations order by version asc")
+func (drv PostgresDriver) postgresSchemaMigrationsDump(db *sql.DB) ([]byte, error) {
+	migrationsTable, err := drv.migrationsTableName(db)
 	if err != nil {
 		return nil, err
 	}
 
-	// build schema_migrations table data
+	// load applied migrations
+	migrations, err := queryColumn(db,
+		"select quote_literal(version) from "+migrationsTable+" order by version asc")
+	if err != nil {
+		return nil, err
+	}
+
+	// build migrations table data
 	var buf bytes.Buffer
 	buf.WriteString("\n--\n-- Dbmate schema migrations\n--\n\n")
 
 	if len(migrations) > 0 {
-		buf.WriteString("INSERT INTO public.schema_migrations (version) VALUES\n    (" +
+		buf.WriteString("INSERT INTO " + migrationsTable + " (version) VALUES\n    (" +
 			strings.Join(migrations, "),\n    (") +
 			");\n")
 	}
@@ -156,7 +161,7 @@ func (drv PostgresDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
 		return nil, err
 	}
 
-	migrations, err := postgresSchemaMigrationsDump(db)
+	migrations, err := drv.postgresSchemaMigrationsDump(db)
 	if err != nil {
 		return nil, err
 	}
@@ -187,8 +192,13 @@ func (drv PostgresDriver) DatabaseExists(u *url.URL) (bool, error) {
 
 // CreateMigrationsTable creates the schema_migrations table
 func (drv PostgresDriver) CreateMigrationsTable(db *sql.DB) error {
-	_, err := db.Exec("create table if not exists public.schema_migrations " +
-		"(version varchar(255) primary key)")
+	migrationsTable, err := drv.migrationsTableName(db)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("create table if not exists " + migrationsTable +
+		" (version varchar(255) primary key)")
 
 	return err
 }
@@ -196,7 +206,12 @@ func (drv PostgresDriver) CreateMigrationsTable(db *sql.DB) error {
 // SelectMigrations returns a list of applied migrations
 // with an optional limit (in descending order)
 func (drv PostgresDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
-	query := "select version from public.schema_migrations order by version desc"
+	migrationsTable, err := drv.migrationsTableName(db)
+	if err != nil {
+		return nil, err
+	}
+
+	query := "select version from " + migrationsTable + " order by version desc"
 	if limit >= 0 {
 		query = fmt.Sprintf("%s limit %d", query, limit)
 	}
@@ -222,14 +237,24 @@ func (drv PostgresDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bo
 
 // InsertMigration adds a new migration record
 func (drv PostgresDriver) InsertMigration(db Transaction, version string) error {
-	_, err := db.Exec("insert into public.schema_migrations (version) values ($1)", version)
+	migrationsTable, err := drv.migrationsTableName(db)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("insert into "+migrationsTable+" (version) values ($1)", version)
 
 	return err
 }
 
 // DeleteMigration removes a migration record
 func (drv PostgresDriver) DeleteMigration(db Transaction, version string) error {
-	_, err := db.Exec("delete from public.schema_migrations where version = $1", version)
+	migrationsTable, err := drv.migrationsTableName(db)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("delete from "+migrationsTable+" where version = $1", version)
 
 	return err
 }
@@ -258,4 +283,18 @@ func (drv PostgresDriver) Ping(u *url.URL) error {
 	}
 
 	return err
+}
+
+func (drv PostgresDriver) migrationsTableName(db Transaction) (string, error) {
+	// get current schema
+	schema, err := queryRow(db, "select quote_ident(current_schema())")
+	if err != nil {
+		return "", err
+	}
+
+	if schema == "" {
+		schema = "public"
+	}
+
+	return schema + ".schema_migrations", nil
 }
