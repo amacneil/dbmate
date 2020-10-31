@@ -252,7 +252,7 @@ func (db *DB) openDatabaseForMigration() (Driver, *sql.DB, error) {
 		return nil, nil, err
 	}
 
-	if err := drv.CreateMigrationsTable(sqlDB); err != nil {
+	if err := drv.CreateMigrationsTable(db.DatabaseURL, sqlDB); err != nil {
 		mustClose(sqlDB)
 		return nil, nil, err
 	}

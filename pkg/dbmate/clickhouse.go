@@ -206,7 +206,7 @@ func (drv ClickHouseDriver) DatabaseExists(u *url.URL) (bool, error) {
 }
 
 // CreateMigrationsTable creates the schema_migrations table
-func (drv ClickHouseDriver) CreateMigrationsTable(db *sql.DB) error {
+func (drv ClickHouseDriver) CreateMigrationsTable(u *url.URL, db *sql.DB) error {
 	_, err := db.Exec(`
 		create table if not exists schema_migrations (
 			version String,

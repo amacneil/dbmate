@@ -15,9 +15,8 @@ func mySQLTestURL(t *testing.T) *url.URL {
 	return u
 }
 
-func prepTestMySQLDB(t *testing.T) *sql.DB {
+func prepTestMySQLDB(t *testing.T, u *url.URL) *sql.DB {
 	drv := MySQLDriver{}
-	u := mySQLTestURL(t)
 
 	// drop any existing database
 	err := drv.DropDatabase(u)
@@ -121,9 +120,9 @@ func TestMySQLDumpSchema(t *testing.T) {
 	u := mySQLTestURL(t)
 
 	// prepare database
-	db := prepTestMySQLDB(t)
+	db := prepTestMySQLDB(t, u)
 	defer mustClose(db)
-	err := drv.CreateMigrationsTable(db)
+	err := drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
 	// insert migration
@@ -191,7 +190,8 @@ func TestMySQLDatabaseExists_Error(t *testing.T) {
 
 func TestMySQLCreateMigrationsTable(t *testing.T) {
 	drv := MySQLDriver{}
-	db := prepTestMySQLDB(t)
+	u := mySQLTestURL(t)
+	db := prepTestMySQLDB(t, u)
 	defer mustClose(db)
 
 	// migrations table should not exist
@@ -200,7 +200,7 @@ func TestMySQLCreateMigrationsTable(t *testing.T) {
 	require.Regexp(t, "Table 'dbmate.schema_migrations' doesn't exist", err.Error())
 
 	// create table
-	err = drv.CreateMigrationsTable(db)
+	err = drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
 	// migrations table should exist
@@ -208,16 +208,17 @@ func TestMySQLCreateMigrationsTable(t *testing.T) {
 	require.NoError(t, err)
 
 	// create table should be idempotent
-	err = drv.CreateMigrationsTable(db)
+	err = drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 }
 
 func TestMySQLSelectMigrations(t *testing.T) {
 	drv := MySQLDriver{}
-	db := prepTestMySQLDB(t)
+	u := mySQLTestURL(t)
+	db := prepTestMySQLDB(t, u)
 	defer mustClose(db)
 
-	err := drv.CreateMigrationsTable(db)
+	err := drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
 	_, err = db.Exec(`insert into schema_migrations (version)
@@ -240,10 +241,11 @@ func TestMySQLSelectMigrations(t *testing.T) {
 
 func TestMySQLInsertMigration(t *testing.T) {
 	drv := MySQLDriver{}
-	db := prepTestMySQLDB(t)
+	u := mySQLTestURL(t)
+	db := prepTestMySQLDB(t, u)
 	defer mustClose(db)
 
-	err := drv.CreateMigrationsTable(db)
+	err := drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
 	count := 0
@@ -263,10 +265,11 @@ func TestMySQLInsertMigration(t *testing.T) {
 
 func TestMySQLDeleteMigration(t *testing.T) {
 	drv := MySQLDriver{}
-	db := prepTestMySQLDB(t)
+	u := mySQLTestURL(t)
+	db := prepTestMySQLDB(t, u)
 	defer mustClose(db)
 
-	err := drv.CreateMigrationsTable(db)
+	err := drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
 	_, err = db.Exec(`insert into schema_migrations (version)

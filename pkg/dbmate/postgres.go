@@ -191,7 +191,7 @@ func (drv PostgresDriver) DatabaseExists(u *url.URL) (bool, error) {
 }
 
 // CreateMigrationsTable creates the schema_migrations table
-func (drv PostgresDriver) CreateMigrationsTable(db *sql.DB) error {
+func (drv PostgresDriver) CreateMigrationsTable(u *url.URL, db *sql.DB) error {
 	migrationsTable, err := drv.migrationsTableName(db)
 	if err != nil {
 		return err

@@ -131,7 +131,7 @@ func TestPostgresDumpSchema(t *testing.T) {
 	// prepare database
 	db := prepTestPostgresDB(t, u)
 	defer mustClose(db)
-	err := drv.CreateMigrationsTable(db)
+	err := drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
 	// insert migration
@@ -207,7 +207,7 @@ func TestPostgresCreateMigrationsTable(t *testing.T) {
 	require.Equal(t, "pq: relation \"public.schema_migrations\" does not exist", err.Error())
 
 	// create table
-	err = drv.CreateMigrationsTable(db)
+	err = drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
 	// migrations table should exist
@@ -215,7 +215,7 @@ func TestPostgresCreateMigrationsTable(t *testing.T) {
 	require.NoError(t, err)
 
 	// create table should be idempotent
-	err = drv.CreateMigrationsTable(db)
+	err = drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 }
 
@@ -225,7 +225,7 @@ func TestPostgresSelectMigrations(t *testing.T) {
 	db := prepTestPostgresDB(t, u)
 	defer mustClose(db)
 
-	err := drv.CreateMigrationsTable(db)
+	err := drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
 	_, err = db.Exec(`insert into public.schema_migrations (version)
@@ -252,7 +252,7 @@ func TestPostgresInsertMigration(t *testing.T) {
 	db := prepTestPostgresDB(t, u)
 	defer mustClose(db)
 
-	err := drv.CreateMigrationsTable(db)
+	err := drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
 	count := 0
@@ -276,7 +276,7 @@ func TestPostgresDeleteMigration(t *testing.T) {
 	db := prepTestPostgresDB(t, u)
 	defer mustClose(db)
 
-	err := drv.CreateMigrationsTable(db)
+	err := drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
 	_, err = db.Exec(`insert into public.schema_migrations (version)
