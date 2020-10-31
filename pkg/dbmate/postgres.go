@@ -258,6 +258,10 @@ func (drv PostgresDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bo
 		migrations[version] = true
 	}
 
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return migrations, nil
 }
 
