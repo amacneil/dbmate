@@ -30,12 +30,6 @@ func normalizePostgresURL(u *url.URL) *url.URL {
 		query.Del("socket")
 	}
 
-	// support schema parameter
-	if query.Get("schema") != "" {
-		query.Set("search_path", query.Get("schema"))
-		query.Del("schema")
-	}
-
 	// default hostname
 	if hostname == "" {
 		hostname = "localhost"
@@ -298,6 +292,7 @@ func (drv PostgresDriver) migrationsTableName(db Transaction) (string, error) {
 		return "", err
 	}
 
+	// if the search path is empty, or does not contain a valid schema, default to public
 	if schema == "" {
 		schema = "public"
 	}

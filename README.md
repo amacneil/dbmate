@@ -139,11 +139,15 @@ A `socket` or `host` parameter can be specified to connect through a unix socket
 DATABASE_URL="postgres://username:password@/database_name?socket=/var/run/postgresql"
 ```
 
-A `schema` or `search_path` parameter can be specified, which will be used as the current schema while applying migrations,
-as well as the schema for dbmate's `schema_migrations` table.
+A `search_path` parameter can be used to specify the [current schema](https://www.postgresql.org/docs/13/ddl-schemas.html#DDL-SCHEMAS-PATH) while applying migrations, as well as for dbmate's `schema_migrations` table.
+If multiple comma-separated schemas are passed, the first will be used for the `schema_migrations` table.
 
 ```sh
-DATABASE_URL="postgres://username:password@127.0.0.1:5432/database_name?schema=myschema"
+DATABASE_URL="postgres://username:password@127.0.0.1:5432/database_name?search_path=myschema"
+```
+
+```sh
+DATABASE_URL="postgres://username:password@127.0.0.1:5432/database_name?search_path=myschema,public"
 ```
 
 **SQLite**

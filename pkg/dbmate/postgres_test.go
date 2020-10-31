@@ -45,8 +45,6 @@ func TestNormalizePostgresURL(t *testing.T) {
 		// support `host` and `port` via url params
 		{"postgres://bob:secret@myhost:1234/foo?host=new&port=9999", "postgres://bob:secret@:9999/foo?host=new"},
 		{"postgres://bob:secret@myhost:1234/foo?port=9999&bar=baz", "postgres://bob:secret@myhost:9999/foo?bar=baz"},
-		// support schema param
-		{"postgres://myhost:1234/foo?schema=foo", "postgres://myhost:1234/foo?search_path=foo"},
 		// support unix sockets via `host` or `socket` param
 		{"postgres://bob:secret@myhost:1234/foo?host=/var/run/postgresql", "postgres://bob:secret@:1234/foo?host=%2Fvar%2Frun%2Fpostgresql"},
 		{"postgres://bob:secret@localhost/foo?socket=/var/run/postgresql", "postgres://bob:secret@:5432/foo?host=%2Fvar%2Frun%2Fpostgresql"},
@@ -331,12 +329,11 @@ func TestMigrationsTableName(t *testing.T) {
 		require.NoError(t, err)
 		db := prepTestPostgresDB(t, u)
 		defer mustClose(db)
-		defer func() {
-			_, _ = db.Exec("drop schema if exists foo")
-		}()
 
 		// if "foo" schema does not exist, current schema should be "public"
 		_, err = db.Exec("drop schema if exists foo")
+		require.NoError(t, err)
+		_, err = db.Exec("drop schema if exists bar")
 		require.NoError(t, err)
 		name, err := drv.migrationsTableName(db)
 		require.NoError(t, err)
