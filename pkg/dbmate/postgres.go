@@ -19,7 +19,7 @@ func init() {
 type PostgresDriver struct {
 }
 
-func normalizePostgresURL(u *url.URL) string {
+func normalizePostgresURL(u *url.URL) *url.URL {
 	hostname := u.Hostname()
 	port := u.Port()
 	query := u.Query()
@@ -54,12 +54,33 @@ func normalizePostgresURL(u *url.URL) string {
 	out.Host = fmt.Sprintf("%s:%s", hostname, port)
 	out.RawQuery = query.Encode()
 
-	return out.String()
+	return out
+}
+
+func normalizePostgresURLForDump(u *url.URL) []string {
+	u = normalizePostgresURL(u)
+
+	// find schemas from search_path
+	query := u.Query()
+	schemas := strings.Split(query.Get("search_path"), ",")
+	query.Del("search_path")
+	u.RawQuery = query.Encode()
+
+	out := []string{}
+	for _, schema := range schemas {
+		schema = strings.TrimSpace(schema)
+		if schema != "" {
+			out = append(out, "--schema", schema)
+		}
+	}
+	out = append(out, u.String())
+
+	return out
 }
 
 // Open creates a new database connection
 func (drv PostgresDriver) Open(u *url.URL) (*sql.DB, error) {
-	return sql.Open("postgres", normalizePostgresURL(u))
+	return sql.Open("postgres", normalizePostgresURL(u).String())
 }
 
 func (drv PostgresDriver) openPostgresDB(u *url.URL) (*sql.DB, error) {
@@ -128,8 +149,9 @@ func postgresSchemaMigrationsDump(db *sql.DB) ([]byte, error) {
 // DumpSchema returns the current database schema
 func (drv PostgresDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
 	// load schema
-	schema, err := runCommand("pg_dump", "--format=plain", "--encoding=UTF8",
-		"--schema-only", "--no-privileges", "--no-owner", normalizePostgresURL(u))
+	args := append([]string{"--format=plain", "--encoding=UTF8", "--schema-only",
+		"--no-privileges", "--no-owner"}, normalizePostgresURLForDump(u)...)
+	schema, err := runCommand("pg_dump", args...)
 	if err != nil {
 		return nil, err
 	}
