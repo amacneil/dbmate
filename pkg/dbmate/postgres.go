@@ -30,6 +30,12 @@ func normalizePostgresURL(u *url.URL) *url.URL {
 		query.Del("socket")
 	}
 
+	// support schema parameter
+	if query.Get("schema") != "" {
+		query.Set("search_path", query.Get("schema"))
+		query.Del("schema")
+	}
+
 	// default hostname
 	if hostname == "" {
 		hostname = "localhost"
