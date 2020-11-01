@@ -148,6 +148,10 @@ func (drv SQLiteDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool
 		migrations[version] = true
 	}
 
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return migrations, nil
 }
 

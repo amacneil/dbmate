@@ -243,6 +243,10 @@ func (drv ClickHouseDriver) SelectMigrations(db *sql.DB, limit int) (map[string]
 		migrations[version] = true
 	}
 
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return migrations, nil
 }
 
