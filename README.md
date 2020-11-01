@@ -139,6 +139,17 @@ A `socket` or `host` parameter can be specified to connect through a unix socket
 DATABASE_URL="postgres://username:password@/database_name?socket=/var/run/postgresql"
 ```
 
+A `search_path` parameter can be used to specify the [current schema](https://www.postgresql.org/docs/13/ddl-schemas.html#DDL-SCHEMAS-PATH) while applying migrations, as well as for dbmate's `schema_migrations` table.
+If multiple comma-separated schemas are passed, the first will be used for the `schema_migrations` table.
+
+```sh
+DATABASE_URL="postgres://username:password@127.0.0.1:5432/database_name?search_path=myschema"
+```
+
+```sh
+DATABASE_URL="postgres://username:password@127.0.0.1:5432/database_name?search_path=myschema,public"
+```
+
 **SQLite**
 
 SQLite databases are stored on the filesystem, so you do not need to specify a host. By default, files are relative to the current directory. For example, the following will create a database at `./db/database_name.sqlite3`:
