@@ -1,7 +1,0 @@
-# this file is used to mount the current directory as a volume
-# we remove it in CI to use files inside the container only
-version: '2.3'
-services:
-  dbmate:
-    volumes:
-      - .:/src
