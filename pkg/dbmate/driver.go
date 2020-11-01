@@ -13,7 +13,7 @@ type Driver interface {
 	CreateDatabase(*url.URL) error
 	DropDatabase(*url.URL) error
 	DumpSchema(*url.URL, *sql.DB) ([]byte, error)
-	CreateMigrationsTable(*sql.DB) error
+	CreateMigrationsTable(*url.URL, *sql.DB) error
 	SelectMigrations(*sql.DB, int) (map[string]bool, error)
 	InsertMigration(Transaction, string) error
 	DeleteMigration(Transaction, string) error

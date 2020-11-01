@@ -15,9 +15,8 @@ func clickhouseTestURL(t *testing.T) *url.URL {
 	return u
 }
 
-func prepTestClickHouseDB(t *testing.T) *sql.DB {
+func prepTestClickHouseDB(t *testing.T, u *url.URL) *sql.DB {
 	drv := ClickHouseDriver{}
-	u := clickhouseTestURL(t)
 
 	// drop any existing database
 	err := drv.DropDatabase(u)
@@ -92,9 +91,9 @@ func TestClickHouseDumpSchema(t *testing.T) {
 	u := clickhouseTestURL(t)
 
 	// prepare database
-	db := prepTestClickHouseDB(t)
+	db := prepTestClickHouseDB(t, u)
 	defer mustClose(db)
-	err := drv.CreateMigrationsTable(db)
+	err := drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
 	// insert migration
@@ -171,7 +170,8 @@ func TestClickHouseDatabaseExists_Error(t *testing.T) {
 
 func TestClickHouseCreateMigrationsTable(t *testing.T) {
 	drv := ClickHouseDriver{}
-	db := prepTestClickHouseDB(t)
+	u := clickhouseTestURL(t)
+	db := prepTestClickHouseDB(t, u)
 	defer mustClose(db)
 
 	// migrations table should not exist
@@ -180,7 +180,7 @@ func TestClickHouseCreateMigrationsTable(t *testing.T) {
 	require.EqualError(t, err, "code: 60, message: Table dbmate.schema_migrations doesn't exist.")
 
 	// create table
-	err = drv.CreateMigrationsTable(db)
+	err = drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
 	// migrations table should exist
@@ -188,16 +188,17 @@ func TestClickHouseCreateMigrationsTable(t *testing.T) {
 	require.NoError(t, err)
 
 	// create table should be idempotent
-	err = drv.CreateMigrationsTable(db)
+	err = drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 }
 
 func TestClickHouseSelectMigrations(t *testing.T) {
 	drv := ClickHouseDriver{}
-	db := prepTestClickHouseDB(t)
+	u := clickhouseTestURL(t)
+	db := prepTestClickHouseDB(t, u)
 	defer mustClose(db)
 
-	err := drv.CreateMigrationsTable(db)
+	err := drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
 	tx, err := db.Begin()
@@ -229,10 +230,11 @@ func TestClickHouseSelectMigrations(t *testing.T) {
 
 func TestClickHouseInsertMigration(t *testing.T) {
 	drv := ClickHouseDriver{}
-	db := prepTestClickHouseDB(t)
+	u := clickhouseTestURL(t)
+	db := prepTestClickHouseDB(t, u)
 	defer mustClose(db)
 
-	err := drv.CreateMigrationsTable(db)
+	err := drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
 	count := 0
@@ -255,10 +257,11 @@ func TestClickHouseInsertMigration(t *testing.T) {
 
 func TestClickHouseDeleteMigration(t *testing.T) {
 	drv := ClickHouseDriver{}
-	db := prepTestClickHouseDB(t)
+	u := clickhouseTestURL(t)
+	db := prepTestClickHouseDB(t, u)
 	defer mustClose(db)
 
-	err := drv.CreateMigrationsTable(db)
+	err := drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
 	tx, err := db.Begin()

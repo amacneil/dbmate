@@ -140,7 +140,7 @@ DATABASE_URL="postgres://username:password@/database_name?socket=/var/run/postgr
 ```
 
 A `search_path` parameter can be used to specify the [current schema](https://www.postgresql.org/docs/13/ddl-schemas.html#DDL-SCHEMAS-PATH) while applying migrations, as well as for dbmate's `schema_migrations` table.
-If multiple comma-separated schemas are passed, the first will be used for the `schema_migrations` table.
+If the schema does not exist, it will be created automatically. If multiple comma-separated schemas are passed, the first will be used for the `schema_migrations` table.
 
 ```sh
 DATABASE_URL="postgres://username:password@127.0.0.1:5432/database_name?search_path=myschema"

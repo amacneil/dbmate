@@ -191,7 +191,33 @@ func (drv PostgresDriver) DatabaseExists(u *url.URL) (bool, error) {
 }
 
 // CreateMigrationsTable creates the schema_migrations table
-func (drv PostgresDriver) CreateMigrationsTable(db *sql.DB) error {
+func (drv PostgresDriver) CreateMigrationsTable(u *url.URL, db *sql.DB) error {
+	// get schema from URL search_path param
+	searchPath := strings.Split(u.Query().Get("search_path"), ",")
+	urlSchema := strings.TrimSpace(searchPath[0])
+	if urlSchema == "" {
+		urlSchema = "public"
+	}
+
+	// get *unquoted* current schema from database
+	dbSchema, err := queryRow(db, "select current_schema()")
+	if err != nil {
+		return err
+	}
+
+	// if urlSchema and dbSchema are not equal, the most likely explanation is that the schema
+	// has not yet been created
+	if urlSchema != dbSchema {
+		// in theory we could just execute this statement every time, but we do the comparison
+		// above in case the user doesn't have permissions to create schemas and the schema
+		// already exists
+		fmt.Printf("Creating schema: %s\n", urlSchema)
+		_, err = db.Exec("create schema if not exists " + pq.QuoteIdentifier(urlSchema))
+		if err != nil {
+			return err
+		}
+	}
+
 	migrationsTable, err := drv.migrationsTableName(db)
 	if err != nil {
 		return err

@@ -192,7 +192,7 @@ func (drv MySQLDriver) DatabaseExists(u *url.URL) (bool, error) {
 }
 
 // CreateMigrationsTable creates the schema_migrations table
-func (drv MySQLDriver) CreateMigrationsTable(db *sql.DB) error {
+func (drv MySQLDriver) CreateMigrationsTable(u *url.URL, db *sql.DB) error {
 	_, err := db.Exec("create table if not exists schema_migrations " +
 		"(version varchar(255) primary key)")
 

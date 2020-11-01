@@ -18,9 +18,8 @@ func sqliteTestURL(t *testing.T) *url.URL {
 	return u
 }
 
-func prepTestSQLiteDB(t *testing.T) *sql.DB {
+func prepTestSQLiteDB(t *testing.T, u *url.URL) *sql.DB {
 	drv := SQLiteDriver{}
-	u := sqliteTestURL(t)
 
 	// drop any existing database
 	err := drv.DropDatabase(u)
@@ -69,9 +68,9 @@ func TestSQLiteDumpSchema(t *testing.T) {
 	u := sqliteTestURL(t)
 
 	// prepare database
-	db := prepTestSQLiteDB(t)
+	db := prepTestSQLiteDB(t, u)
 	defer mustClose(db)
-	err := drv.CreateMigrationsTable(db)
+	err := drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
 	// insert migration
@@ -122,7 +121,8 @@ func TestSQLiteDatabaseExists(t *testing.T) {
 
 func TestSQLiteCreateMigrationsTable(t *testing.T) {
 	drv := SQLiteDriver{}
-	db := prepTestSQLiteDB(t)
+	u := sqliteTestURL(t)
+	db := prepTestSQLiteDB(t, u)
 	defer mustClose(db)
 
 	// migrations table should not exist
@@ -131,7 +131,7 @@ func TestSQLiteCreateMigrationsTable(t *testing.T) {
 	require.Regexp(t, "no such table: schema_migrations", err.Error())
 
 	// create table
-	err = drv.CreateMigrationsTable(db)
+	err = drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
 	// migrations table should exist
@@ -139,16 +139,17 @@ func TestSQLiteCreateMigrationsTable(t *testing.T) {
 	require.NoError(t, err)
 
 	// create table should be idempotent
-	err = drv.CreateMigrationsTable(db)
+	err = drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 }
 
 func TestSQLiteSelectMigrations(t *testing.T) {
 	drv := SQLiteDriver{}
-	db := prepTestSQLiteDB(t)
+	u := sqliteTestURL(t)
+	db := prepTestSQLiteDB(t, u)
 	defer mustClose(db)
 
-	err := drv.CreateMigrationsTable(db)
+	err := drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
 	_, err = db.Exec(`insert into schema_migrations (version)
@@ -171,10 +172,11 @@ func TestSQLiteSelectMigrations(t *testing.T) {
 
 func TestSQLiteInsertMigration(t *testing.T) {
 	drv := SQLiteDriver{}
-	db := prepTestSQLiteDB(t)
+	u := sqliteTestURL(t)
+	db := prepTestSQLiteDB(t, u)
 	defer mustClose(db)
 
-	err := drv.CreateMigrationsTable(db)
+	err := drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
 	count := 0
@@ -194,10 +196,11 @@ func TestSQLiteInsertMigration(t *testing.T) {
 
 func TestSQLiteDeleteMigration(t *testing.T) {
 	drv := SQLiteDriver{}
-	db := prepTestSQLiteDB(t)
+	u := sqliteTestURL(t)
+	db := prepTestSQLiteDB(t, u)
 	defer mustClose(db)
 
-	err := drv.CreateMigrationsTable(db)
+	err := drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
 	_, err = db.Exec(`insert into schema_migrations (version)

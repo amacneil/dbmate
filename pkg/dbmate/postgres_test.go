@@ -119,7 +119,7 @@ func TestPostgresCreateDropDatabase(t *testing.T) {
 		defer mustClose(db)
 
 		err = db.Ping()
-		require.NotNil(t, err)
+		require.Error(t, err)
 		require.Equal(t, "pq: database \"dbmate\" does not exist", err.Error())
 	}()
 }
@@ -131,7 +131,7 @@ func TestPostgresDumpSchema(t *testing.T) {
 	// prepare database
 	db := prepTestPostgresDB(t, u)
 	defer mustClose(db)
-	err := drv.CreateMigrationsTable(db)
+	err := drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
 	// insert migration
@@ -191,32 +191,76 @@ func TestPostgresDatabaseExists_Error(t *testing.T) {
 	u.User = url.User("invalid")
 
 	exists, err := drv.DatabaseExists(u)
+	require.Error(t, err)
 	require.Equal(t, "pq: password authentication failed for user \"invalid\"", err.Error())
 	require.Equal(t, false, exists)
 }
 
 func TestPostgresCreateMigrationsTable(t *testing.T) {
 	drv := PostgresDriver{}
-	u := postgresTestURL(t)
-	db := prepTestPostgresDB(t, u)
-	defer mustClose(db)
 
-	// migrations table should not exist
-	count := 0
-	err := db.QueryRow("select count(*) from public.schema_migrations").Scan(&count)
-	require.Equal(t, "pq: relation \"public.schema_migrations\" does not exist", err.Error())
+	t.Run("default schema", func(t *testing.T) {
+		u := postgresTestURL(t)
+		db := prepTestPostgresDB(t, u)
+		defer mustClose(db)
 
-	// create table
-	err = drv.CreateMigrationsTable(db)
-	require.NoError(t, err)
+		// migrations table should not exist
+		count := 0
+		err := db.QueryRow("select count(*) from public.schema_migrations").Scan(&count)
+		require.Error(t, err)
+		require.Equal(t, "pq: relation \"public.schema_migrations\" does not exist", err.Error())
 
-	// migrations table should exist
-	err = db.QueryRow("select count(*) from public.schema_migrations").Scan(&count)
-	require.NoError(t, err)
+		// create table
+		err = drv.CreateMigrationsTable(u, db)
+		require.NoError(t, err)
 
-	// create table should be idempotent
-	err = drv.CreateMigrationsTable(db)
-	require.NoError(t, err)
+		// migrations table should exist
+		err = db.QueryRow("select count(*) from public.schema_migrations").Scan(&count)
+		require.NoError(t, err)
+
+		// create table should be idempotent
+		err = drv.CreateMigrationsTable(u, db)
+		require.NoError(t, err)
+	})
+
+	t.Run("custom schema", func(t *testing.T) {
+		u, err := url.Parse(postgresTestURL(t).String() + "&search_path=foo")
+		require.NoError(t, err)
+		db := prepTestPostgresDB(t, u)
+		defer mustClose(db)
+
+		// delete schema
+		_, err = db.Exec("drop schema if exists foo")
+		require.NoError(t, err)
+
+		// drop any schema_migrations table in public schema
+		_, err = db.Exec("drop table if exists public.schema_migrations")
+		require.NoError(t, err)
+
+		// migrations table should not exist in either schema
+		count := 0
+		err = db.QueryRow("select count(*) from foo.schema_migrations").Scan(&count)
+		require.Error(t, err)
+		require.Equal(t, "pq: relation \"foo.schema_migrations\" does not exist", err.Error())
+		err = db.QueryRow("select count(*) from public.schema_migrations").Scan(&count)
+		require.Error(t, err)
+		require.Equal(t, "pq: relation \"public.schema_migrations\" does not exist", err.Error())
+
+		// create table
+		err = drv.CreateMigrationsTable(u, db)
+		require.NoError(t, err)
+
+		// foo schema should be created, and migrations table should exist only in foo schema
+		err = db.QueryRow("select count(*) from foo.schema_migrations").Scan(&count)
+		require.NoError(t, err)
+		err = db.QueryRow("select count(*) from public.schema_migrations").Scan(&count)
+		require.Error(t, err)
+		require.Equal(t, "pq: relation \"public.schema_migrations\" does not exist", err.Error())
+
+		// create table should be idempotent
+		err = drv.CreateMigrationsTable(u, db)
+		require.NoError(t, err)
+	})
 }
 
 func TestPostgresSelectMigrations(t *testing.T) {
@@ -225,7 +269,7 @@ func TestPostgresSelectMigrations(t *testing.T) {
 	db := prepTestPostgresDB(t, u)
 	defer mustClose(db)
 
-	err := drv.CreateMigrationsTable(db)
+	err := drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
 	_, err = db.Exec(`insert into public.schema_migrations (version)
@@ -252,7 +296,7 @@ func TestPostgresInsertMigration(t *testing.T) {
 	db := prepTestPostgresDB(t, u)
 	defer mustClose(db)
 
-	err := drv.CreateMigrationsTable(db)
+	err := drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
 	count := 0
@@ -276,7 +320,7 @@ func TestPostgresDeleteMigration(t *testing.T) {
 	db := prepTestPostgresDB(t, u)
 	defer mustClose(db)
 
-	err := drv.CreateMigrationsTable(db)
+	err := drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
 	_, err = db.Exec(`insert into public.schema_migrations (version)
