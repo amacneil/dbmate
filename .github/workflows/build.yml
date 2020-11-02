@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+    tags: 'v*'
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Environment
+        run: |
+          set -x
+          docker version
+          docker-compose version
+
+      - name: Cache
+        uses: actions/cache@v2
+        with:
+          key: cache
+          path: .cache
+
+      - name: Build docker image
+        run: |
+          set -x
+          docker-compose build
+          docker-compose run --rm --no-deps dbmate --version
+
+      - name: Build binaries
+        run: |
+          set -x
+          docker-compose run --rm --no-deps dev make build-all
+          dist/dbmate-linux-amd64 --version
+
+      - name: Lint
+        run: docker-compose run --rm --no-deps dev make lint
+
+      - name: Start test dependencies
+        run: |
+          set -x
+          docker-compose pull --quiet
+          docker-compose up --detach
+
+      - name: Run tests
+        run: |
+          set -x
+          docker-compose run --rm dev make wait
+          docker-compose run --rm dev make test
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        with:
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

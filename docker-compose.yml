@@ -1,9 +1,11 @@
 version: '2.3'
 services:
-  dbmate:
+  dev:
     build:
       context: .
-      target: build
+      target: dev
+    volumes:
+      - .:/src
     depends_on:
       - mysql
       - postgres
@@ -12,6 +14,11 @@ services:
       MYSQL_URL: mysql://root:root@mysql/dbmate
       POSTGRESQL_URL: postgres://postgres:postgres@postgres/dbmate?sslmode=disable
       CLICKHOUSE_URL: clickhouse://clickhouse:9000?database=dbmate
+
+  dbmate:
+    build:
+      context: .
+      target: release
 
   mysql:
     image: mysql:5.7

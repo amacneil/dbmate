@@ -1,6 +1,7 @@
-# build image
-FROM techknowlogick/xgo:go-1.15.x as build
+# development image
+FROM techknowlogick/xgo:go-1.15.x as dev
 WORKDIR /src
+ENV GOCACHE /src/.cache/go-build
 
 # enable cgo to build sqlite
 ENV CGO_ENABLED 1
@@ -24,18 +25,19 @@ RUN curl -fsSL -o /tmp/lint-install.sh https://raw.githubusercontent.com/golangc
 COPY go.* ./
 RUN go mod download
 
-# build
-COPY . ./
-RUN make build
-
 ENTRYPOINT []
 CMD ["/bin/bash"]
 
-# runtime image
-FROM alpine
+# build stage
+FROM dev as build
+COPY . ./
+RUN make build
+
+# release stage
+FROM alpine as release
 RUN apk add --no-cache \
-        mariadb-client \
-        postgresql-client \
-        sqlite
+	mariadb-client \
+	postgresql-client \
+	sqlite
 COPY --from=build /src/dist/dbmate-linux-amd64 /usr/local/bin/dbmate
 ENTRYPOINT ["dbmate"]

@@ -1,5 +1,6 @@
 .DS_Store
 .env
+/.cache
 /db
 /dbmate
 /dist

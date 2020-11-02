@@ -52,8 +52,8 @@ build-all: clean build-linux-amd64
 .PHONY: docker-make
 docker-make:
 	docker-compose build
-	docker-compose run --rm dbmate make
+	docker-compose run --rm dev make
 
-.PHONY: docker-bash
-docker-bash:
-	-docker-compose run --rm dbmate bash
+.PHONY: docker-sh
+docker-sh:
+	-docker-compose run --rm dev
