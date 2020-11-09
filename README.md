@@ -1,6 +1,6 @@
 # Dbmate
 
-[![Build Status](https://travis-ci.org/amacneil/dbmate.svg?branch=master)](https://travis-ci.org/amacneil/dbmate)
+[![GitHub Build](https://img.shields.io/github/workflow/status/amacneil/dbmate/CI/master)](https://github.com/amacneil/dbmate/actions?query=branch%3Amaster+event%3Apush+workflow%3ACI)
 [![Go Report Card](https://goreportcard.com/badge/github.com/amacneil/dbmate)](https://goreportcard.com/report/github.com/amacneil/dbmate)
 [![GitHub Release](https://img.shields.io/github/release/amacneil/dbmate.svg)](https://github.com/amacneil/dbmate/releases)
 
@@ -46,13 +46,13 @@ $ sudo chmod +x /usr/local/bin/dbmate
 You can run dbmate using the official docker image (remember to set `--network=host` or see [this comment](https://github.com/amacneil/dbmate/issues/128#issuecomment-615924611) for more tips on using dbmate with docker networking):
 
 ```sh
-$ docker run --rm --network=host -it amacneil/dbmate --help
+$ docker run --rm -it --network=host amacneil/dbmate --help
 ```
 
-If you wish to create or apply migrations, you will need to use Docker's [bind mount](https://docs.docker.com/storage/bind-mounts/) feature to make your local working directory available inside the dbmate container:
+If you wish to create or apply migrations, you will need to use Docker's [bind mount](https://docs.docker.com/storage/bind-mounts/) feature to make your local working directory (`pwd`) available inside the dbmate container:
 
 ```sh
-$ docker run --rm -it -v "$(pwd)"/db:/db amacneil/dbmate new create_users_table
+$ docker run --rm -it --network=host -v "$(pwd)/db:/db" amacneil/dbmate new create_users_table
 ```
 
 **Heroku**
