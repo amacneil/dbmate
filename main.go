@@ -176,7 +176,7 @@ func NewApp() *cli.App {
 				}
 
 				if pending > 0 && setExitCode {
-					return cli.NewExitError("", 1)
+					return cli.Exit("", 1)
 				}
 
 				return nil
