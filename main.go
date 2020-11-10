@@ -53,6 +53,12 @@ func NewApp() *cli.App {
 			Usage:   "specify the directory containing migration files",
 		},
 		&cli.StringFlag{
+			Name:    "migrations-table",
+			EnvVars: []string{"DBMATE_MIGRATIONS_TABLE"},
+			Value:   dbmate.DefaultMigrationsTableName,
+			Usage:   "specify the database table to record migrations in",
+		},
+		&cli.StringFlag{
 			Name:    "schema-file",
 			Aliases: []string{"s"},
 			EnvVars: []string{"DBMATE_SCHEMA_FILE"},
@@ -222,6 +228,7 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 		db := dbmate.New(u)
 		db.AutoDumpSchema = !c.Bool("no-dump-schema")
 		db.MigrationsDir = c.String("migrations-dir")
+		db.MigrationsTableName = c.String("migrations-table")
 		db.SchemaFile = c.String("schema-file")
 		db.WaitBefore = c.Bool("wait")
 		overrideTimeout := c.Duration("wait-timeout")

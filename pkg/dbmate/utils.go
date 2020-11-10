@@ -104,8 +104,8 @@ func trimLeadingSQLComments(data []byte) ([]byte, error) {
 // queryColumn runs a SQL statement and returns a slice of strings
 // it is assumed that the statement returns only one column
 // e.g. schema_migrations table
-func queryColumn(db Transaction, query string) ([]string, error) {
-	rows, err := db.Query(query)
+func queryColumn(db Transaction, query string, args ...interface{}) ([]string, error) {
+	rows, err := db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -128,12 +128,12 @@ func queryColumn(db Transaction, query string) ([]string, error) {
 	return result, nil
 }
 
-// queryRow runs a SQL statement and returns a single string
+// queryValue runs a SQL statement and returns a single string
 // it is assumed that the statement returns only one row and one column
 // sql NULL is returned as empty string
-func queryRow(db Transaction, query string) (string, error) {
+func queryValue(db Transaction, query string, args ...interface{}) (string, error) {
 	var result sql.NullString
-	err := db.QueryRow(query).Scan(&result)
+	err := db.QueryRow(query, args...).Scan(&result)
 	if err != nil || !result.Valid {
 		return "", err
 	}

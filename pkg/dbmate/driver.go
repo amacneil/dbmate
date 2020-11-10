@@ -13,6 +13,7 @@ type Driver interface {
 	CreateDatabase(*url.URL) error
 	DropDatabase(*url.URL) error
 	DumpSchema(*url.URL, *sql.DB) ([]byte, error)
+	SetMigrationsTableName(string)
 	CreateMigrationsTable(*url.URL, *sql.DB) error
 	SelectMigrations(*sql.DB, int) (map[string]bool, error)
 	InsertMigration(Transaction, string) error
@@ -34,18 +35,20 @@ type Transaction interface {
 	QueryRow(query string, args ...interface{}) *sql.Row
 }
 
-// GetDriver loads a database driver by name
-func GetDriver(name string) (Driver, error) {
-	if val, ok := drivers[name]; ok {
-		return val, nil
+// getDriver loads a database driver by name
+func getDriver(name string) (Driver, error) {
+	if drv, ok := drivers[name]; ok {
+		drv.SetMigrationsTableName(DefaultMigrationsTableName)
+
+		return drv, nil
 	}
 
 	return nil, fmt.Errorf("unsupported driver: %s", name)
 }
 
-// GetDriverOpen is a shortcut for GetDriver(u.Scheme).Open(u)
-func GetDriverOpen(u *url.URL) (*sql.DB, error) {
-	drv, err := GetDriver(u.Scheme)
+// getDriverOpen is a shortcut for GetDriver(u.Scheme).Open(u)
+func getDriverOpen(u *url.URL) (*sql.DB, error) {
+	drv, err := getDriver(u.Scheme)
 	if err != nil {
 		return nil, err
 	}
