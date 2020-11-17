@@ -18,8 +18,15 @@ func sqliteTestURL(t *testing.T) *url.URL {
 	return u
 }
 
+func testSQLiteDriver() *SQLiteDriver {
+	drv := &SQLiteDriver{}
+	drv.SetMigrationsTableName(DefaultMigrationsTableName)
+
+	return drv
+}
+
 func prepTestSQLiteDB(t *testing.T, u *url.URL) *sql.DB {
-	drv := SQLiteDriver{}
+	drv := testSQLiteDriver()
 
 	// drop any existing database
 	err := drv.DropDatabase(u)
@@ -37,7 +44,7 @@ func prepTestSQLiteDB(t *testing.T, u *url.URL) *sql.DB {
 }
 
 func TestSQLiteCreateDropDatabase(t *testing.T) {
-	drv := SQLiteDriver{}
+	drv := testSQLiteDriver()
 	u := sqliteTestURL(t)
 	path := sqlitePath(u)
 
@@ -64,7 +71,9 @@ func TestSQLiteCreateDropDatabase(t *testing.T) {
 }
 
 func TestSQLiteDumpSchema(t *testing.T) {
-	drv := SQLiteDriver{}
+	drv := testSQLiteDriver()
+	drv.SetMigrationsTableName("test_migrations")
+
 	u := sqliteTestURL(t)
 
 	// prepare database
@@ -82,9 +91,9 @@ func TestSQLiteDumpSchema(t *testing.T) {
 	// DumpSchema should return schema
 	schema, err := drv.DumpSchema(u, db)
 	require.NoError(t, err)
-	require.Contains(t, string(schema), "CREATE TABLE schema_migrations")
+	require.Contains(t, string(schema), "CREATE TABLE IF NOT EXISTS \"test_migrations\"")
 	require.Contains(t, string(schema), ");\n-- Dbmate schema migrations\n"+
-		"INSERT INTO schema_migrations (version) VALUES\n"+
+		"INSERT INTO \"test_migrations\" (version) VALUES\n"+
 		"  ('abc1'),\n"+
 		"  ('abc2');\n")
 
@@ -97,7 +106,7 @@ func TestSQLiteDumpSchema(t *testing.T) {
 }
 
 func TestSQLiteDatabaseExists(t *testing.T) {
-	drv := SQLiteDriver{}
+	drv := testSQLiteDriver()
 	u := sqliteTestURL(t)
 
 	// drop any existing database
@@ -120,31 +129,61 @@ func TestSQLiteDatabaseExists(t *testing.T) {
 }
 
 func TestSQLiteCreateMigrationsTable(t *testing.T) {
-	drv := SQLiteDriver{}
-	u := sqliteTestURL(t)
-	db := prepTestSQLiteDB(t, u)
-	defer mustClose(db)
+	t.Run("default table", func(t *testing.T) {
+		drv := testSQLiteDriver()
+		u := sqliteTestURL(t)
+		db := prepTestSQLiteDB(t, u)
+		defer mustClose(db)
 
-	// migrations table should not exist
-	count := 0
-	err := db.QueryRow("select count(*) from schema_migrations").Scan(&count)
-	require.Regexp(t, "no such table: schema_migrations", err.Error())
+		// migrations table should not exist
+		count := 0
+		err := db.QueryRow("select count(*) from schema_migrations").Scan(&count)
+		require.Regexp(t, "no such table: schema_migrations", err.Error())
 
-	// create table
-	err = drv.CreateMigrationsTable(u, db)
-	require.NoError(t, err)
+		// create table
+		err = drv.CreateMigrationsTable(u, db)
+		require.NoError(t, err)
 
-	// migrations table should exist
-	err = db.QueryRow("select count(*) from schema_migrations").Scan(&count)
-	require.NoError(t, err)
+		// migrations table should exist
+		err = db.QueryRow("select count(*) from schema_migrations").Scan(&count)
+		require.NoError(t, err)
 
-	// create table should be idempotent
-	err = drv.CreateMigrationsTable(u, db)
-	require.NoError(t, err)
+		// create table should be idempotent
+		err = drv.CreateMigrationsTable(u, db)
+		require.NoError(t, err)
+	})
+
+	t.Run("custom table", func(t *testing.T) {
+		drv := testSQLiteDriver()
+		drv.SetMigrationsTableName("test_migrations")
+
+		u := sqliteTestURL(t)
+		db := prepTestSQLiteDB(t, u)
+		defer mustClose(db)
+
+		// migrations table should not exist
+		count := 0
+		err := db.QueryRow("select count(*) from test_migrations").Scan(&count)
+		require.Regexp(t, "no such table: test_migrations", err.Error())
+
+		// create table
+		err = drv.CreateMigrationsTable(u, db)
+		require.NoError(t, err)
+
+		// migrations table should exist
+		err = db.QueryRow("select count(*) from test_migrations").Scan(&count)
+		require.NoError(t, err)
+
+		// create table should be idempotent
+		err = drv.CreateMigrationsTable(u, db)
+		require.NoError(t, err)
+	})
 }
 
 func TestSQLiteSelectMigrations(t *testing.T) {
-	drv := SQLiteDriver{}
+	drv := testSQLiteDriver()
+	drv.SetMigrationsTableName("test_migrations")
+
 	u := sqliteTestURL(t)
 	db := prepTestSQLiteDB(t, u)
 	defer mustClose(db)
@@ -152,7 +191,7 @@ func TestSQLiteSelectMigrations(t *testing.T) {
 	err := drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
-	_, err = db.Exec(`insert into schema_migrations (version)
+	_, err = db.Exec(`insert into test_migrations (version)
 		values ('abc2'), ('abc1'), ('abc3')`)
 	require.NoError(t, err)
 
@@ -171,7 +210,9 @@ func TestSQLiteSelectMigrations(t *testing.T) {
 }
 
 func TestSQLiteInsertMigration(t *testing.T) {
-	drv := SQLiteDriver{}
+	drv := testSQLiteDriver()
+	drv.SetMigrationsTableName("test_migrations")
+
 	u := sqliteTestURL(t)
 	db := prepTestSQLiteDB(t, u)
 	defer mustClose(db)
@@ -180,7 +221,7 @@ func TestSQLiteInsertMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	count := 0
-	err = db.QueryRow("select count(*) from schema_migrations").Scan(&count)
+	err = db.QueryRow("select count(*) from test_migrations").Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 0, count)
 
@@ -188,14 +229,16 @@ func TestSQLiteInsertMigration(t *testing.T) {
 	err = drv.InsertMigration(db, "abc1")
 	require.NoError(t, err)
 
-	err = db.QueryRow("select count(*) from schema_migrations where version = 'abc1'").
+	err = db.QueryRow("select count(*) from test_migrations where version = 'abc1'").
 		Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
 }
 
 func TestSQLiteDeleteMigration(t *testing.T) {
-	drv := SQLiteDriver{}
+	drv := testSQLiteDriver()
+	drv.SetMigrationsTableName("test_migrations")
+
 	u := sqliteTestURL(t)
 	db := prepTestSQLiteDB(t, u)
 	defer mustClose(db)
@@ -203,7 +246,7 @@ func TestSQLiteDeleteMigration(t *testing.T) {
 	err := drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
-	_, err = db.Exec(`insert into schema_migrations (version)
+	_, err = db.Exec(`insert into test_migrations (version)
 		values ('abc1'), ('abc2')`)
 	require.NoError(t, err)
 
@@ -211,13 +254,13 @@ func TestSQLiteDeleteMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	count := 0
-	err = db.QueryRow("select count(*) from schema_migrations").Scan(&count)
+	err = db.QueryRow("select count(*) from test_migrations").Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
 }
 
 func TestSQLitePing(t *testing.T) {
-	drv := SQLiteDriver{}
+	drv := testSQLiteDriver()
 	u := sqliteTestURL(t)
 	path := sqlitePath(u)
 
@@ -248,4 +291,20 @@ func TestSQLitePing(t *testing.T) {
 	// ping database should fail
 	err = drv.Ping(u)
 	require.EqualError(t, err, "unable to open database file: is a directory")
+}
+
+func TestSQLiteQuotedMigrationsTableName(t *testing.T) {
+	t.Run("default name", func(t *testing.T) {
+		drv := testSQLiteDriver()
+		name := drv.quotedMigrationsTableName()
+		require.Equal(t, `"schema_migrations"`, name)
+	})
+
+	t.Run("custom name", func(t *testing.T) {
+		drv := testSQLiteDriver()
+		drv.SetMigrationsTableName("fooMigrations")
+
+		name := drv.quotedMigrationsTableName()
+		require.Equal(t, `"fooMigrations"`, name)
+	})
 }

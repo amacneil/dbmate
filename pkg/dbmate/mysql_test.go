@@ -15,8 +15,15 @@ func mySQLTestURL(t *testing.T) *url.URL {
 	return u
 }
 
+func testMySQLDriver() *MySQLDriver {
+	drv := &MySQLDriver{}
+	drv.SetMigrationsTableName(DefaultMigrationsTableName)
+
+	return drv
+}
+
 func prepTestMySQLDB(t *testing.T, u *url.URL) *sql.DB {
-	drv := MySQLDriver{}
+	drv := testMySQLDriver()
 
 	// drop any existing database
 	err := drv.DropDatabase(u)
@@ -78,7 +85,7 @@ func TestNormalizeMySQLURLSocket(t *testing.T) {
 }
 
 func TestMySQLCreateDropDatabase(t *testing.T) {
-	drv := MySQLDriver{}
+	drv := testMySQLDriver()
 	u := mySQLTestURL(t)
 
 	// drop any existing database
@@ -116,7 +123,9 @@ func TestMySQLCreateDropDatabase(t *testing.T) {
 }
 
 func TestMySQLDumpSchema(t *testing.T) {
-	drv := MySQLDriver{}
+	drv := testMySQLDriver()
+	drv.SetMigrationsTableName("test_migrations")
+
 	u := mySQLTestURL(t)
 
 	// prepare database
@@ -134,13 +143,13 @@ func TestMySQLDumpSchema(t *testing.T) {
 	// DumpSchema should return schema
 	schema, err := drv.DumpSchema(u, db)
 	require.NoError(t, err)
-	require.Contains(t, string(schema), "CREATE TABLE `schema_migrations`")
+	require.Contains(t, string(schema), "CREATE TABLE `test_migrations`")
 	require.Contains(t, string(schema), "\n-- Dump completed\n\n"+
 		"--\n"+
 		"-- Dbmate schema migrations\n"+
 		"--\n\n"+
-		"LOCK TABLES `schema_migrations` WRITE;\n"+
-		"INSERT INTO `schema_migrations` (version) VALUES\n"+
+		"LOCK TABLES `test_migrations` WRITE;\n"+
+		"INSERT INTO `test_migrations` (version) VALUES\n"+
 		"  ('abc1'),\n"+
 		"  ('abc2');\n"+
 		"UNLOCK TABLES;\n")
@@ -156,7 +165,7 @@ func TestMySQLDumpSchema(t *testing.T) {
 }
 
 func TestMySQLDatabaseExists(t *testing.T) {
-	drv := MySQLDriver{}
+	drv := testMySQLDriver()
 	u := mySQLTestURL(t)
 
 	// drop any existing database
@@ -179,7 +188,7 @@ func TestMySQLDatabaseExists(t *testing.T) {
 }
 
 func TestMySQLDatabaseExists_Error(t *testing.T) {
-	drv := MySQLDriver{}
+	drv := testMySQLDriver()
 	u := mySQLTestURL(t)
 	u.User = url.User("invalid")
 
@@ -189,22 +198,25 @@ func TestMySQLDatabaseExists_Error(t *testing.T) {
 }
 
 func TestMySQLCreateMigrationsTable(t *testing.T) {
-	drv := MySQLDriver{}
+	drv := testMySQLDriver()
+	drv.SetMigrationsTableName("test_migrations")
+
 	u := mySQLTestURL(t)
 	db := prepTestMySQLDB(t, u)
 	defer mustClose(db)
 
 	// migrations table should not exist
 	count := 0
-	err := db.QueryRow("select count(*) from schema_migrations").Scan(&count)
-	require.Regexp(t, "Table 'dbmate.schema_migrations' doesn't exist", err.Error())
+	err := db.QueryRow("select count(*) from test_migrations").Scan(&count)
+	require.Error(t, err)
+	require.Regexp(t, "Table 'dbmate.test_migrations' doesn't exist", err.Error())
 
 	// create table
 	err = drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
 	// migrations table should exist
-	err = db.QueryRow("select count(*) from schema_migrations").Scan(&count)
+	err = db.QueryRow("select count(*) from test_migrations").Scan(&count)
 	require.NoError(t, err)
 
 	// create table should be idempotent
@@ -213,7 +225,9 @@ func TestMySQLCreateMigrationsTable(t *testing.T) {
 }
 
 func TestMySQLSelectMigrations(t *testing.T) {
-	drv := MySQLDriver{}
+	drv := testMySQLDriver()
+	drv.SetMigrationsTableName("test_migrations")
+
 	u := mySQLTestURL(t)
 	db := prepTestMySQLDB(t, u)
 	defer mustClose(db)
@@ -221,7 +235,7 @@ func TestMySQLSelectMigrations(t *testing.T) {
 	err := drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
-	_, err = db.Exec(`insert into schema_migrations (version)
+	_, err = db.Exec(`insert into test_migrations (version)
 		values ('abc2'), ('abc1'), ('abc3')`)
 	require.NoError(t, err)
 
@@ -240,7 +254,9 @@ func TestMySQLSelectMigrations(t *testing.T) {
 }
 
 func TestMySQLInsertMigration(t *testing.T) {
-	drv := MySQLDriver{}
+	drv := testMySQLDriver()
+	drv.SetMigrationsTableName("test_migrations")
+
 	u := mySQLTestURL(t)
 	db := prepTestMySQLDB(t, u)
 	defer mustClose(db)
@@ -249,7 +265,7 @@ func TestMySQLInsertMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	count := 0
-	err = db.QueryRow("select count(*) from schema_migrations").Scan(&count)
+	err = db.QueryRow("select count(*) from test_migrations").Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 0, count)
 
@@ -257,14 +273,16 @@ func TestMySQLInsertMigration(t *testing.T) {
 	err = drv.InsertMigration(db, "abc1")
 	require.NoError(t, err)
 
-	err = db.QueryRow("select count(*) from schema_migrations where version = 'abc1'").
+	err = db.QueryRow("select count(*) from test_migrations where version = 'abc1'").
 		Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
 }
 
 func TestMySQLDeleteMigration(t *testing.T) {
-	drv := MySQLDriver{}
+	drv := testMySQLDriver()
+	drv.SetMigrationsTableName("test_migrations")
+
 	u := mySQLTestURL(t)
 	db := prepTestMySQLDB(t, u)
 	defer mustClose(db)
@@ -272,7 +290,7 @@ func TestMySQLDeleteMigration(t *testing.T) {
 	err := drv.CreateMigrationsTable(u, db)
 	require.NoError(t, err)
 
-	_, err = db.Exec(`insert into schema_migrations (version)
+	_, err = db.Exec(`insert into test_migrations (version)
 		values ('abc1'), ('abc2')`)
 	require.NoError(t, err)
 
@@ -280,13 +298,13 @@ func TestMySQLDeleteMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	count := 0
-	err = db.QueryRow("select count(*) from schema_migrations").Scan(&count)
+	err = db.QueryRow("select count(*) from test_migrations").Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
 }
 
 func TestMySQLPing(t *testing.T) {
-	drv := MySQLDriver{}
+	drv := testMySQLDriver()
 	u := mySQLTestURL(t)
 
 	// drop any existing database
@@ -302,4 +320,20 @@ func TestMySQLPing(t *testing.T) {
 	err = drv.Ping(u)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "connect: connection refused")
+}
+
+func TestMySQLQuotedMigrationsTableName(t *testing.T) {
+	t.Run("default name", func(t *testing.T) {
+		drv := testMySQLDriver()
+		name := drv.quotedMigrationsTableName()
+		require.Equal(t, "`schema_migrations`", name)
+	})
+
+	t.Run("custom name", func(t *testing.T) {
+		drv := testMySQLDriver()
+		drv.SetMigrationsTableName("fooMigrations")
+
+		name := drv.quotedMigrationsTableName()
+		require.Equal(t, "`fooMigrations`", name)
+	})
 }

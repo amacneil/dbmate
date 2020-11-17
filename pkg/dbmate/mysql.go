@@ -11,11 +11,12 @@ import (
 )
 
 func init() {
-	RegisterDriver(MySQLDriver{}, "mysql")
+	RegisterDriver(&MySQLDriver{}, "mysql")
 }
 
 // MySQLDriver provides top level database functions
 type MySQLDriver struct {
+	migrationsTableName string
 }
 
 func normalizeMySQLURL(u *url.URL) string {
@@ -52,12 +53,17 @@ func normalizeMySQLURL(u *url.URL) string {
 	return normalizedString
 }
 
+// SetMigrationsTableName sets the schema migrations table name
+func (drv *MySQLDriver) SetMigrationsTableName(name string) {
+	drv.migrationsTableName = name
+}
+
 // Open creates a new database connection
-func (drv MySQLDriver) Open(u *url.URL) (*sql.DB, error) {
+func (drv *MySQLDriver) Open(u *url.URL) (*sql.DB, error) {
 	return sql.Open("mysql", normalizeMySQLURL(u))
 }
 
-func (drv MySQLDriver) openRootDB(u *url.URL) (*sql.DB, error) {
+func (drv *MySQLDriver) openRootDB(u *url.URL) (*sql.DB, error) {
 	// connect to no particular database
 	rootURL := *u
 	rootURL.Path = "/"
@@ -65,14 +71,14 @@ func (drv MySQLDriver) openRootDB(u *url.URL) (*sql.DB, error) {
 	return drv.Open(&rootURL)
 }
 
-func mysqlQuoteIdentifier(str string) string {
+func (drv *MySQLDriver) quoteIdentifier(str string) string {
 	str = strings.Replace(str, "`", "\\`", -1)
 
 	return fmt.Sprintf("`%s`", str)
 }
 
 // CreateDatabase creates the specified database
-func (drv MySQLDriver) CreateDatabase(u *url.URL) error {
+func (drv *MySQLDriver) CreateDatabase(u *url.URL) error {
 	name := databaseName(u)
 	fmt.Printf("Creating: %s\n", name)
 
@@ -83,13 +89,13 @@ func (drv MySQLDriver) CreateDatabase(u *url.URL) error {
 	defer mustClose(db)
 
 	_, err = db.Exec(fmt.Sprintf("create database %s",
-		mysqlQuoteIdentifier(name)))
+		drv.quoteIdentifier(name)))
 
 	return err
 }
 
 // DropDatabase drops the specified database (if it exists)
-func (drv MySQLDriver) DropDatabase(u *url.URL) error {
+func (drv *MySQLDriver) DropDatabase(u *url.URL) error {
 	name := databaseName(u)
 	fmt.Printf("Dropping: %s\n", name)
 
@@ -100,12 +106,12 @@ func (drv MySQLDriver) DropDatabase(u *url.URL) error {
 	defer mustClose(db)
 
 	_, err = db.Exec(fmt.Sprintf("drop database if exists %s",
-		mysqlQuoteIdentifier(name)))
+		drv.quoteIdentifier(name)))
 
 	return err
 }
 
-func mysqldumpArgs(u *url.URL) []string {
+func (drv *MySQLDriver) mysqldumpArgs(u *url.URL) []string {
 	// generate CLI arguments
 	args := []string{"--opt", "--routines", "--no-data",
 		"--skip-dump-date", "--skip-add-drop-table"}
@@ -131,10 +137,12 @@ func mysqldumpArgs(u *url.URL) []string {
 	return args
 }
 
-func mysqlSchemaMigrationsDump(db *sql.DB) ([]byte, error) {
+func (drv *MySQLDriver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
+	migrationsTable := drv.quotedMigrationsTableName()
+
 	// load applied migrations
 	migrations, err := queryColumn(db,
-		"select quote(version) from schema_migrations order by version asc")
+		fmt.Sprintf("select quote(version) from %s order by version asc", migrationsTable))
 	if err != nil {
 		return nil, err
 	}
@@ -142,12 +150,13 @@ func mysqlSchemaMigrationsDump(db *sql.DB) ([]byte, error) {
 	// build schema_migrations table data
 	var buf bytes.Buffer
 	buf.WriteString("\n--\n-- Dbmate schema migrations\n--\n\n" +
-		"LOCK TABLES `schema_migrations` WRITE;\n")
+		fmt.Sprintf("LOCK TABLES %s WRITE;\n", migrationsTable))
 
 	if len(migrations) > 0 {
-		buf.WriteString("INSERT INTO `schema_migrations` (version) VALUES\n  (" +
-			strings.Join(migrations, "),\n  (") +
-			");\n")
+		buf.WriteString(
+			fmt.Sprintf("INSERT INTO %s (version) VALUES\n  (", migrationsTable) +
+				strings.Join(migrations, "),\n  (") +
+				");\n")
 	}
 
 	buf.WriteString("UNLOCK TABLES;\n")
@@ -156,13 +165,13 @@ func mysqlSchemaMigrationsDump(db *sql.DB) ([]byte, error) {
 }
 
 // DumpSchema returns the current database schema
-func (drv MySQLDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
-	schema, err := runCommand("mysqldump", mysqldumpArgs(u)...)
+func (drv *MySQLDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
+	schema, err := runCommand("mysqldump", drv.mysqldumpArgs(u)...)
 	if err != nil {
 		return nil, err
 	}
 
-	migrations, err := mysqlSchemaMigrationsDump(db)
+	migrations, err := drv.schemaMigrationsDump(db)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +181,7 @@ func (drv MySQLDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
 }
 
 // DatabaseExists determines whether the database exists
-func (drv MySQLDriver) DatabaseExists(u *url.URL) (bool, error) {
+func (drv *MySQLDriver) DatabaseExists(u *url.URL) (bool, error) {
 	name := databaseName(u)
 
 	db, err := drv.openRootDB(u)
@@ -192,17 +201,18 @@ func (drv MySQLDriver) DatabaseExists(u *url.URL) (bool, error) {
 }
 
 // CreateMigrationsTable creates the schema_migrations table
-func (drv MySQLDriver) CreateMigrationsTable(u *url.URL, db *sql.DB) error {
-	_, err := db.Exec("create table if not exists schema_migrations " +
-		"(version varchar(255) primary key) character set latin1 collate latin1_bin")
+func (drv *MySQLDriver) CreateMigrationsTable(u *url.URL, db *sql.DB) error {
+	_, err := db.Exec(fmt.Sprintf("create table if not exists %s "+
+		"(version varchar(255) primary key) character set latin1 collate latin1_bin",
+		drv.quotedMigrationsTableName()))
 
 	return err
 }
 
 // SelectMigrations returns a list of applied migrations
 // with an optional limit (in descending order)
-func (drv MySQLDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
-	query := "select version from schema_migrations order by version desc"
+func (drv *MySQLDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
+	query := fmt.Sprintf("select version from %s order by version desc", drv.quotedMigrationsTableName())
 	if limit >= 0 {
 		query = fmt.Sprintf("%s limit %d", query, limit)
 	}
@@ -231,22 +241,26 @@ func (drv MySQLDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool,
 }
 
 // InsertMigration adds a new migration record
-func (drv MySQLDriver) InsertMigration(db Transaction, version string) error {
-	_, err := db.Exec("insert into schema_migrations (version) values (?)", version)
+func (drv *MySQLDriver) InsertMigration(db Transaction, version string) error {
+	_, err := db.Exec(
+		fmt.Sprintf("insert into %s (version) values (?)", drv.quotedMigrationsTableName()),
+		version)
 
 	return err
 }
 
 // DeleteMigration removes a migration record
-func (drv MySQLDriver) DeleteMigration(db Transaction, version string) error {
-	_, err := db.Exec("delete from schema_migrations where version = ?", version)
+func (drv *MySQLDriver) DeleteMigration(db Transaction, version string) error {
+	_, err := db.Exec(
+		fmt.Sprintf("delete from %s where version = ?", drv.quotedMigrationsTableName()),
+		version)
 
 	return err
 }
 
 // Ping verifies a connection to the database server. It does not verify whether the
 // specified database exists.
-func (drv MySQLDriver) Ping(u *url.URL) error {
+func (drv *MySQLDriver) Ping(u *url.URL) error {
 	db, err := drv.openRootDB(u)
 	if err != nil {
 		return err
@@ -254,4 +268,8 @@ func (drv MySQLDriver) Ping(u *url.URL) error {
 	defer mustClose(db)
 
 	return db.Ping()
+}
+
+func (drv *MySQLDriver) quotedMigrationsTableName() string {
+	return drv.quoteIdentifier(drv.migrationsTableName)
 }

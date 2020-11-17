@@ -15,6 +15,9 @@ import (
 // DefaultMigrationsDir specifies default directory to find migration files
 const DefaultMigrationsDir = "./db/migrations"
 
+// DefaultMigrationsTableName specifies default database tables to record migraitons in
+const DefaultMigrationsTableName = "schema_migrations"
+
 // DefaultSchemaFile specifies default location for schema.sql
 const DefaultSchemaFile = "./db/schema.sql"
 
@@ -26,14 +29,15 @@ const DefaultWaitTimeout = 60 * time.Second
 
 // DB allows dbmate actions to be performed on a specified database
 type DB struct {
-	AutoDumpSchema bool
-	DatabaseURL    *url.URL
-	MigrationsDir  string
-	SchemaFile     string
-	Verbose        bool
-	WaitBefore     bool
-	WaitInterval   time.Duration
-	WaitTimeout    time.Duration
+	AutoDumpSchema      bool
+	DatabaseURL         *url.URL
+	MigrationsDir       string
+	MigrationsTableName string
+	SchemaFile          string
+	Verbose             bool
+	WaitBefore          bool
+	WaitInterval        time.Duration
+	WaitTimeout         time.Duration
 }
 
 // migrationFileRegexp pattern for valid migration files
@@ -47,19 +51,27 @@ type statusResult struct {
 // New initializes a new dbmate database
 func New(databaseURL *url.URL) *DB {
 	return &DB{
-		AutoDumpSchema: true,
-		DatabaseURL:    databaseURL,
-		MigrationsDir:  DefaultMigrationsDir,
-		SchemaFile:     DefaultSchemaFile,
-		WaitBefore:     false,
-		WaitInterval:   DefaultWaitInterval,
-		WaitTimeout:    DefaultWaitTimeout,
+		AutoDumpSchema:      true,
+		DatabaseURL:         databaseURL,
+		MigrationsDir:       DefaultMigrationsDir,
+		MigrationsTableName: DefaultMigrationsTableName,
+		SchemaFile:          DefaultSchemaFile,
+		WaitBefore:          false,
+		WaitInterval:        DefaultWaitInterval,
+		WaitTimeout:         DefaultWaitTimeout,
 	}
 }
 
 // GetDriver loads the required database driver
 func (db *DB) GetDriver() (Driver, error) {
-	return GetDriver(db.DatabaseURL.Scheme)
+	drv, err := getDriver(db.DatabaseURL.Scheme)
+	if err != nil {
+		return nil, err
+	}
+
+	drv.SetMigrationsTableName(db.MigrationsTableName)
+
+	return drv, err
 }
 
 // Wait blocks until the database server is available. It does not verify that

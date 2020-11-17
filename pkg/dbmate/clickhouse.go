@@ -13,11 +13,12 @@ import (
 )
 
 func init() {
-	RegisterDriver(ClickHouseDriver{}, "clickhouse")
+	RegisterDriver(&ClickHouseDriver{}, "clickhouse")
 }
 
 // ClickHouseDriver provides top level database functions
 type ClickHouseDriver struct {
+	migrationsTableName string
 }
 
 func normalizeClickHouseURL(initialURL *url.URL) *url.URL {
@@ -52,12 +53,17 @@ func normalizeClickHouseURL(initialURL *url.URL) *url.URL {
 	return &u
 }
 
+// SetMigrationsTableName sets the schema migrations table name
+func (drv *ClickHouseDriver) SetMigrationsTableName(name string) {
+	drv.migrationsTableName = name
+}
+
 // Open creates a new database connection
-func (drv ClickHouseDriver) Open(u *url.URL) (*sql.DB, error) {
+func (drv *ClickHouseDriver) Open(u *url.URL) (*sql.DB, error) {
 	return sql.Open("clickhouse", normalizeClickHouseURL(u).String())
 }
 
-func (drv ClickHouseDriver) openClickHouseDB(u *url.URL) (*sql.DB, error) {
+func (drv *ClickHouseDriver) openClickHouseDB(u *url.URL) (*sql.DB, error) {
 	// connect to clickhouse database
 	clickhouseURL := normalizeClickHouseURL(u)
 	values := clickhouseURL.Query()
@@ -67,7 +73,7 @@ func (drv ClickHouseDriver) openClickHouseDB(u *url.URL) (*sql.DB, error) {
 	return drv.Open(clickhouseURL)
 }
 
-func (drv ClickHouseDriver) databaseName(u *url.URL) string {
+func (drv *ClickHouseDriver) databaseName(u *url.URL) string {
 	name := normalizeClickHouseURL(u).Query().Get("database")
 	if name == "" {
 		name = "default"
@@ -77,7 +83,7 @@ func (drv ClickHouseDriver) databaseName(u *url.URL) string {
 
 var clickhouseValidIdentifier = regexp.MustCompile(`^[a-zA-Z_][0-9a-zA-Z_]*$`)
 
-func clickhouseQuoteIdentifier(str string) string {
+func (drv *ClickHouseDriver) quoteIdentifier(str string) string {
 	if clickhouseValidIdentifier.MatchString(str) {
 		return str
 	}
@@ -88,7 +94,7 @@ func clickhouseQuoteIdentifier(str string) string {
 }
 
 // CreateDatabase creates the specified database
-func (drv ClickHouseDriver) CreateDatabase(u *url.URL) error {
+func (drv *ClickHouseDriver) CreateDatabase(u *url.URL) error {
 	name := drv.databaseName(u)
 	fmt.Printf("Creating: %s\n", name)
 
@@ -98,13 +104,13 @@ func (drv ClickHouseDriver) CreateDatabase(u *url.URL) error {
 	}
 	defer mustClose(db)
 
-	_, err = db.Exec("create database " + clickhouseQuoteIdentifier(name))
+	_, err = db.Exec("create database " + drv.quoteIdentifier(name))
 
 	return err
 }
 
 // DropDatabase drops the specified database (if it exists)
-func (drv ClickHouseDriver) DropDatabase(u *url.URL) error {
+func (drv *ClickHouseDriver) DropDatabase(u *url.URL) error {
 	name := drv.databaseName(u)
 	fmt.Printf("Dropping: %s\n", name)
 
@@ -114,15 +120,15 @@ func (drv ClickHouseDriver) DropDatabase(u *url.URL) error {
 	}
 	defer mustClose(db)
 
-	_, err = db.Exec("drop database if exists " + clickhouseQuoteIdentifier(name))
+	_, err = db.Exec("drop database if exists " + drv.quoteIdentifier(name))
 
 	return err
 }
 
-func clickhouseSchemaDump(db *sql.DB, buf *bytes.Buffer, databaseName string) error {
+func (drv *ClickHouseDriver) schemaDump(db *sql.DB, buf *bytes.Buffer, databaseName string) error {
 	buf.WriteString("\n--\n-- Database schema\n--\n\n")
 
-	buf.WriteString("CREATE DATABASE " + clickhouseQuoteIdentifier(databaseName) + " IF NOT EXISTS;\n\n")
+	buf.WriteString("CREATE DATABASE " + drv.quoteIdentifier(databaseName) + " IF NOT EXISTS;\n\n")
 
 	tables, err := queryColumn(db, "show tables")
 	if err != nil {
@@ -132,7 +138,7 @@ func clickhouseSchemaDump(db *sql.DB, buf *bytes.Buffer, databaseName string) er
 
 	for _, table := range tables {
 		var clause string
-		err = db.QueryRow("show create table " + clickhouseQuoteIdentifier(table)).Scan(&clause)
+		err = db.QueryRow("show create table " + drv.quoteIdentifier(table)).Scan(&clause)
 		if err != nil {
 			return err
 		}
@@ -141,10 +147,13 @@ func clickhouseSchemaDump(db *sql.DB, buf *bytes.Buffer, databaseName string) er
 	return nil
 }
 
-func clickhouseSchemaMigrationsDump(db *sql.DB, buf *bytes.Buffer) error {
+func (drv *ClickHouseDriver) schemaMigrationsDump(db *sql.DB, buf *bytes.Buffer) error {
+	migrationsTable := drv.quotedMigrationsTableName()
+
 	// load applied migrations
 	migrations, err := queryColumn(db,
-		"select version from schema_migrations final where applied order by version asc",
+		fmt.Sprintf("select version from %s final ", migrationsTable)+
+			"where applied order by version asc",
 	)
 	if err != nil {
 		return err
@@ -155,29 +164,30 @@ func clickhouseSchemaMigrationsDump(db *sql.DB, buf *bytes.Buffer) error {
 		migrations[i] = "'" + quoter.Replace(migrations[i]) + "'"
 	}
 
-	// build schema_migrations table data
+	// build schema migrations table data
 	buf.WriteString("\n--\n-- Dbmate schema migrations\n--\n\n")
 
 	if len(migrations) > 0 {
-		buf.WriteString("INSERT INTO schema_migrations (version) VALUES\n    (" +
-			strings.Join(migrations, "),\n    (") +
-			");\n")
+		buf.WriteString(
+			fmt.Sprintf("INSERT INTO %s (version) VALUES\n    (", migrationsTable) +
+				strings.Join(migrations, "),\n    (") +
+				");\n")
 	}
 
 	return nil
 }
 
 // DumpSchema returns the current database schema
-func (drv ClickHouseDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
+func (drv *ClickHouseDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
 	var buf bytes.Buffer
 	var err error
 
-	err = clickhouseSchemaDump(db, &buf, drv.databaseName(u))
+	err = drv.schemaDump(db, &buf, drv.databaseName(u))
 	if err != nil {
 		return nil, err
 	}
 
-	err = clickhouseSchemaMigrationsDump(db, &buf)
+	err = drv.schemaMigrationsDump(db, &buf)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +196,7 @@ func (drv ClickHouseDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
 }
 
 // DatabaseExists determines whether the database exists
-func (drv ClickHouseDriver) DatabaseExists(u *url.URL) (bool, error) {
+func (drv *ClickHouseDriver) DatabaseExists(u *url.URL) (bool, error) {
 	name := drv.databaseName(u)
 
 	db, err := drv.openClickHouseDB(u)
@@ -205,24 +215,27 @@ func (drv ClickHouseDriver) DatabaseExists(u *url.URL) (bool, error) {
 	return exists, err
 }
 
-// CreateMigrationsTable creates the schema_migrations table
-func (drv ClickHouseDriver) CreateMigrationsTable(u *url.URL, db *sql.DB) error {
-	_, err := db.Exec(`
-		create table if not exists schema_migrations (
+// CreateMigrationsTable creates the schema migrations table
+func (drv *ClickHouseDriver) CreateMigrationsTable(u *url.URL, db *sql.DB) error {
+	_, err := db.Exec(fmt.Sprintf(`
+		create table if not exists %s (
 			version String,
 			ts DateTime default now(),
 			applied UInt8 default 1
 		) engine = ReplacingMergeTree(ts)
 		primary key version
 		order by version
-	`)
+	`, drv.quotedMigrationsTableName()))
+
 	return err
 }
 
 // SelectMigrations returns a list of applied migrations
 // with an optional limit (in descending order)
-func (drv ClickHouseDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
-	query := "select version from schema_migrations final where applied order by version desc"
+func (drv *ClickHouseDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
+	query := fmt.Sprintf("select version from %s final where applied order by version desc",
+		drv.quotedMigrationsTableName())
+
 	if limit >= 0 {
 		query = fmt.Sprintf("%s limit %d", query, limit)
 	}
@@ -251,15 +264,19 @@ func (drv ClickHouseDriver) SelectMigrations(db *sql.DB, limit int) (map[string]
 }
 
 // InsertMigration adds a new migration record
-func (drv ClickHouseDriver) InsertMigration(db Transaction, version string) error {
-	_, err := db.Exec("insert into schema_migrations (version) values (?)", version)
+func (drv *ClickHouseDriver) InsertMigration(db Transaction, version string) error {
+	_, err := db.Exec(
+		fmt.Sprintf("insert into %s (version) values (?)", drv.quotedMigrationsTableName()),
+		version)
+
 	return err
 }
 
 // DeleteMigration removes a migration record
-func (drv ClickHouseDriver) DeleteMigration(db Transaction, version string) error {
+func (drv *ClickHouseDriver) DeleteMigration(db Transaction, version string) error {
 	_, err := db.Exec(
-		"insert into schema_migrations (version, applied) values (?, ?)",
+		fmt.Sprintf("insert into %s (version, applied) values (?, ?)",
+			drv.quotedMigrationsTableName()),
 		version, false,
 	)
 
@@ -268,7 +285,7 @@ func (drv ClickHouseDriver) DeleteMigration(db Transaction, version string) erro
 
 // Ping verifies a connection to the database server. It does not verify whether the
 // specified database exists.
-func (drv ClickHouseDriver) Ping(u *url.URL) error {
+func (drv *ClickHouseDriver) Ping(u *url.URL) error {
 	// attempt connection to primary database, not "clickhouse" database
 	// to support servers with no "clickhouse" database
 	// (see https://github.com/amacneil/dbmate/issues/78)
@@ -290,4 +307,8 @@ func (drv ClickHouseDriver) Ping(u *url.URL) error {
 	}
 
 	return err
+}
+
+func (drv *ClickHouseDriver) quotedMigrationsTableName() string {
+	return drv.quoteIdentifier(drv.migrationsTableName)
 }

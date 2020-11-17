@@ -38,10 +38,24 @@ func TestNew(t *testing.T) {
 	require.True(t, db.AutoDumpSchema)
 	require.Equal(t, u.String(), db.DatabaseURL.String())
 	require.Equal(t, "./db/migrations", db.MigrationsDir)
+	require.Equal(t, "schema_migrations", db.MigrationsTableName)
 	require.Equal(t, "./db/schema.sql", db.SchemaFile)
 	require.False(t, db.WaitBefore)
 	require.Equal(t, time.Second, db.WaitInterval)
 	require.Equal(t, 60*time.Second, db.WaitTimeout)
+}
+
+func TestGetDriver(t *testing.T) {
+	u := postgresTestURL(t)
+	db := New(u)
+
+	drv, err := db.GetDriver()
+	require.NoError(t, err)
+
+	// driver should have default migrations table set
+	pgDrv, ok := drv.(*PostgresDriver)
+	require.True(t, ok)
+	require.Equal(t, "schema_migrations", pgDrv.migrationsTableName)
 }
 
 func TestWait(t *testing.T) {
@@ -242,7 +256,7 @@ func testMigrateURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 
 	// verify results
-	sqlDB, err := GetDriverOpen(u)
+	sqlDB, err := getDriverOpen(u)
 	require.NoError(t, err)
 	defer mustClose(sqlDB)
 
@@ -275,7 +289,7 @@ func testUpURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 
 	// verify results
-	sqlDB, err := GetDriverOpen(u)
+	sqlDB, err := getDriverOpen(u)
 	require.NoError(t, err)
 	defer mustClose(sqlDB)
 
@@ -308,7 +322,7 @@ func testRollbackURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 
 	// verify migration
-	sqlDB, err := GetDriverOpen(u)
+	sqlDB, err := getDriverOpen(u)
 	require.NoError(t, err)
 	defer mustClose(sqlDB)
 
@@ -351,7 +365,7 @@ func testStatusURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 
 	// verify migration
-	sqlDB, err := GetDriverOpen(u)
+	sqlDB, err := getDriverOpen(u)
 	require.NoError(t, err)
 	defer mustClose(sqlDB)
 
