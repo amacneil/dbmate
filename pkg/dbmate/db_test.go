@@ -257,181 +257,165 @@ func testURLs() []*url.URL {
 	}
 }
 
-func testMigrateURL(t *testing.T, u *url.URL) {
-	db := newTestDB(t, u)
-	drv, err := db.GetDriver()
-	require.NoError(t, err)
-
-	// drop and recreate database
-	err = db.Drop()
-	require.NoError(t, err)
-	err = db.Create()
-	require.NoError(t, err)
-
-	// migrate
-	err = db.Migrate()
-	require.NoError(t, err)
-
-	// verify results
-	sqlDB, err := drv.Open()
-	require.NoError(t, err)
-	defer dbutil.MustClose(sqlDB)
-
-	count := 0
-	err = sqlDB.QueryRow(`select count(*) from schema_migrations
-		where version = '20151129054053'`).Scan(&count)
-	require.NoError(t, err)
-	require.Equal(t, 1, count)
-
-	err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
-	require.NoError(t, err)
-	require.Equal(t, 1, count)
-}
-
 func TestMigrate(t *testing.T) {
 	for _, u := range testURLs() {
 		t.Run(u.Scheme, func(t *testing.T) {
-			testMigrateURL(t, u)
+			db := newTestDB(t, u)
+			drv, err := db.GetDriver()
+			require.NoError(t, err)
+
+			// drop and recreate database
+			err = db.Drop()
+			require.NoError(t, err)
+			err = db.Create()
+			require.NoError(t, err)
+
+			// migrate
+			err = db.Migrate()
+			require.NoError(t, err)
+
+			// verify results
+			sqlDB, err := drv.Open()
+			require.NoError(t, err)
+			defer dbutil.MustClose(sqlDB)
+
+			count := 0
+			err = sqlDB.QueryRow(`select count(*) from schema_migrations
+				where version = '20151129054053'`).Scan(&count)
+			require.NoError(t, err)
+			require.Equal(t, 1, count)
+
+			err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
+			require.NoError(t, err)
+			require.Equal(t, 1, count)
 		})
 	}
-}
-
-func testUpURL(t *testing.T, u *url.URL) {
-	db := newTestDB(t, u)
-	drv, err := db.GetDriver()
-	require.NoError(t, err)
-
-	// drop database
-	err = db.Drop()
-	require.NoError(t, err)
-
-	// create and migrate
-	err = db.CreateAndMigrate()
-	require.NoError(t, err)
-
-	// verify results
-	sqlDB, err := drv.Open()
-	require.NoError(t, err)
-	defer dbutil.MustClose(sqlDB)
-
-	count := 0
-	err = sqlDB.QueryRow(`select count(*) from schema_migrations
-		where version = '20151129054053'`).Scan(&count)
-	require.NoError(t, err)
-	require.Equal(t, 1, count)
-
-	err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
-	require.NoError(t, err)
-	require.Equal(t, 1, count)
 }
 
 func TestUp(t *testing.T) {
 	for _, u := range testURLs() {
 		t.Run(u.Scheme, func(t *testing.T) {
-			testUpURL(t, u)
+			db := newTestDB(t, u)
+			drv, err := db.GetDriver()
+			require.NoError(t, err)
+
+			// drop database
+			err = db.Drop()
+			require.NoError(t, err)
+
+			// create and migrate
+			err = db.CreateAndMigrate()
+			require.NoError(t, err)
+
+			// verify results
+			sqlDB, err := drv.Open()
+			require.NoError(t, err)
+			defer dbutil.MustClose(sqlDB)
+
+			count := 0
+			err = sqlDB.QueryRow(`select count(*) from schema_migrations
+				where version = '20151129054053'`).Scan(&count)
+			require.NoError(t, err)
+			require.Equal(t, 1, count)
+
+			err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
+			require.NoError(t, err)
+			require.Equal(t, 1, count)
 		})
 	}
-}
-
-func testRollbackURL(t *testing.T, u *url.URL) {
-	db := newTestDB(t, u)
-	drv, err := db.GetDriver()
-	require.NoError(t, err)
-
-	// drop, recreate, and migrate database
-	err = db.Drop()
-	require.NoError(t, err)
-	err = db.Create()
-	require.NoError(t, err)
-	err = db.Migrate()
-	require.NoError(t, err)
-
-	// verify migration
-	sqlDB, err := drv.Open()
-	require.NoError(t, err)
-	defer dbutil.MustClose(sqlDB)
-
-	count := 0
-	err = sqlDB.QueryRow(`select count(*) from schema_migrations
-		where version = '20151129054053'`).Scan(&count)
-	require.NoError(t, err)
-	require.Equal(t, 1, count)
-
-	err = sqlDB.QueryRow("select count(*) from posts").Scan(&count)
-	require.Nil(t, err)
-
-	// rollback
-	err = db.Rollback()
-	require.NoError(t, err)
-
-	// verify rollback
-	err = sqlDB.QueryRow("select count(*) from schema_migrations").Scan(&count)
-	require.NoError(t, err)
-	require.Equal(t, 1, count)
-
-	err = sqlDB.QueryRow("select count(*) from posts").Scan(&count)
-	require.NotNil(t, err)
-	require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
 }
 
 func TestRollback(t *testing.T) {
 	for _, u := range testURLs() {
 		t.Run(u.Scheme, func(t *testing.T) {
-			testRollbackURL(t, u)
+			db := newTestDB(t, u)
+			drv, err := db.GetDriver()
+			require.NoError(t, err)
+
+			// drop, recreate, and migrate database
+			err = db.Drop()
+			require.NoError(t, err)
+			err = db.Create()
+			require.NoError(t, err)
+			err = db.Migrate()
+			require.NoError(t, err)
+
+			// verify migration
+			sqlDB, err := drv.Open()
+			require.NoError(t, err)
+			defer dbutil.MustClose(sqlDB)
+
+			count := 0
+			err = sqlDB.QueryRow(`select count(*) from schema_migrations
+				where version = '20151129054053'`).Scan(&count)
+			require.NoError(t, err)
+			require.Equal(t, 1, count)
+
+			err = sqlDB.QueryRow("select count(*) from posts").Scan(&count)
+			require.Nil(t, err)
+
+			// rollback
+			err = db.Rollback()
+			require.NoError(t, err)
+
+			// verify rollback
+			err = sqlDB.QueryRow("select count(*) from schema_migrations").Scan(&count)
+			require.NoError(t, err)
+			require.Equal(t, 1, count)
+
+			err = sqlDB.QueryRow("select count(*) from posts").Scan(&count)
+			require.NotNil(t, err)
+			require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
 		})
 	}
-}
-
-func testStatusURL(t *testing.T, u *url.URL) {
-	db := newTestDB(t, u)
-	drv, err := db.GetDriver()
-	require.NoError(t, err)
-
-	// drop, recreate, and migrate database
-	err = db.Drop()
-	require.NoError(t, err)
-	err = db.Create()
-	require.NoError(t, err)
-
-	// verify migration
-	sqlDB, err := drv.Open()
-	require.NoError(t, err)
-	defer dbutil.MustClose(sqlDB)
-
-	// two pending
-	results, err := db.CheckMigrationsStatus(drv)
-	require.NoError(t, err)
-	require.Len(t, results, 2)
-	require.False(t, results[0].Applied)
-	require.False(t, results[1].Applied)
-
-	// run migrations
-	err = db.Migrate()
-	require.NoError(t, err)
-
-	// two applied
-	results, err = db.CheckMigrationsStatus(drv)
-	require.NoError(t, err)
-	require.Len(t, results, 2)
-	require.True(t, results[0].Applied)
-	require.True(t, results[1].Applied)
-
-	// rollback last migration
-	err = db.Rollback()
-	require.NoError(t, err)
-
-	// one applied, one pending
-	results, err = db.CheckMigrationsStatus(drv)
-	require.NoError(t, err)
-	require.Len(t, results, 2)
-	require.True(t, results[0].Applied)
-	require.False(t, results[1].Applied)
 }
 
 func TestStatus(t *testing.T) {
 	for _, u := range testURLs() {
 		t.Run(u.Scheme, func(t *testing.T) {
-			testStatusURL(t, u)
+			db := newTestDB(t, u)
+			drv, err := db.GetDriver()
+			require.NoError(t, err)
+
+			// drop, recreate, and migrate database
+			err = db.Drop()
+			require.NoError(t, err)
+			err = db.Create()
+			require.NoError(t, err)
+
+			// verify migration
+			sqlDB, err := drv.Open()
+			require.NoError(t, err)
+			defer dbutil.MustClose(sqlDB)
+
+			// two pending
+			results, err := db.CheckMigrationsStatus(drv)
+			require.NoError(t, err)
+			require.Len(t, results, 2)
+			require.False(t, results[0].Applied)
+			require.False(t, results[1].Applied)
+
+			// run migrations
+			err = db.Migrate()
+			require.NoError(t, err)
+
+			// two applied
+			results, err = db.CheckMigrationsStatus(drv)
+			require.NoError(t, err)
+			require.Len(t, results, 2)
+			require.True(t, results[0].Applied)
+			require.True(t, results[1].Applied)
+
+			// rollback last migration
+			err = db.Rollback()
+			require.NoError(t, err)
+
+			// one applied, one pending
+			results, err = db.CheckMigrationsStatus(drv)
+			require.NoError(t, err)
+			require.Len(t, results, 2)
+			require.True(t, results[0].Applied)
+			require.False(t, results[1].Applied)
 		})
 	}
 }

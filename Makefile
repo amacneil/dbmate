@@ -22,9 +22,9 @@ lint:
 
 .PHONY: wait
 wait:
+	dist/dbmate-linux-amd64 -e CLICKHOUSE_TEST_URL wait
 	dist/dbmate-linux-amd64 -e MYSQL_TEST_URL wait
 	dist/dbmate-linux-amd64 -e POSTGRES_TEST_URL wait
-	dist/dbmate-linux-amd64 -e CLICKHOUSE_TEST_URL wait
 
 .PHONY: clean
 clean:
