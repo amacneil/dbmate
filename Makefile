@@ -10,7 +10,7 @@ all: build lint test
 
 .PHONY: test
 test:
-	go test $(TAGS) $(STATICLDFLAGS) ./...
+	go test -p 1 $(TAGS) $(STATICLDFLAGS) ./...
 
 .PHONY: fix
 fix:

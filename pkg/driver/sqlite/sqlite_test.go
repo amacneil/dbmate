@@ -4,7 +4,6 @@ package sqlite
 
 import (
 	"database/sql"
-	"net/url"
 	"os"
 	"testing"
 
@@ -14,15 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func sqliteTestURL(t *testing.T) *url.URL {
-	u, err := url.Parse("sqlite3:////tmp/dbmate.sqlite3")
-	require.NoError(t, err)
-
-	return u
-}
-
 func testSQLiteDriver(t *testing.T) *Driver {
-	u := sqliteTestURL(t)
+	u := dbutil.MustParseURL(os.Getenv("SQLITE_TEST_URL"))
 	drv, err := dbmate.New(u).GetDriver()
 	require.NoError(t, err)
 

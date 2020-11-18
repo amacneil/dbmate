@@ -3,6 +3,7 @@ package mysql
 import (
 	"database/sql"
 	"net/url"
+	"os"
 	"testing"
 
 	"github.com/amacneil/dbmate/pkg/dbmate"
@@ -11,15 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func mySQLTestURL(t *testing.T) *url.URL {
-	u, err := url.Parse("mysql://root:root@mysql/dbmate")
-	require.NoError(t, err)
-
-	return u
-}
-
 func testMySQLDriver(t *testing.T) *Driver {
-	u := mySQLTestURL(t)
+	u := dbutil.MustParseURL(os.Getenv("MYSQL_TEST_URL"))
 	drv, err := dbmate.New(u).GetDriver()
 	require.NoError(t, err)
 
@@ -123,7 +117,7 @@ func TestMySQLCreateDropDatabase(t *testing.T) {
 
 		err = db.Ping()
 		require.Error(t, err)
-		require.Regexp(t, "Unknown database 'dbmate'", err.Error())
+		require.Regexp(t, "Unknown database 'dbmate_test'", err.Error())
 	}()
 }
 
@@ -210,7 +204,7 @@ func TestMySQLCreateMigrationsTable(t *testing.T) {
 	count := 0
 	err := db.QueryRow("select count(*) from test_migrations").Scan(&count)
 	require.Error(t, err)
-	require.Regexp(t, "Table 'dbmate.test_migrations' doesn't exist", err.Error())
+	require.Regexp(t, "Table 'dbmate_test.test_migrations' doesn't exist", err.Error())
 
 	// create table
 	err = drv.CreateMigrationsTable(db)

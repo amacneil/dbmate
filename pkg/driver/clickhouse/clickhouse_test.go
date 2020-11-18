@@ -3,6 +3,7 @@ package clickhouse
 import (
 	"database/sql"
 	"net/url"
+	"os"
 	"testing"
 
 	"github.com/amacneil/dbmate/pkg/dbmate"
@@ -11,15 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func clickHouseTestURL(t *testing.T) *url.URL {
-	u, err := url.Parse("clickhouse://clickhouse:9000?database=dbmate")
-	require.NoError(t, err)
-
-	return u
-}
-
 func testClickHouseDriver(t *testing.T) *Driver {
-	u := clickHouseTestURL(t)
+	u := dbutil.MustParseURL(os.Getenv("CLICKHOUSE_TEST_URL"))
 	drv, err := dbmate.New(u).GetDriver()
 	require.NoError(t, err)
 
@@ -94,7 +88,7 @@ func TestClickHouseCreateDropDatabase(t *testing.T) {
 		defer dbutil.MustClose(db)
 
 		err = db.Ping()
-		require.EqualError(t, err, "code: 81, message: Database dbmate doesn't exist")
+		require.EqualError(t, err, "code: 81, message: Database dbmate_test doesn't exist")
 	}()
 }
 
@@ -187,7 +181,7 @@ func TestClickHouseCreateMigrationsTable(t *testing.T) {
 		// migrations table should not exist
 		count := 0
 		err := db.QueryRow("select count(*) from schema_migrations").Scan(&count)
-		require.EqualError(t, err, "code: 60, message: Table dbmate.schema_migrations doesn't exist.")
+		require.EqualError(t, err, "code: 60, message: Table dbmate_test.schema_migrations doesn't exist.")
 
 		// create table
 		err = drv.CreateMigrationsTable(db)
@@ -212,7 +206,7 @@ func TestClickHouseCreateMigrationsTable(t *testing.T) {
 		// migrations table should not exist
 		count := 0
 		err := db.QueryRow("select count(*) from \"testMigrations\"").Scan(&count)
-		require.EqualError(t, err, "code: 60, message: Table dbmate.testMigrations doesn't exist.")
+		require.EqualError(t, err, "code: 60, message: Table dbmate_test.testMigrations doesn't exist.")
 
 		// create table
 		err = drv.CreateMigrationsTable(db)

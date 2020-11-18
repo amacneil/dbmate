@@ -3,6 +3,7 @@ package postgres
 import (
 	"database/sql"
 	"net/url"
+	"os"
 	"testing"
 
 	"github.com/amacneil/dbmate/pkg/dbmate"
@@ -11,15 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func postgresTestURL(t *testing.T) *url.URL {
-	u, err := url.Parse("postgres://postgres:postgres@postgres/dbmate?sslmode=disable")
-	require.NoError(t, err)
-
-	return u
-}
-
 func testPostgresDriver(t *testing.T) *Driver {
-	u := postgresTestURL(t)
+	u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
 	drv, err := dbmate.New(u).GetDriver()
 	require.NoError(t, err)
 
@@ -142,7 +136,7 @@ func TestPostgresCreateDropDatabase(t *testing.T) {
 
 		err = db.Ping()
 		require.Error(t, err)
-		require.Equal(t, "pq: database \"dbmate\" does not exist", err.Error())
+		require.Equal(t, "pq: database \"dbmate_test\" does not exist", err.Error())
 	}()
 }
 
