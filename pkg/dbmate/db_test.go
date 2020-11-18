@@ -32,6 +32,15 @@ func newTestDB(t *testing.T, u *url.URL) *DB {
 	return db
 }
 
+func urlMustParse(s string) *url.URL {
+	u, err := url.Parse(s)
+	if err != nil {
+		panic(err)
+	}
+
+	return u
+}
+
 func TestNew(t *testing.T) {
 	u := postgresTestURL(t)
 	db := New(u)
@@ -46,16 +55,50 @@ func TestNew(t *testing.T) {
 }
 
 func TestGetDriver(t *testing.T) {
-	u := postgresTestURL(t)
-	db := New(u)
+	t.Run("postgres", func(t *testing.T) {
+		db := New(urlMustParse("postgres://"))
+		drv, err := db.GetDriver()
+		require.NoError(t, err)
 
-	drv, err := db.GetDriver()
-	require.NoError(t, err)
+		// driver should have URL and default migrations table set
+		pgDrv, ok := drv.(*PostgresDriver)
+		require.Equal(t, true, ok)
+		require.Equal(t, db.DatabaseURL.String(), pgDrv.databaseURL.String())
+		require.Equal(t, "schema_migrations", pgDrv.migrationsTableName)
+	})
 
-	// driver should have default migrations table set
-	pgDrv, ok := drv.(*PostgresDriver)
-	require.True(t, ok)
-	require.Equal(t, "schema_migrations", pgDrv.migrationsTableName)
+	t.Run("mysql", func(t *testing.T) {
+		db := New(urlMustParse("mysql://"))
+		drv, err := db.GetDriver()
+		require.NoError(t, err)
+
+		// driver should have URL and default migrations table set
+		pgDrv, ok := drv.(*MySQLDriver)
+		require.Equal(t, true, ok)
+		require.Equal(t, db.DatabaseURL.String(), pgDrv.databaseURL.String())
+		require.Equal(t, "schema_migrations", pgDrv.migrationsTableName)
+	})
+
+	t.Run("missing URL", func(t *testing.T) {
+		db := New(nil)
+		drv, err := db.GetDriver()
+		require.Nil(t, drv)
+		require.EqualError(t, err, "invalid url")
+	})
+
+	t.Run("missing scheme", func(t *testing.T) {
+		db := New(urlMustParse("//hi"))
+		drv, err := db.GetDriver()
+		require.Nil(t, drv)
+		require.EqualError(t, err, "invalid url")
+	})
+
+	t.Run("invalid driver", func(t *testing.T) {
+		db := New(urlMustParse("foo://bar"))
+		drv, err := db.GetDriver()
+		require.EqualError(t, err, "unsupported driver: foo")
+		require.Nil(t, drv)
+	})
 }
 
 func TestWait(t *testing.T) {
@@ -244,9 +287,11 @@ func testURLs(t *testing.T) []*url.URL {
 
 func testMigrateURL(t *testing.T, u *url.URL) {
 	db := newTestDB(t, u)
+	drv, err := db.GetDriver()
+	require.NoError(t, err)
 
 	// drop and recreate database
-	err := db.Drop()
+	err = db.Drop()
 	require.NoError(t, err)
 	err = db.Create()
 	require.NoError(t, err)
@@ -256,7 +301,7 @@ func testMigrateURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 
 	// verify results
-	sqlDB, err := getDriverOpen(u)
+	sqlDB, err := drv.Open()
 	require.NoError(t, err)
 	defer mustClose(sqlDB)
 
@@ -273,15 +318,19 @@ func testMigrateURL(t *testing.T, u *url.URL) {
 
 func TestMigrate(t *testing.T) {
 	for _, u := range testURLs(t) {
-		testMigrateURL(t, u)
+		t.Run(u.Scheme, func(t *testing.T) {
+			testMigrateURL(t, u)
+		})
 	}
 }
 
 func testUpURL(t *testing.T, u *url.URL) {
 	db := newTestDB(t, u)
+	drv, err := db.GetDriver()
+	require.NoError(t, err)
 
 	// drop database
-	err := db.Drop()
+	err = db.Drop()
 	require.NoError(t, err)
 
 	// create and migrate
@@ -289,7 +338,7 @@ func testUpURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 
 	// verify results
-	sqlDB, err := getDriverOpen(u)
+	sqlDB, err := drv.Open()
 	require.NoError(t, err)
 	defer mustClose(sqlDB)
 
@@ -306,15 +355,19 @@ func testUpURL(t *testing.T, u *url.URL) {
 
 func TestUp(t *testing.T) {
 	for _, u := range testURLs(t) {
-		testUpURL(t, u)
+		t.Run(u.Scheme, func(t *testing.T) {
+			testUpURL(t, u)
+		})
 	}
 }
 
 func testRollbackURL(t *testing.T, u *url.URL) {
 	db := newTestDB(t, u)
+	drv, err := db.GetDriver()
+	require.NoError(t, err)
 
 	// drop, recreate, and migrate database
-	err := db.Drop()
+	err = db.Drop()
 	require.NoError(t, err)
 	err = db.Create()
 	require.NoError(t, err)
@@ -322,7 +375,7 @@ func testRollbackURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 
 	// verify migration
-	sqlDB, err := getDriverOpen(u)
+	sqlDB, err := drv.Open()
 	require.NoError(t, err)
 	defer mustClose(sqlDB)
 
@@ -351,26 +404,30 @@ func testRollbackURL(t *testing.T, u *url.URL) {
 
 func TestRollback(t *testing.T) {
 	for _, u := range testURLs(t) {
-		testRollbackURL(t, u)
+		t.Run(u.Scheme, func(t *testing.T) {
+			testRollbackURL(t, u)
+		})
 	}
 }
 
 func testStatusURL(t *testing.T, u *url.URL) {
 	db := newTestDB(t, u)
+	drv, err := db.GetDriver()
+	require.NoError(t, err)
 
 	// drop, recreate, and migrate database
-	err := db.Drop()
+	err = db.Drop()
 	require.NoError(t, err)
 	err = db.Create()
 	require.NoError(t, err)
 
 	// verify migration
-	sqlDB, err := getDriverOpen(u)
+	sqlDB, err := drv.Open()
 	require.NoError(t, err)
 	defer mustClose(sqlDB)
 
 	// two pending
-	results, err := checkMigrationsStatus(db)
+	results, err := db.checkMigrationsStatus(drv)
 	require.NoError(t, err)
 	require.Len(t, results, 2)
 	require.False(t, results[0].applied)
@@ -381,7 +438,7 @@ func testStatusURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 
 	// two applied
-	results, err = checkMigrationsStatus(db)
+	results, err = db.checkMigrationsStatus(drv)
 	require.NoError(t, err)
 	require.Len(t, results, 2)
 	require.True(t, results[0].applied)
@@ -392,7 +449,7 @@ func testStatusURL(t *testing.T, u *url.URL) {
 	require.NoError(t, err)
 
 	// one applied, one pending
-	results, err = checkMigrationsStatus(db)
+	results, err = db.checkMigrationsStatus(drv)
 	require.NoError(t, err)
 	require.Len(t, results, 2)
 	require.True(t, results[0].applied)
@@ -401,6 +458,8 @@ func testStatusURL(t *testing.T, u *url.URL) {
 
 func TestStatus(t *testing.T) {
 	for _, u := range testURLs(t) {
-		testStatusURL(t, u)
+		t.Run(u.Scheme, func(t *testing.T) {
+			testStatusURL(t, u)
+		})
 	}
 }

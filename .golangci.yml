@@ -26,3 +26,7 @@ linters-settings:
     local-prefixes: github.com/amacneil/dbmate
   misspell:
     locale: US
+
+issues:
+  include:
+    - EXC0002

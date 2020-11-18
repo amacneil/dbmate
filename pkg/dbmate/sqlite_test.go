@@ -18,42 +18,42 @@ func sqliteTestURL(t *testing.T) *url.URL {
 	return u
 }
 
-func testSQLiteDriver() *SQLiteDriver {
-	drv := &SQLiteDriver{}
-	drv.SetMigrationsTableName(DefaultMigrationsTableName)
+func testSQLiteDriver(t *testing.T) *SQLiteDriver {
+	u := sqliteTestURL(t)
+	drv, err := New(u).GetDriver()
+	require.NoError(t, err)
 
-	return drv
+	return drv.(*SQLiteDriver)
 }
 
-func prepTestSQLiteDB(t *testing.T, u *url.URL) *sql.DB {
-	drv := testSQLiteDriver()
+func prepTestSQLiteDB(t *testing.T) *sql.DB {
+	drv := testSQLiteDriver(t)
 
 	// drop any existing database
-	err := drv.DropDatabase(u)
+	err := drv.DropDatabase()
 	require.NoError(t, err)
 
 	// create database
-	err = drv.CreateDatabase(u)
+	err = drv.CreateDatabase()
 	require.NoError(t, err)
 
 	// connect database
-	db, err := drv.Open(u)
+	db, err := drv.Open()
 	require.NoError(t, err)
 
 	return db
 }
 
 func TestSQLiteCreateDropDatabase(t *testing.T) {
-	drv := testSQLiteDriver()
-	u := sqliteTestURL(t)
-	path := sqlitePath(u)
+	drv := testSQLiteDriver(t)
+	path := sqlitePath(drv.databaseURL)
 
 	// drop any existing database
-	err := drv.DropDatabase(u)
+	err := drv.DropDatabase()
 	require.NoError(t, err)
 
 	// create database
-	err = drv.CreateDatabase(u)
+	err = drv.CreateDatabase()
 	require.NoError(t, err)
 
 	// check that database exists
@@ -61,7 +61,7 @@ func TestSQLiteCreateDropDatabase(t *testing.T) {
 	require.NoError(t, err)
 
 	// drop the database
-	err = drv.DropDatabase(u)
+	err = drv.DropDatabase()
 	require.NoError(t, err)
 
 	// check that database no longer exists
@@ -71,15 +71,13 @@ func TestSQLiteCreateDropDatabase(t *testing.T) {
 }
 
 func TestSQLiteDumpSchema(t *testing.T) {
-	drv := testSQLiteDriver()
-	drv.SetMigrationsTableName("test_migrations")
-
-	u := sqliteTestURL(t)
+	drv := testSQLiteDriver(t)
+	drv.migrationsTableName = "test_migrations"
 
 	// prepare database
-	db := prepTestSQLiteDB(t, u)
+	db := prepTestSQLiteDB(t)
 	defer mustClose(db)
-	err := drv.CreateMigrationsTable(u, db)
+	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
 	// insert migration
@@ -89,7 +87,7 @@ func TestSQLiteDumpSchema(t *testing.T) {
 	require.NoError(t, err)
 
 	// DumpSchema should return schema
-	schema, err := drv.DumpSchema(u, db)
+	schema, err := drv.DumpSchema(db)
 	require.NoError(t, err)
 	require.Contains(t, string(schema), "CREATE TABLE IF NOT EXISTS \"test_migrations\"")
 	require.Contains(t, string(schema), ");\n-- Dbmate schema migrations\n"+
@@ -98,50 +96,50 @@ func TestSQLiteDumpSchema(t *testing.T) {
 		"  ('abc2');\n")
 
 	// DumpSchema should return error if command fails
-	u.Path = "/."
-	schema, err = drv.DumpSchema(u, db)
+	drv.databaseURL.Path = "/."
+	schema, err = drv.DumpSchema(db)
 	require.Nil(t, schema)
+	require.Error(t, err)
 	require.EqualError(t, err, "Error: unable to open database \".\": "+
 		"unable to open database file")
 }
 
 func TestSQLiteDatabaseExists(t *testing.T) {
-	drv := testSQLiteDriver()
-	u := sqliteTestURL(t)
+	drv := testSQLiteDriver(t)
 
 	// drop any existing database
-	err := drv.DropDatabase(u)
+	err := drv.DropDatabase()
 	require.NoError(t, err)
 
 	// DatabaseExists should return false
-	exists, err := drv.DatabaseExists(u)
+	exists, err := drv.DatabaseExists()
 	require.NoError(t, err)
 	require.Equal(t, false, exists)
 
 	// create database
-	err = drv.CreateDatabase(u)
+	err = drv.CreateDatabase()
 	require.NoError(t, err)
 
 	// DatabaseExists should return true
-	exists, err = drv.DatabaseExists(u)
+	exists, err = drv.DatabaseExists()
 	require.NoError(t, err)
 	require.Equal(t, true, exists)
 }
 
 func TestSQLiteCreateMigrationsTable(t *testing.T) {
 	t.Run("default table", func(t *testing.T) {
-		drv := testSQLiteDriver()
-		u := sqliteTestURL(t)
-		db := prepTestSQLiteDB(t, u)
+		drv := testSQLiteDriver(t)
+		db := prepTestSQLiteDB(t)
 		defer mustClose(db)
 
 		// migrations table should not exist
 		count := 0
 		err := db.QueryRow("select count(*) from schema_migrations").Scan(&count)
+		require.Error(t, err)
 		require.Regexp(t, "no such table: schema_migrations", err.Error())
 
 		// create table
-		err = drv.CreateMigrationsTable(u, db)
+		err = drv.CreateMigrationsTable(db)
 		require.NoError(t, err)
 
 		// migrations table should exist
@@ -149,25 +147,25 @@ func TestSQLiteCreateMigrationsTable(t *testing.T) {
 		require.NoError(t, err)
 
 		// create table should be idempotent
-		err = drv.CreateMigrationsTable(u, db)
+		err = drv.CreateMigrationsTable(db)
 		require.NoError(t, err)
 	})
 
 	t.Run("custom table", func(t *testing.T) {
-		drv := testSQLiteDriver()
-		drv.SetMigrationsTableName("test_migrations")
+		drv := testSQLiteDriver(t)
+		drv.migrationsTableName = "test_migrations"
 
-		u := sqliteTestURL(t)
-		db := prepTestSQLiteDB(t, u)
+		db := prepTestSQLiteDB(t)
 		defer mustClose(db)
 
 		// migrations table should not exist
 		count := 0
 		err := db.QueryRow("select count(*) from test_migrations").Scan(&count)
+		require.Error(t, err)
 		require.Regexp(t, "no such table: test_migrations", err.Error())
 
 		// create table
-		err = drv.CreateMigrationsTable(u, db)
+		err = drv.CreateMigrationsTable(db)
 		require.NoError(t, err)
 
 		// migrations table should exist
@@ -175,20 +173,19 @@ func TestSQLiteCreateMigrationsTable(t *testing.T) {
 		require.NoError(t, err)
 
 		// create table should be idempotent
-		err = drv.CreateMigrationsTable(u, db)
+		err = drv.CreateMigrationsTable(db)
 		require.NoError(t, err)
 	})
 }
 
 func TestSQLiteSelectMigrations(t *testing.T) {
-	drv := testSQLiteDriver()
-	drv.SetMigrationsTableName("test_migrations")
+	drv := testSQLiteDriver(t)
+	drv.migrationsTableName = "test_migrations"
 
-	u := sqliteTestURL(t)
-	db := prepTestSQLiteDB(t, u)
+	db := prepTestSQLiteDB(t)
 	defer mustClose(db)
 
-	err := drv.CreateMigrationsTable(u, db)
+	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
 	_, err = db.Exec(`insert into test_migrations (version)
@@ -210,14 +207,13 @@ func TestSQLiteSelectMigrations(t *testing.T) {
 }
 
 func TestSQLiteInsertMigration(t *testing.T) {
-	drv := testSQLiteDriver()
-	drv.SetMigrationsTableName("test_migrations")
+	drv := testSQLiteDriver(t)
+	drv.migrationsTableName = "test_migrations"
 
-	u := sqliteTestURL(t)
-	db := prepTestSQLiteDB(t, u)
+	db := prepTestSQLiteDB(t)
 	defer mustClose(db)
 
-	err := drv.CreateMigrationsTable(u, db)
+	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
 	count := 0
@@ -236,14 +232,13 @@ func TestSQLiteInsertMigration(t *testing.T) {
 }
 
 func TestSQLiteDeleteMigration(t *testing.T) {
-	drv := testSQLiteDriver()
-	drv.SetMigrationsTableName("test_migrations")
+	drv := testSQLiteDriver(t)
+	drv.migrationsTableName = "test_migrations"
 
-	u := sqliteTestURL(t)
-	db := prepTestSQLiteDB(t, u)
+	db := prepTestSQLiteDB(t)
 	defer mustClose(db)
 
-	err := drv.CreateMigrationsTable(u, db)
+	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
 	_, err = db.Exec(`insert into test_migrations (version)
@@ -260,16 +255,15 @@ func TestSQLiteDeleteMigration(t *testing.T) {
 }
 
 func TestSQLitePing(t *testing.T) {
-	drv := testSQLiteDriver()
-	u := sqliteTestURL(t)
-	path := sqlitePath(u)
+	drv := testSQLiteDriver(t)
+	path := sqlitePath(drv.databaseURL)
 
 	// drop any existing database
-	err := drv.DropDatabase(u)
+	err := drv.DropDatabase()
 	require.NoError(t, err)
 
 	// ping database
-	err = drv.Ping(u)
+	err = drv.Ping()
 	require.NoError(t, err)
 
 	// check that the database was created (sqlite-only behavior)
@@ -277,7 +271,7 @@ func TestSQLitePing(t *testing.T) {
 	require.NoError(t, err)
 
 	// drop the database
-	err = drv.DropDatabase(u)
+	err = drv.DropDatabase()
 	require.NoError(t, err)
 
 	// create directory where database file is expected
@@ -289,20 +283,20 @@ func TestSQLitePing(t *testing.T) {
 	}()
 
 	// ping database should fail
-	err = drv.Ping(u)
+	err = drv.Ping()
 	require.EqualError(t, err, "unable to open database file: is a directory")
 }
 
 func TestSQLiteQuotedMigrationsTableName(t *testing.T) {
 	t.Run("default name", func(t *testing.T) {
-		drv := testSQLiteDriver()
+		drv := testSQLiteDriver(t)
 		name := drv.quotedMigrationsTableName()
 		require.Equal(t, `"schema_migrations"`, name)
 	})
 
 	t.Run("custom name", func(t *testing.T) {
-		drv := testSQLiteDriver()
-		drv.SetMigrationsTableName("fooMigrations")
+		drv := testSQLiteDriver(t)
+		drv.migrationsTableName = "fooMigrations"
 
 		name := drv.quotedMigrationsTableName()
 		require.Equal(t, `"fooMigrations"`, name)

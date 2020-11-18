@@ -11,14 +11,21 @@ import (
 )
 
 func init() {
-	drv := &PostgresDriver{}
-	RegisterDriver(drv, "postgres")
-	RegisterDriver(drv, "postgresql")
+	RegisterDriver(newPostgresDriver, "postgres")
+	RegisterDriver(newPostgresDriver, "postgresql")
 }
 
 // PostgresDriver provides top level database functions
 type PostgresDriver struct {
 	migrationsTableName string
+	databaseURL         *url.URL
+}
+
+func newPostgresDriver(config DriverConfig) Driver {
+	return &PostgresDriver{
+		migrationsTableName: config.MigrationsTableName,
+		databaseURL:         config.DatabaseURL,
+	}
 }
 
 func normalizePostgresURL(u *url.URL) *url.URL {
@@ -80,30 +87,30 @@ func normalizePostgresURLForDump(u *url.URL) []string {
 	return out
 }
 
-// SetMigrationsTableName sets the schema migrations table name
-func (drv *PostgresDriver) SetMigrationsTableName(name string) {
-	drv.migrationsTableName = name
-}
-
 // Open creates a new database connection
-func (drv *PostgresDriver) Open(u *url.URL) (*sql.DB, error) {
-	return sql.Open("postgres", normalizePostgresURL(u).String())
+func (drv *PostgresDriver) Open() (*sql.DB, error) {
+	return sql.Open("postgres", normalizePostgresURL(drv.databaseURL).String())
 }
 
-func (drv *PostgresDriver) openPostgresDB(u *url.URL) (*sql.DB, error) {
+func (drv *PostgresDriver) openPostgresDB() (*sql.DB, error) {
+	// clone databaseURL
+	postgresURL, err := url.Parse(normalizePostgresURL(drv.databaseURL).String())
+	if err != nil {
+		return nil, err
+	}
+
 	// connect to postgres database
-	postgresURL := *u
 	postgresURL.Path = "postgres"
 
-	return drv.Open(&postgresURL)
+	return sql.Open("postgres", postgresURL.String())
 }
 
 // CreateDatabase creates the specified database
-func (drv *PostgresDriver) CreateDatabase(u *url.URL) error {
-	name := databaseName(u)
+func (drv *PostgresDriver) CreateDatabase() error {
+	name := databaseName(drv.databaseURL)
 	fmt.Printf("Creating: %s\n", name)
 
-	db, err := drv.openPostgresDB(u)
+	db, err := drv.openPostgresDB()
 	if err != nil {
 		return err
 	}
@@ -116,11 +123,11 @@ func (drv *PostgresDriver) CreateDatabase(u *url.URL) error {
 }
 
 // DropDatabase drops the specified database (if it exists)
-func (drv *PostgresDriver) DropDatabase(u *url.URL) error {
-	name := databaseName(u)
+func (drv *PostgresDriver) DropDatabase() error {
+	name := databaseName(drv.databaseURL)
 	fmt.Printf("Dropping: %s\n", name)
 
-	db, err := drv.openPostgresDB(u)
+	db, err := drv.openPostgresDB()
 	if err != nil {
 		return err
 	}
@@ -159,10 +166,10 @@ func (drv *PostgresDriver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 }
 
 // DumpSchema returns the current database schema
-func (drv *PostgresDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
+func (drv *PostgresDriver) DumpSchema(db *sql.DB) ([]byte, error) {
 	// load schema
 	args := append([]string{"--format=plain", "--encoding=UTF8", "--schema-only",
-		"--no-privileges", "--no-owner"}, normalizePostgresURLForDump(u)...)
+		"--no-privileges", "--no-owner"}, normalizePostgresURLForDump(drv.databaseURL)...)
 	schema, err := runCommand("pg_dump", args...)
 	if err != nil {
 		return nil, err
@@ -178,10 +185,10 @@ func (drv *PostgresDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
 }
 
 // DatabaseExists determines whether the database exists
-func (drv *PostgresDriver) DatabaseExists(u *url.URL) (bool, error) {
-	name := databaseName(u)
+func (drv *PostgresDriver) DatabaseExists() (bool, error) {
+	name := databaseName(drv.databaseURL)
 
-	db, err := drv.openPostgresDB(u)
+	db, err := drv.openPostgresDB()
 	if err != nil {
 		return false, err
 	}
@@ -198,8 +205,8 @@ func (drv *PostgresDriver) DatabaseExists(u *url.URL) (bool, error) {
 }
 
 // CreateMigrationsTable creates the schema_migrations table
-func (drv *PostgresDriver) CreateMigrationsTable(u *url.URL, db *sql.DB) error {
-	schema, migrationsTable, err := drv.quotedMigrationsTableNameParts(db, u)
+func (drv *PostgresDriver) CreateMigrationsTable(db *sql.DB) error {
+	schema, migrationsTable, err := drv.quotedMigrationsTableNameParts(db)
 	if err != nil {
 		return err
 	}
@@ -295,11 +302,11 @@ func (drv *PostgresDriver) DeleteMigration(db Transaction, version string) error
 
 // Ping verifies a connection to the database server. It does not verify whether the
 // specified database exists.
-func (drv *PostgresDriver) Ping(u *url.URL) error {
+func (drv *PostgresDriver) Ping() error {
 	// attempt connection to primary database, not "postgres" database
 	// to support servers with no "postgres" database
 	// (see https://github.com/amacneil/dbmate/issues/78)
-	db, err := drv.Open(u)
+	db, err := drv.Open()
 	if err != nil {
 		return err
 	}
@@ -320,7 +327,7 @@ func (drv *PostgresDriver) Ping(u *url.URL) error {
 }
 
 func (drv *PostgresDriver) quotedMigrationsTableName(db Transaction) (string, error) {
-	schema, name, err := drv.quotedMigrationsTableNameParts(db, nil)
+	schema, name, err := drv.quotedMigrationsTableNameParts(db)
 	if err != nil {
 		return "", err
 	}
@@ -328,7 +335,7 @@ func (drv *PostgresDriver) quotedMigrationsTableName(db Transaction) (string, er
 	return schema + "." + name, nil
 }
 
-func (drv *PostgresDriver) quotedMigrationsTableNameParts(db Transaction, u *url.URL) (string, string, error) {
+func (drv *PostgresDriver) quotedMigrationsTableNameParts(db Transaction) (string, string, error) {
 	schema := ""
 	tableNameParts := strings.Split(drv.migrationsTableName, ".")
 	if len(tableNameParts) > 1 {
@@ -336,9 +343,9 @@ func (drv *PostgresDriver) quotedMigrationsTableNameParts(db Transaction, u *url
 		schema, tableNameParts = tableNameParts[0], tableNameParts[1:]
 	}
 
-	if schema == "" && u != nil {
+	if schema == "" {
 		// no schema specified with table name, try URL search path if available
-		searchPath := strings.Split(u.Query().Get("search_path"), ",")
+		searchPath := strings.Split(drv.databaseURL.Query().Get("search_path"), ",")
 		schema = strings.TrimSpace(searchPath[0])
 	}
 

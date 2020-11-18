@@ -15,26 +15,27 @@ func postgresTestURL(t *testing.T) *url.URL {
 	return u
 }
 
-func testPostgresDriver() *PostgresDriver {
-	drv := &PostgresDriver{}
-	drv.SetMigrationsTableName(DefaultMigrationsTableName)
+func testPostgresDriver(t *testing.T) *PostgresDriver {
+	u := postgresTestURL(t)
+	drv, err := New(u).GetDriver()
+	require.NoError(t, err)
 
-	return drv
+	return drv.(*PostgresDriver)
 }
 
-func prepTestPostgresDB(t *testing.T, u *url.URL) *sql.DB {
-	drv := testPostgresDriver()
+func prepTestPostgresDB(t *testing.T) *sql.DB {
+	drv := testPostgresDriver(t)
 
 	// drop any existing database
-	err := drv.DropDatabase(u)
+	err := drv.DropDatabase()
 	require.NoError(t, err)
 
 	// create database
-	err = drv.CreateDatabase(u)
+	err = drv.CreateDatabase()
 	require.NoError(t, err)
 
 	// connect database
-	db, err := sql.Open("postgres", u.String())
+	db, err := sql.Open("postgres", drv.databaseURL.String())
 	require.NoError(t, err)
 
 	return db
@@ -94,20 +95,19 @@ func TestNormalizePostgresURLForDump(t *testing.T) {
 }
 
 func TestPostgresCreateDropDatabase(t *testing.T) {
-	drv := testPostgresDriver()
-	u := postgresTestURL(t)
+	drv := testPostgresDriver(t)
 
 	// drop any existing database
-	err := drv.DropDatabase(u)
+	err := drv.DropDatabase()
 	require.NoError(t, err)
 
 	// create database
-	err = drv.CreateDatabase(u)
+	err = drv.CreateDatabase()
 	require.NoError(t, err)
 
 	// check that database exists and we can connect to it
 	func() {
-		db, err := sql.Open("postgres", u.String())
+		db, err := sql.Open("postgres", drv.databaseURL.String())
 		require.NoError(t, err)
 		defer mustClose(db)
 
@@ -116,12 +116,12 @@ func TestPostgresCreateDropDatabase(t *testing.T) {
 	}()
 
 	// drop the database
-	err = drv.DropDatabase(u)
+	err = drv.DropDatabase()
 	require.NoError(t, err)
 
 	// check that database no longer exists
 	func() {
-		db, err := sql.Open("postgres", u.String())
+		db, err := sql.Open("postgres", drv.databaseURL.String())
 		require.NoError(t, err)
 		defer mustClose(db)
 
@@ -133,13 +133,12 @@ func TestPostgresCreateDropDatabase(t *testing.T) {
 
 func TestPostgresDumpSchema(t *testing.T) {
 	t.Run("default migrations table", func(t *testing.T) {
-		drv := testPostgresDriver()
-		u := postgresTestURL(t)
+		drv := testPostgresDriver(t)
 
 		// prepare database
-		db := prepTestPostgresDB(t, u)
+		db := prepTestPostgresDB(t)
 		defer mustClose(db)
-		err := drv.CreateMigrationsTable(u, db)
+		err := drv.CreateMigrationsTable(db)
 		require.NoError(t, err)
 
 		// insert migration
@@ -149,7 +148,7 @@ func TestPostgresDumpSchema(t *testing.T) {
 		require.NoError(t, err)
 
 		// DumpSchema should return schema
-		schema, err := drv.DumpSchema(u, db)
+		schema, err := drv.DumpSchema(db)
 		require.NoError(t, err)
 		require.Contains(t, string(schema), "CREATE TABLE public.schema_migrations")
 		require.Contains(t, string(schema), "\n--\n"+
@@ -163,23 +162,21 @@ func TestPostgresDumpSchema(t *testing.T) {
 			"    ('abc2');\n")
 
 		// DumpSchema should return error if command fails
-		u.Path = "/fakedb"
-		schema, err = drv.DumpSchema(u, db)
+		drv.databaseURL.Path = "/fakedb"
+		schema, err = drv.DumpSchema(db)
 		require.Nil(t, schema)
 		require.EqualError(t, err, "pg_dump: [archiver (db)] connection to database "+
 			"\"fakedb\" failed: FATAL:  database \"fakedb\" does not exist")
 	})
 
 	t.Run("custom migrations table with schema", func(t *testing.T) {
-		drv := testPostgresDriver()
-		drv.SetMigrationsTableName("camelSchema.testMigrations")
-
-		u := postgresTestURL(t)
+		drv := testPostgresDriver(t)
+		drv.migrationsTableName = "camelSchema.testMigrations"
 
 		// prepare database
-		db := prepTestPostgresDB(t, u)
+		db := prepTestPostgresDB(t)
 		defer mustClose(db)
-		err := drv.CreateMigrationsTable(u, db)
+		err := drv.CreateMigrationsTable(db)
 		require.NoError(t, err)
 
 		// insert migration
@@ -189,7 +186,7 @@ func TestPostgresDumpSchema(t *testing.T) {
 		require.NoError(t, err)
 
 		// DumpSchema should return schema
-		schema, err := drv.DumpSchema(u, db)
+		schema, err := drv.DumpSchema(db)
 		require.NoError(t, err)
 		require.Contains(t, string(schema), "CREATE TABLE \"camelSchema\".\"testMigrations\"")
 		require.Contains(t, string(schema), "\n--\n"+
@@ -205,34 +202,32 @@ func TestPostgresDumpSchema(t *testing.T) {
 }
 
 func TestPostgresDatabaseExists(t *testing.T) {
-	drv := testPostgresDriver()
-	u := postgresTestURL(t)
+	drv := testPostgresDriver(t)
 
 	// drop any existing database
-	err := drv.DropDatabase(u)
+	err := drv.DropDatabase()
 	require.NoError(t, err)
 
 	// DatabaseExists should return false
-	exists, err := drv.DatabaseExists(u)
+	exists, err := drv.DatabaseExists()
 	require.NoError(t, err)
 	require.Equal(t, false, exists)
 
 	// create database
-	err = drv.CreateDatabase(u)
+	err = drv.CreateDatabase()
 	require.NoError(t, err)
 
 	// DatabaseExists should return true
-	exists, err = drv.DatabaseExists(u)
+	exists, err = drv.DatabaseExists()
 	require.NoError(t, err)
 	require.Equal(t, true, exists)
 }
 
 func TestPostgresDatabaseExists_Error(t *testing.T) {
-	drv := testPostgresDriver()
-	u := postgresTestURL(t)
-	u.User = url.User("invalid")
+	drv := testPostgresDriver(t)
+	drv.databaseURL.User = url.User("invalid")
 
-	exists, err := drv.DatabaseExists(u)
+	exists, err := drv.DatabaseExists()
 	require.Error(t, err)
 	require.Equal(t, "pq: password authentication failed for user \"invalid\"", err.Error())
 	require.Equal(t, false, exists)
@@ -240,9 +235,8 @@ func TestPostgresDatabaseExists_Error(t *testing.T) {
 
 func TestPostgresCreateMigrationsTable(t *testing.T) {
 	t.Run("default schema", func(t *testing.T) {
-		drv := testPostgresDriver()
-		u := postgresTestURL(t)
-		db := prepTestPostgresDB(t, u)
+		drv := testPostgresDriver(t)
+		db := prepTestPostgresDB(t)
 		defer mustClose(db)
 
 		// migrations table should not exist
@@ -252,7 +246,7 @@ func TestPostgresCreateMigrationsTable(t *testing.T) {
 		require.Equal(t, "pq: relation \"public.schema_migrations\" does not exist", err.Error())
 
 		// create table
-		err = drv.CreateMigrationsTable(u, db)
+		err = drv.CreateMigrationsTable(db)
 		require.NoError(t, err)
 
 		// migrations table should exist
@@ -260,17 +254,19 @@ func TestPostgresCreateMigrationsTable(t *testing.T) {
 		require.NoError(t, err)
 
 		// create table should be idempotent
-		err = drv.CreateMigrationsTable(u, db)
+		err = drv.CreateMigrationsTable(db)
 		require.NoError(t, err)
 	})
 
 	t.Run("custom search path", func(t *testing.T) {
-		drv := testPostgresDriver()
-		drv.SetMigrationsTableName("testMigrations")
+		drv := testPostgresDriver(t)
+		drv.migrationsTableName = "testMigrations"
 
-		u, err := url.Parse(postgresTestURL(t).String() + "&search_path=camelFoo")
+		u, err := url.Parse(drv.databaseURL.String() + "&search_path=camelFoo")
 		require.NoError(t, err)
-		db := prepTestPostgresDB(t, u)
+		drv.databaseURL = u
+
+		db := prepTestPostgresDB(t)
 		defer mustClose(db)
 
 		// delete schema
@@ -291,7 +287,7 @@ func TestPostgresCreateMigrationsTable(t *testing.T) {
 		require.Equal(t, "pq: relation \"public.testMigrations\" does not exist", err.Error())
 
 		// create table
-		err = drv.CreateMigrationsTable(u, db)
+		err = drv.CreateMigrationsTable(db)
 		require.NoError(t, err)
 
 		// camelFoo schema should be created, and migrations table should exist only in camelFoo schema
@@ -302,17 +298,19 @@ func TestPostgresCreateMigrationsTable(t *testing.T) {
 		require.Equal(t, "pq: relation \"public.testMigrations\" does not exist", err.Error())
 
 		// create table should be idempotent
-		err = drv.CreateMigrationsTable(u, db)
+		err = drv.CreateMigrationsTable(db)
 		require.NoError(t, err)
 	})
 
 	t.Run("custom schema", func(t *testing.T) {
-		drv := testPostgresDriver()
-		drv.SetMigrationsTableName("camelSchema.testMigrations")
+		drv := testPostgresDriver(t)
+		drv.migrationsTableName = "camelSchema.testMigrations"
 
-		u, err := url.Parse(postgresTestURL(t).String() + "&search_path=foo")
+		u, err := url.Parse(drv.databaseURL.String() + "&search_path=foo")
 		require.NoError(t, err)
-		db := prepTestPostgresDB(t, u)
+		drv.databaseURL = u
+
+		db := prepTestPostgresDB(t)
 		defer mustClose(db)
 
 		// delete schemas
@@ -328,7 +326,7 @@ func TestPostgresCreateMigrationsTable(t *testing.T) {
 		require.Equal(t, "pq: relation \"camelSchema.testMigrations\" does not exist", err.Error())
 
 		// create table
-		err = drv.CreateMigrationsTable(u, db)
+		err = drv.CreateMigrationsTable(db)
 		require.NoError(t, err)
 
 		// camelSchema should be created, and testMigrations table should exist
@@ -341,20 +339,19 @@ func TestPostgresCreateMigrationsTable(t *testing.T) {
 		require.Equal(t, "pq: relation \"foo.testMigrations\" does not exist", err.Error())
 
 		// create table should be idempotent
-		err = drv.CreateMigrationsTable(u, db)
+		err = drv.CreateMigrationsTable(db)
 		require.NoError(t, err)
 	})
 }
 
 func TestPostgresSelectMigrations(t *testing.T) {
-	drv := testPostgresDriver()
-	drv.SetMigrationsTableName("test_migrations")
+	drv := testPostgresDriver(t)
+	drv.migrationsTableName = "test_migrations"
 
-	u := postgresTestURL(t)
-	db := prepTestPostgresDB(t, u)
+	db := prepTestPostgresDB(t)
 	defer mustClose(db)
 
-	err := drv.CreateMigrationsTable(u, db)
+	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
 	_, err = db.Exec(`insert into public.test_migrations (version)
@@ -376,14 +373,13 @@ func TestPostgresSelectMigrations(t *testing.T) {
 }
 
 func TestPostgresInsertMigration(t *testing.T) {
-	drv := testPostgresDriver()
-	drv.SetMigrationsTableName("test_migrations")
+	drv := testPostgresDriver(t)
+	drv.migrationsTableName = "test_migrations"
 
-	u := postgresTestURL(t)
-	db := prepTestPostgresDB(t, u)
+	db := prepTestPostgresDB(t)
 	defer mustClose(db)
 
-	err := drv.CreateMigrationsTable(u, db)
+	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
 	count := 0
@@ -402,14 +398,13 @@ func TestPostgresInsertMigration(t *testing.T) {
 }
 
 func TestPostgresDeleteMigration(t *testing.T) {
-	drv := testPostgresDriver()
-	drv.SetMigrationsTableName("test_migrations")
+	drv := testPostgresDriver(t)
+	drv.migrationsTableName = "test_migrations"
 
-	u := postgresTestURL(t)
-	db := prepTestPostgresDB(t, u)
+	db := prepTestPostgresDB(t)
 	defer mustClose(db)
 
-	err := drv.CreateMigrationsTable(u, db)
+	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
 	_, err = db.Exec(`insert into public.test_migrations (version)
@@ -426,30 +421,27 @@ func TestPostgresDeleteMigration(t *testing.T) {
 }
 
 func TestPostgresPing(t *testing.T) {
-	drv := testPostgresDriver()
-	u := postgresTestURL(t)
+	drv := testPostgresDriver(t)
 
 	// drop any existing database
-	err := drv.DropDatabase(u)
+	err := drv.DropDatabase()
 	require.NoError(t, err)
 
 	// ping database
-	err = drv.Ping(u)
+	err = drv.Ping()
 	require.NoError(t, err)
 
 	// ping invalid host should return error
-	u.Host = "postgres:404"
-	err = drv.Ping(u)
+	drv.databaseURL.Host = "postgres:404"
+	err = drv.Ping()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "connect: connection refused")
 }
 
 func TestPostgresQuotedMigrationsTableName(t *testing.T) {
-	drv := testPostgresDriver()
-
 	t.Run("default schema", func(t *testing.T) {
-		u := postgresTestURL(t)
-		db := prepTestPostgresDB(t, u)
+		drv := testPostgresDriver(t)
+		db := prepTestPostgresDB(t)
 		defer mustClose(db)
 
 		name, err := drv.quotedMigrationsTableName(db)
@@ -458,31 +450,28 @@ func TestPostgresQuotedMigrationsTableName(t *testing.T) {
 	})
 
 	t.Run("custom schema", func(t *testing.T) {
-		u, err := url.Parse(postgresTestURL(t).String() + "&search_path=foo,bar,public")
+		drv := testPostgresDriver(t)
+		u, err := url.Parse(drv.databaseURL.String() + "&search_path=foo,bar,public")
 		require.NoError(t, err)
-		db := prepTestPostgresDB(t, u)
+		drv.databaseURL = u
+
+		db := prepTestPostgresDB(t)
 		defer mustClose(db)
 
-		// if "foo" schema does not exist, current schema should be "public"
 		_, err = db.Exec("drop schema if exists foo")
 		require.NoError(t, err)
 		_, err = db.Exec("drop schema if exists bar")
 		require.NoError(t, err)
-		name, err := drv.quotedMigrationsTableName(db)
-		require.NoError(t, err)
-		require.Equal(t, "public.schema_migrations", name)
 
-		// if "foo" schema exists, it should be used
-		_, err = db.Exec("create schema foo")
-		require.NoError(t, err)
-		name, err = drv.quotedMigrationsTableName(db)
+		// should use first schema from search path
+		name, err := drv.quotedMigrationsTableName(db)
 		require.NoError(t, err)
 		require.Equal(t, "foo.schema_migrations", name)
 	})
 
 	t.Run("no schema", func(t *testing.T) {
-		u := postgresTestURL(t)
-		db := prepTestPostgresDB(t, u)
+		drv := testPostgresDriver(t)
+		db := prepTestPostgresDB(t)
 		defer mustClose(db)
 
 		// this is an unlikely edge case, but if for some reason there is
@@ -496,47 +485,53 @@ func TestPostgresQuotedMigrationsTableName(t *testing.T) {
 	})
 
 	t.Run("custom table name", func(t *testing.T) {
-		u := postgresTestURL(t)
-		db := prepTestPostgresDB(t, u)
+		drv := testPostgresDriver(t)
+		db := prepTestPostgresDB(t)
 		defer mustClose(db)
 
-		drv.SetMigrationsTableName("simple_name")
+		drv.migrationsTableName = "simple_name"
 		name, err := drv.quotedMigrationsTableName(db)
 		require.NoError(t, err)
 		require.Equal(t, "public.simple_name", name)
 	})
 
 	t.Run("custom table name quoted", func(t *testing.T) {
-		u := postgresTestURL(t)
-		db := prepTestPostgresDB(t, u)
+		drv := testPostgresDriver(t)
+		db := prepTestPostgresDB(t)
 		defer mustClose(db)
 
 		// this table name will need quoting
-		drv.SetMigrationsTableName("camelCase")
+		drv.migrationsTableName = "camelCase"
 		name, err := drv.quotedMigrationsTableName(db)
 		require.NoError(t, err)
 		require.Equal(t, "public.\"camelCase\"", name)
 	})
 
 	t.Run("custom table name with custom schema", func(t *testing.T) {
-		u, err := url.Parse(postgresTestURL(t).String() + "&search_path=foo")
+		drv := testPostgresDriver(t)
+		u, err := url.Parse(drv.databaseURL.String() + "&search_path=foo")
 		require.NoError(t, err)
-		db := prepTestPostgresDB(t, u)
+		drv.databaseURL = u
+
+		db := prepTestPostgresDB(t)
 		defer mustClose(db)
 
 		_, err = db.Exec("create schema if not exists foo")
 		require.NoError(t, err)
 
-		drv.SetMigrationsTableName("simple_name")
+		drv.migrationsTableName = "simple_name"
 		name, err := drv.quotedMigrationsTableName(db)
 		require.NoError(t, err)
 		require.Equal(t, "foo.simple_name", name)
 	})
 
 	t.Run("custom table name overrides schema", func(t *testing.T) {
-		u, err := url.Parse(postgresTestURL(t).String() + "&search_path=foo")
+		drv := testPostgresDriver(t)
+		u, err := url.Parse(drv.databaseURL.String() + "&search_path=foo")
 		require.NoError(t, err)
-		db := prepTestPostgresDB(t, u)
+		drv.databaseURL = u
+
+		db := prepTestPostgresDB(t)
 		defer mustClose(db)
 
 		_, err = db.Exec("create schema if not exists foo")
@@ -545,19 +540,19 @@ func TestPostgresQuotedMigrationsTableName(t *testing.T) {
 		require.NoError(t, err)
 
 		// if schema is specified as part of table name, it should override search_path
-		drv.SetMigrationsTableName("bar.simple_name")
+		drv.migrationsTableName = "bar.simple_name"
 		name, err := drv.quotedMigrationsTableName(db)
 		require.NoError(t, err)
 		require.Equal(t, "bar.simple_name", name)
 
 		// schema and table name should be quoted if necessary
-		drv.SetMigrationsTableName("barName.camelTable")
+		drv.migrationsTableName = "barName.camelTable"
 		name, err = drv.quotedMigrationsTableName(db)
 		require.NoError(t, err)
 		require.Equal(t, "\"barName\".\"camelTable\"", name)
 
 		// more than 2 components is unexpected but we will quote and pass it along anyway
-		drv.SetMigrationsTableName("whyWould.i.doThis")
+		drv.migrationsTableName = "whyWould.i.doThis"
 		name, err = drv.quotedMigrationsTableName(db)
 		require.NoError(t, err)
 		require.Equal(t, "\"whyWould\".i.\"doThis\"", name)

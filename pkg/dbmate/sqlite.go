@@ -16,14 +16,21 @@ import (
 )
 
 func init() {
-	drv := &SQLiteDriver{}
-	RegisterDriver(drv, "sqlite")
-	RegisterDriver(drv, "sqlite3")
+	RegisterDriver(newSQLiteDriver, "sqlite")
+	RegisterDriver(newSQLiteDriver, "sqlite3")
 }
 
 // SQLiteDriver provides top level database functions
 type SQLiteDriver struct {
 	migrationsTableName string
+	databaseURL         *url.URL
+}
+
+func newSQLiteDriver(config DriverConfig) Driver {
+	return &SQLiteDriver{
+		migrationsTableName: config.MigrationsTableName,
+		databaseURL:         config.DatabaseURL,
+	}
 }
 
 func sqlitePath(u *url.URL) string {
@@ -34,21 +41,16 @@ func sqlitePath(u *url.URL) string {
 	return str
 }
 
-// SetMigrationsTableName sets the schema migrations table name
-func (drv *SQLiteDriver) SetMigrationsTableName(name string) {
-	drv.migrationsTableName = name
-}
-
 // Open creates a new database connection
-func (drv *SQLiteDriver) Open(u *url.URL) (*sql.DB, error) {
-	return sql.Open("sqlite3", sqlitePath(u))
+func (drv *SQLiteDriver) Open() (*sql.DB, error) {
+	return sql.Open("sqlite3", sqlitePath(drv.databaseURL))
 }
 
 // CreateDatabase creates the specified database
-func (drv *SQLiteDriver) CreateDatabase(u *url.URL) error {
-	fmt.Printf("Creating: %s\n", sqlitePath(u))
+func (drv *SQLiteDriver) CreateDatabase() error {
+	fmt.Printf("Creating: %s\n", sqlitePath(drv.databaseURL))
 
-	db, err := drv.Open(u)
+	db, err := drv.Open()
 	if err != nil {
 		return err
 	}
@@ -58,11 +60,11 @@ func (drv *SQLiteDriver) CreateDatabase(u *url.URL) error {
 }
 
 // DropDatabase drops the specified database (if it exists)
-func (drv *SQLiteDriver) DropDatabase(u *url.URL) error {
-	path := sqlitePath(u)
+func (drv *SQLiteDriver) DropDatabase() error {
+	path := sqlitePath(drv.databaseURL)
 	fmt.Printf("Dropping: %s\n", path)
 
-	exists, err := drv.DatabaseExists(u)
+	exists, err := drv.DatabaseExists()
 	if err != nil {
 		return err
 	}
@@ -98,8 +100,8 @@ func (drv *SQLiteDriver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 }
 
 // DumpSchema returns the current database schema
-func (drv *SQLiteDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
-	path := sqlitePath(u)
+func (drv *SQLiteDriver) DumpSchema(db *sql.DB) ([]byte, error) {
+	path := sqlitePath(drv.databaseURL)
 	schema, err := runCommand("sqlite3", path, ".schema")
 	if err != nil {
 		return nil, err
@@ -115,8 +117,8 @@ func (drv *SQLiteDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
 }
 
 // DatabaseExists determines whether the database exists
-func (drv *SQLiteDriver) DatabaseExists(u *url.URL) (bool, error) {
-	_, err := os.Stat(sqlitePath(u))
+func (drv *SQLiteDriver) DatabaseExists() (bool, error) {
+	_, err := os.Stat(sqlitePath(drv.databaseURL))
 	if os.IsNotExist(err) {
 		return false, nil
 	}
@@ -128,7 +130,7 @@ func (drv *SQLiteDriver) DatabaseExists(u *url.URL) (bool, error) {
 }
 
 // CreateMigrationsTable creates the schema migrations table
-func (drv *SQLiteDriver) CreateMigrationsTable(u *url.URL, db *sql.DB) error {
+func (drv *SQLiteDriver) CreateMigrationsTable(db *sql.DB) error {
 	_, err := db.Exec(
 		fmt.Sprintf("create table if not exists %s ", drv.quotedMigrationsTableName()) +
 			"(version varchar(255) primary key)")
@@ -188,8 +190,8 @@ func (drv *SQLiteDriver) DeleteMigration(db Transaction, version string) error {
 // Ping verifies a connection to the database. Due to the way SQLite works, by
 // testing whether the database is valid, it will automatically create the database
 // if it does not already exist.
-func (drv *SQLiteDriver) Ping(u *url.URL) error {
-	db, err := drv.Open(u)
+func (drv *SQLiteDriver) Ping() error {
+	db, err := drv.Open()
 	if err != nil {
 		return err
 	}
