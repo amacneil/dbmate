@@ -6,7 +6,7 @@ STATICLDFLAGS := -ldflags '-s -extldflags "-static"'
 TAGS := -tags netgo,osusergo,sqlite_omit_load_extension,sqlite_json
 
 .PHONY: all
-all: build lint test
+all: build test lint
 
 .PHONY: test
 test:

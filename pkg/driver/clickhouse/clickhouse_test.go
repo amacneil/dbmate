@@ -38,6 +38,18 @@ func prepTestClickHouseDB(t *testing.T) *sql.DB {
 	return db
 }
 
+func TestGetDriver(t *testing.T) {
+	db := dbmate.New(dbutil.MustParseURL("clickhouse://"))
+	drvInterface, err := db.GetDriver()
+	require.NoError(t, err)
+
+	// driver should have URL and default migrations table set
+	drv, ok := drvInterface.(*Driver)
+	require.True(t, ok)
+	require.Equal(t, db.DatabaseURL.String(), drv.databaseURL.String())
+	require.Equal(t, "schema_migrations", drv.migrationsTableName)
+}
+
 func TestConnectionString(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		u, err := url.Parse("clickhouse://user:pass@host/db")

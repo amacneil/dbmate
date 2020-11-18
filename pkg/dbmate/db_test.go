@@ -11,7 +11,7 @@ import (
 	"github.com/amacneil/dbmate/pkg/dbmate"
 	"github.com/amacneil/dbmate/pkg/dbutil"
 	_ "github.com/amacneil/dbmate/pkg/driver/mysql"
-	"github.com/amacneil/dbmate/pkg/driver/postgres"
+	_ "github.com/amacneil/dbmate/pkg/driver/postgres"
 	_ "github.com/amacneil/dbmate/pkg/driver/sqlite"
 
 	"github.com/kami-zh/go-capturer"
@@ -51,15 +51,6 @@ func TestNew(t *testing.T) {
 }
 
 func TestGetDriver(t *testing.T) {
-	t.Run("postgres", func(t *testing.T) {
-		db := dbmate.New(dbutil.MustParseURL("postgres://"))
-		drv, err := db.GetDriver()
-		require.NoError(t, err)
-
-		_, ok := drv.(*postgres.Driver)
-		require.Equal(t, true, ok)
-	})
-
 	t.Run("missing URL", func(t *testing.T) {
 		db := dbmate.New(nil)
 		drv, err := db.GetDriver()

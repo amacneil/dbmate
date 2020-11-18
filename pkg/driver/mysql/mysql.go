@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	dbmate.RegisterDriver(newDriver, "mysql")
+	dbmate.RegisterDriver(NewDriver, "mysql")
 }
 
 // Driver provides top level database functions
@@ -23,7 +23,8 @@ type Driver struct {
 	databaseURL         *url.URL
 }
 
-func newDriver(config dbmate.DriverConfig) dbmate.Driver {
+// NewDriver initializes the driver
+func NewDriver(config dbmate.DriverConfig) dbmate.Driver {
 	return &Driver{
 		migrationsTableName: config.MigrationsTableName,
 		databaseURL:         config.DatabaseURL,

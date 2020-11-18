@@ -40,14 +40,14 @@ func prepTestPostgresDB(t *testing.T) *sql.DB {
 
 func TestGetDriver(t *testing.T) {
 	db := dbmate.New(dbutil.MustParseURL("postgres://"))
-	drv, err := db.GetDriver()
+	drvInterface, err := db.GetDriver()
 	require.NoError(t, err)
 
 	// driver should have URL and default migrations table set
-	pgDrv, ok := drv.(*Driver)
-	require.Equal(t, true, ok)
-	require.Equal(t, db.DatabaseURL.String(), pgDrv.databaseURL.String())
-	require.Equal(t, "schema_migrations", pgDrv.migrationsTableName)
+	drv, ok := drvInterface.(*Driver)
+	require.True(t, ok)
+	require.Equal(t, db.DatabaseURL.String(), drv.databaseURL.String())
+	require.Equal(t, "schema_migrations", drv.migrationsTableName)
 }
 
 func TestConnectionString(t *testing.T) {

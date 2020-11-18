@@ -19,8 +19,8 @@ import (
 )
 
 func init() {
-	dbmate.RegisterDriver(newDriver, "sqlite")
-	dbmate.RegisterDriver(newDriver, "sqlite3")
+	dbmate.RegisterDriver(NewDriver, "sqlite")
+	dbmate.RegisterDriver(NewDriver, "sqlite3")
 }
 
 // Driver provides top level database functions
@@ -29,7 +29,8 @@ type Driver struct {
 	databaseURL         *url.URL
 }
 
-func newDriver(config dbmate.DriverConfig) dbmate.Driver {
+// NewDriver initializes the driver
+func NewDriver(config dbmate.DriverConfig) dbmate.Driver {
 	return &Driver{
 		migrationsTableName: config.MigrationsTableName,
 		databaseURL:         config.DatabaseURL,

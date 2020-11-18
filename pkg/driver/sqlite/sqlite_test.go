@@ -39,6 +39,18 @@ func prepTestSQLiteDB(t *testing.T) *sql.DB {
 	return db
 }
 
+func TestGetDriver(t *testing.T) {
+	db := dbmate.New(dbutil.MustParseURL("sqlite://"))
+	drvInterface, err := db.GetDriver()
+	require.NoError(t, err)
+
+	// driver should have URL and default migrations table set
+	drv, ok := drvInterface.(*Driver)
+	require.True(t, ok)
+	require.Equal(t, db.DatabaseURL.String(), drv.databaseURL.String())
+	require.Equal(t, "schema_migrations", drv.migrationsTableName)
+}
+
 func TestConnectionString(t *testing.T) {
 	t.Run("relative", func(t *testing.T) {
 		u := dbutil.MustParseURL("sqlite:foo/bar.sqlite3?mode=ro")
