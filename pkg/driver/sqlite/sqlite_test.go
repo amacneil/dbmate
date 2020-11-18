@@ -1,12 +1,15 @@
 // +build cgo
 
-package dbmate
+package sqlite
 
 import (
 	"database/sql"
 	"net/url"
 	"os"
 	"testing"
+
+	"github.com/amacneil/dbmate/pkg/dbmate"
+	"github.com/amacneil/dbmate/pkg/dbutil"
 
 	"github.com/stretchr/testify/require"
 )
@@ -18,12 +21,12 @@ func sqliteTestURL(t *testing.T) *url.URL {
 	return u
 }
 
-func testSQLiteDriver(t *testing.T) *SQLiteDriver {
+func testSQLiteDriver(t *testing.T) *Driver {
 	u := sqliteTestURL(t)
-	drv, err := New(u).GetDriver()
+	drv, err := dbmate.New(u).GetDriver()
 	require.NoError(t, err)
 
-	return drv.(*SQLiteDriver)
+	return drv.(*Driver)
 }
 
 func prepTestSQLiteDB(t *testing.T) *sql.DB {
@@ -44,9 +47,34 @@ func prepTestSQLiteDB(t *testing.T) *sql.DB {
 	return db
 }
 
+func TestConnectionString(t *testing.T) {
+	t.Run("relative", func(t *testing.T) {
+		u := dbutil.MustParseURL("sqlite:foo/bar.sqlite3?mode=ro")
+		require.Equal(t, "foo/bar.sqlite3?mode=ro", ConnectionString(u))
+	})
+
+	t.Run("absolute", func(t *testing.T) {
+		u := dbutil.MustParseURL("sqlite:/tmp/foo.sqlite3?mode=ro")
+		require.Equal(t, "/tmp/foo.sqlite3?mode=ro", ConnectionString(u))
+	})
+
+	t.Run("three slashes", func(t *testing.T) {
+		// interpreted as absolute path
+		u := dbutil.MustParseURL("sqlite:///tmp/foo.sqlite3?mode=ro")
+		require.Equal(t, "/tmp/foo.sqlite3?mode=ro", ConnectionString(u))
+	})
+
+	t.Run("four slashes", func(t *testing.T) {
+		// interpreted as absolute path
+		// supported for backwards compatibility
+		u := dbutil.MustParseURL("sqlite:////tmp/foo.sqlite3?mode=ro")
+		require.Equal(t, "/tmp/foo.sqlite3?mode=ro", ConnectionString(u))
+	})
+}
+
 func TestSQLiteCreateDropDatabase(t *testing.T) {
 	drv := testSQLiteDriver(t)
-	path := sqlitePath(drv.databaseURL)
+	path := ConnectionString(drv.databaseURL)
 
 	// drop any existing database
 	err := drv.DropDatabase()
@@ -76,7 +104,7 @@ func TestSQLiteDumpSchema(t *testing.T) {
 
 	// prepare database
 	db := prepTestSQLiteDB(t)
-	defer mustClose(db)
+	defer dbutil.MustClose(db)
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
@@ -96,7 +124,7 @@ func TestSQLiteDumpSchema(t *testing.T) {
 		"  ('abc2');\n")
 
 	// DumpSchema should return error if command fails
-	drv.databaseURL.Path = "/."
+	drv.databaseURL = dbutil.MustParseURL(".")
 	schema, err = drv.DumpSchema(db)
 	require.Nil(t, schema)
 	require.Error(t, err)
@@ -130,7 +158,7 @@ func TestSQLiteCreateMigrationsTable(t *testing.T) {
 	t.Run("default table", func(t *testing.T) {
 		drv := testSQLiteDriver(t)
 		db := prepTestSQLiteDB(t)
-		defer mustClose(db)
+		defer dbutil.MustClose(db)
 
 		// migrations table should not exist
 		count := 0
@@ -156,7 +184,7 @@ func TestSQLiteCreateMigrationsTable(t *testing.T) {
 		drv.migrationsTableName = "test_migrations"
 
 		db := prepTestSQLiteDB(t)
-		defer mustClose(db)
+		defer dbutil.MustClose(db)
 
 		// migrations table should not exist
 		count := 0
@@ -183,7 +211,7 @@ func TestSQLiteSelectMigrations(t *testing.T) {
 	drv.migrationsTableName = "test_migrations"
 
 	db := prepTestSQLiteDB(t)
-	defer mustClose(db)
+	defer dbutil.MustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
@@ -211,7 +239,7 @@ func TestSQLiteInsertMigration(t *testing.T) {
 	drv.migrationsTableName = "test_migrations"
 
 	db := prepTestSQLiteDB(t)
-	defer mustClose(db)
+	defer dbutil.MustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
@@ -236,7 +264,7 @@ func TestSQLiteDeleteMigration(t *testing.T) {
 	drv.migrationsTableName = "test_migrations"
 
 	db := prepTestSQLiteDB(t)
-	defer mustClose(db)
+	defer dbutil.MustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
@@ -256,7 +284,7 @@ func TestSQLiteDeleteMigration(t *testing.T) {
 
 func TestSQLitePing(t *testing.T) {
 	drv := testSQLiteDriver(t)
-	path := sqlitePath(drv.databaseURL)
+	path := ConnectionString(drv.databaseURL)
 
 	// drop any existing database
 	err := drv.DropDatabase()

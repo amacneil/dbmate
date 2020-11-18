@@ -1,9 +1,12 @@
-package dbmate
+package clickhouse
 
 import (
 	"database/sql"
 	"net/url"
 	"testing"
+
+	"github.com/amacneil/dbmate/pkg/dbmate"
+	"github.com/amacneil/dbmate/pkg/dbutil"
 
 	"github.com/stretchr/testify/require"
 )
@@ -15,12 +18,12 @@ func clickHouseTestURL(t *testing.T) *url.URL {
 	return u
 }
 
-func testClickHouseDriver(t *testing.T) *ClickHouseDriver {
+func testClickHouseDriver(t *testing.T) *Driver {
 	u := clickHouseTestURL(t)
-	drv, err := New(u).GetDriver()
+	drv, err := dbmate.New(u).GetDriver()
 	require.NoError(t, err)
 
-	return drv.(*ClickHouseDriver)
+	return drv.(*Driver)
 }
 
 func prepTestClickHouseDB(t *testing.T) *sql.DB {
@@ -41,20 +44,22 @@ func prepTestClickHouseDB(t *testing.T) *sql.DB {
 	return db
 }
 
-func TestNormalizeClickHouseURLSimplified(t *testing.T) {
-	u, err := url.Parse("clickhouse://user:pass@host/db")
-	require.NoError(t, err)
+func TestConnectionString(t *testing.T) {
+	t.Run("simple", func(t *testing.T) {
+		u, err := url.Parse("clickhouse://user:pass@host/db")
+		require.NoError(t, err)
 
-	s := normalizeClickHouseURL(u).String()
-	require.Equal(t, "tcp://host:9000?database=db&password=pass&username=user", s)
-}
+		s := connectionString(u)
+		require.Equal(t, "tcp://host:9000?database=db&password=pass&username=user", s)
+	})
 
-func TestNormalizeClickHouseURLCanonical(t *testing.T) {
-	u, err := url.Parse("clickhouse://host:9000?database=db&password=pass&username=user")
-	require.NoError(t, err)
+	t.Run("canonical", func(t *testing.T) {
+		u, err := url.Parse("clickhouse://host:9000?database=db&password=pass&username=user")
+		require.NoError(t, err)
 
-	s := normalizeClickHouseURL(u).String()
-	require.Equal(t, "tcp://host:9000?database=db&password=pass&username=user", s)
+		s := connectionString(u)
+		require.Equal(t, "tcp://host:9000?database=db&password=pass&username=user", s)
+	})
 }
 
 func TestClickHouseCreateDropDatabase(t *testing.T) {
@@ -72,7 +77,7 @@ func TestClickHouseCreateDropDatabase(t *testing.T) {
 	func() {
 		db, err := sql.Open("clickhouse", drv.databaseURL.String())
 		require.NoError(t, err)
-		defer mustClose(db)
+		defer dbutil.MustClose(db)
 
 		err = db.Ping()
 		require.NoError(t, err)
@@ -86,7 +91,7 @@ func TestClickHouseCreateDropDatabase(t *testing.T) {
 	func() {
 		db, err := sql.Open("clickhouse", drv.databaseURL.String())
 		require.NoError(t, err)
-		defer mustClose(db)
+		defer dbutil.MustClose(db)
 
 		err = db.Ping()
 		require.EqualError(t, err, "code: 81, message: Database dbmate doesn't exist")
@@ -99,7 +104,7 @@ func TestClickHouseDumpSchema(t *testing.T) {
 
 	// prepare database
 	db := prepTestClickHouseDB(t)
-	defer mustClose(db)
+	defer dbutil.MustClose(db)
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
@@ -177,7 +182,7 @@ func TestClickHouseCreateMigrationsTable(t *testing.T) {
 	t.Run("default table", func(t *testing.T) {
 		drv := testClickHouseDriver(t)
 		db := prepTestClickHouseDB(t)
-		defer mustClose(db)
+		defer dbutil.MustClose(db)
 
 		// migrations table should not exist
 		count := 0
@@ -202,7 +207,7 @@ func TestClickHouseCreateMigrationsTable(t *testing.T) {
 		drv.migrationsTableName = "testMigrations"
 
 		db := prepTestClickHouseDB(t)
-		defer mustClose(db)
+		defer dbutil.MustClose(db)
 
 		// migrations table should not exist
 		count := 0
@@ -228,7 +233,7 @@ func TestClickHouseSelectMigrations(t *testing.T) {
 	drv.migrationsTableName = "test_migrations"
 
 	db := prepTestClickHouseDB(t)
-	defer mustClose(db)
+	defer dbutil.MustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
@@ -265,7 +270,7 @@ func TestClickHouseInsertMigration(t *testing.T) {
 	drv.migrationsTableName = "test_migrations"
 
 	db := prepTestClickHouseDB(t)
-	defer mustClose(db)
+	defer dbutil.MustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
@@ -293,7 +298,7 @@ func TestClickHouseDeleteMigration(t *testing.T) {
 	drv.migrationsTableName = "test_migrations"
 
 	db := prepTestClickHouseDB(t)
-	defer mustClose(db)
+	defer dbutil.MustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)

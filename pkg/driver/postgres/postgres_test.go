@@ -1,9 +1,12 @@
-package dbmate
+package postgres
 
 import (
 	"database/sql"
 	"net/url"
 	"testing"
+
+	"github.com/amacneil/dbmate/pkg/dbmate"
+	"github.com/amacneil/dbmate/pkg/dbutil"
 
 	"github.com/stretchr/testify/require"
 )
@@ -15,12 +18,12 @@ func postgresTestURL(t *testing.T) *url.URL {
 	return u
 }
 
-func testPostgresDriver(t *testing.T) *PostgresDriver {
+func testPostgresDriver(t *testing.T) *Driver {
 	u := postgresTestURL(t)
-	drv, err := New(u).GetDriver()
+	drv, err := dbmate.New(u).GetDriver()
 	require.NoError(t, err)
 
-	return drv.(*PostgresDriver)
+	return drv.(*Driver)
 }
 
 func prepTestPostgresDB(t *testing.T) *sql.DB {
@@ -41,7 +44,19 @@ func prepTestPostgresDB(t *testing.T) *sql.DB {
 	return db
 }
 
-func TestNormalizePostgresURL(t *testing.T) {
+func TestGetDriver(t *testing.T) {
+	db := dbmate.New(dbutil.MustParseURL("postgres://"))
+	drv, err := db.GetDriver()
+	require.NoError(t, err)
+
+	// driver should have URL and default migrations table set
+	pgDrv, ok := drv.(*Driver)
+	require.Equal(t, true, ok)
+	require.Equal(t, db.DatabaseURL.String(), pgDrv.databaseURL.String())
+	require.Equal(t, "schema_migrations", pgDrv.migrationsTableName)
+}
+
+func TestConnectionString(t *testing.T) {
 	cases := []struct {
 		input    string
 		expected string
@@ -64,13 +79,13 @@ func TestNormalizePostgresURL(t *testing.T) {
 			u, err := url.Parse(c.input)
 			require.NoError(t, err)
 
-			actual := normalizePostgresURL(u).String()
+			actual := connectionString(u)
 			require.Equal(t, c.expected, actual)
 		})
 	}
 }
 
-func TestNormalizePostgresURLForDump(t *testing.T) {
+func TestConnectionArgsForDump(t *testing.T) {
 	cases := []struct {
 		input    string
 		expected []string
@@ -88,7 +103,7 @@ func TestNormalizePostgresURLForDump(t *testing.T) {
 			u, err := url.Parse(c.input)
 			require.NoError(t, err)
 
-			actual := normalizePostgresURLForDump(u)
+			actual := connectionArgsForDump(u)
 			require.Equal(t, c.expected, actual)
 		})
 	}
@@ -109,7 +124,7 @@ func TestPostgresCreateDropDatabase(t *testing.T) {
 	func() {
 		db, err := sql.Open("postgres", drv.databaseURL.String())
 		require.NoError(t, err)
-		defer mustClose(db)
+		defer dbutil.MustClose(db)
 
 		err = db.Ping()
 		require.NoError(t, err)
@@ -123,7 +138,7 @@ func TestPostgresCreateDropDatabase(t *testing.T) {
 	func() {
 		db, err := sql.Open("postgres", drv.databaseURL.String())
 		require.NoError(t, err)
-		defer mustClose(db)
+		defer dbutil.MustClose(db)
 
 		err = db.Ping()
 		require.Error(t, err)
@@ -137,7 +152,7 @@ func TestPostgresDumpSchema(t *testing.T) {
 
 		// prepare database
 		db := prepTestPostgresDB(t)
-		defer mustClose(db)
+		defer dbutil.MustClose(db)
 		err := drv.CreateMigrationsTable(db)
 		require.NoError(t, err)
 
@@ -175,7 +190,7 @@ func TestPostgresDumpSchema(t *testing.T) {
 
 		// prepare database
 		db := prepTestPostgresDB(t)
-		defer mustClose(db)
+		defer dbutil.MustClose(db)
 		err := drv.CreateMigrationsTable(db)
 		require.NoError(t, err)
 
@@ -237,7 +252,7 @@ func TestPostgresCreateMigrationsTable(t *testing.T) {
 	t.Run("default schema", func(t *testing.T) {
 		drv := testPostgresDriver(t)
 		db := prepTestPostgresDB(t)
-		defer mustClose(db)
+		defer dbutil.MustClose(db)
 
 		// migrations table should not exist
 		count := 0
@@ -267,7 +282,7 @@ func TestPostgresCreateMigrationsTable(t *testing.T) {
 		drv.databaseURL = u
 
 		db := prepTestPostgresDB(t)
-		defer mustClose(db)
+		defer dbutil.MustClose(db)
 
 		// delete schema
 		_, err = db.Exec("drop schema if exists \"camelFoo\"")
@@ -311,7 +326,7 @@ func TestPostgresCreateMigrationsTable(t *testing.T) {
 		drv.databaseURL = u
 
 		db := prepTestPostgresDB(t)
-		defer mustClose(db)
+		defer dbutil.MustClose(db)
 
 		// delete schemas
 		_, err = db.Exec("drop schema if exists foo")
@@ -349,7 +364,7 @@ func TestPostgresSelectMigrations(t *testing.T) {
 	drv.migrationsTableName = "test_migrations"
 
 	db := prepTestPostgresDB(t)
-	defer mustClose(db)
+	defer dbutil.MustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
@@ -377,7 +392,7 @@ func TestPostgresInsertMigration(t *testing.T) {
 	drv.migrationsTableName = "test_migrations"
 
 	db := prepTestPostgresDB(t)
-	defer mustClose(db)
+	defer dbutil.MustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
@@ -402,7 +417,7 @@ func TestPostgresDeleteMigration(t *testing.T) {
 	drv.migrationsTableName = "test_migrations"
 
 	db := prepTestPostgresDB(t)
-	defer mustClose(db)
+	defer dbutil.MustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
@@ -442,7 +457,7 @@ func TestPostgresQuotedMigrationsTableName(t *testing.T) {
 	t.Run("default schema", func(t *testing.T) {
 		drv := testPostgresDriver(t)
 		db := prepTestPostgresDB(t)
-		defer mustClose(db)
+		defer dbutil.MustClose(db)
 
 		name, err := drv.quotedMigrationsTableName(db)
 		require.NoError(t, err)
@@ -456,7 +471,7 @@ func TestPostgresQuotedMigrationsTableName(t *testing.T) {
 		drv.databaseURL = u
 
 		db := prepTestPostgresDB(t)
-		defer mustClose(db)
+		defer dbutil.MustClose(db)
 
 		_, err = db.Exec("drop schema if exists foo")
 		require.NoError(t, err)
@@ -472,7 +487,7 @@ func TestPostgresQuotedMigrationsTableName(t *testing.T) {
 	t.Run("no schema", func(t *testing.T) {
 		drv := testPostgresDriver(t)
 		db := prepTestPostgresDB(t)
-		defer mustClose(db)
+		defer dbutil.MustClose(db)
 
 		// this is an unlikely edge case, but if for some reason there is
 		// no current schema then we should default to "public"
@@ -487,7 +502,7 @@ func TestPostgresQuotedMigrationsTableName(t *testing.T) {
 	t.Run("custom table name", func(t *testing.T) {
 		drv := testPostgresDriver(t)
 		db := prepTestPostgresDB(t)
-		defer mustClose(db)
+		defer dbutil.MustClose(db)
 
 		drv.migrationsTableName = "simple_name"
 		name, err := drv.quotedMigrationsTableName(db)
@@ -498,7 +513,7 @@ func TestPostgresQuotedMigrationsTableName(t *testing.T) {
 	t.Run("custom table name quoted", func(t *testing.T) {
 		drv := testPostgresDriver(t)
 		db := prepTestPostgresDB(t)
-		defer mustClose(db)
+		defer dbutil.MustClose(db)
 
 		// this table name will need quoting
 		drv.migrationsTableName = "camelCase"
@@ -514,7 +529,7 @@ func TestPostgresQuotedMigrationsTableName(t *testing.T) {
 		drv.databaseURL = u
 
 		db := prepTestPostgresDB(t)
-		defer mustClose(db)
+		defer dbutil.MustClose(db)
 
 		_, err = db.Exec("create schema if not exists foo")
 		require.NoError(t, err)
@@ -532,7 +547,7 @@ func TestPostgresQuotedMigrationsTableName(t *testing.T) {
 		drv.databaseURL = u
 
 		db := prepTestPostgresDB(t)
-		defer mustClose(db)
+		defer dbutil.MustClose(db)
 
 		_, err = db.Exec("create schema if not exists foo")
 		require.NoError(t, err)

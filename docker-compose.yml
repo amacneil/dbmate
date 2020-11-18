@@ -11,9 +11,10 @@ services:
       - postgres
       - clickhouse
     environment:
-      MYSQL_URL: mysql://root:root@mysql/dbmate
-      POSTGRESQL_URL: postgres://postgres:postgres@postgres/dbmate?sslmode=disable
-      CLICKHOUSE_URL: clickhouse://clickhouse:9000?database=dbmate
+      CLICKHOUSE_TEST_URL: clickhouse://clickhouse:9000?database=dbmate_test
+      MYSQL_TEST_URL: mysql://root:root@mysql/dbmate_test
+      POSTGRES_TEST_URL: postgres://postgres:postgres@postgres/dbmate_test?sslmode=disable
+      SQLITE_TEST_URL: sqlite3:/tmp/dbmate_test.sqlite3
 
   dbmate:
     build:

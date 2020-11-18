@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"sort"
 	"time"
+
+	"github.com/amacneil/dbmate/pkg/dbutil"
 )
 
 // DefaultMigrationsDir specifies default directory to find migration files
@@ -44,9 +46,10 @@ type DB struct {
 // migrationFileRegexp pattern for valid migration files
 var migrationFileRegexp = regexp.MustCompile(`^\d.*\.sql$`)
 
-type statusResult struct {
-	filename string
-	applied  bool
+// StatusResult represents an available migration status
+type StatusResult struct {
+	Filename string
+	Applied  bool
 }
 
 // New initializes a new dbmate database
@@ -204,7 +207,7 @@ func (db *DB) dumpSchema(drv Driver) error {
 	if err != nil {
 		return err
 	}
-	defer mustClose(sqlDB)
+	defer dbutil.MustClose(sqlDB)
 
 	schema, err := drv.DumpSchema(sqlDB)
 	if err != nil {
@@ -220,6 +223,15 @@ func (db *DB) dumpSchema(drv Driver) error {
 
 	// write schema to file
 	return ioutil.WriteFile(db.SchemaFile, schema, 0644)
+}
+
+// ensureDir creates a directory if it does not already exist
+func ensureDir(dir string) error {
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("unable to create directory `%s`", dir)
+	}
+
+	return nil
 }
 
 const migrationTemplate = "-- migrate:up\n\n\n-- migrate:down\n\n"
@@ -252,12 +264,12 @@ func (db *DB) NewMigration(name string) error {
 		return err
 	}
 
-	defer mustClose(file)
+	defer dbutil.MustClose(file)
 	_, err = file.WriteString(migrationTemplate)
 	return err
 }
 
-func doTransaction(sqlDB *sql.DB, txFunc func(Transaction) error) error {
+func doTransaction(sqlDB *sql.DB, txFunc func(dbutil.Transaction) error) error {
 	tx, err := sqlDB.Begin()
 	if err != nil {
 		return err
@@ -281,7 +293,7 @@ func (db *DB) openDatabaseForMigration(drv Driver) (*sql.DB, error) {
 	}
 
 	if err := drv.CreateMigrationsTable(sqlDB); err != nil {
-		mustClose(sqlDB)
+		dbutil.MustClose(sqlDB)
 		return nil, err
 	}
 
@@ -319,7 +331,7 @@ func (db *DB) migrate(drv Driver) error {
 	if err != nil {
 		return err
 	}
-	defer mustClose(sqlDB)
+	defer dbutil.MustClose(sqlDB)
 
 	applied, err := drv.SelectMigrations(sqlDB, -1)
 	if err != nil {
@@ -340,7 +352,7 @@ func (db *DB) migrate(drv Driver) error {
 			return err
 		}
 
-		execMigration := func(tx Transaction) error {
+		execMigration := func(tx dbutil.Transaction) error {
 			// run actual migration
 			result, err := tx.Exec(up.Contents)
 			if err != nil {
@@ -372,6 +384,17 @@ func (db *DB) migrate(drv Driver) error {
 	}
 
 	return nil
+}
+
+func printVerbose(result sql.Result) {
+	lastInsertID, err := result.LastInsertId()
+	if err == nil {
+		fmt.Printf("Last insert ID: %d\n", lastInsertID)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err == nil {
+		fmt.Printf("Rows affected: %d\n", rowsAffected)
+	}
 }
 
 func findMigrationFiles(dir string, re *regexp.Regexp) ([]string, error) {
@@ -441,7 +464,7 @@ func (db *DB) Rollback() error {
 	if err != nil {
 		return err
 	}
-	defer mustClose(sqlDB)
+	defer dbutil.MustClose(sqlDB)
 
 	applied, err := drv.SelectMigrations(sqlDB, 1)
 	if err != nil {
@@ -469,7 +492,7 @@ func (db *DB) Rollback() error {
 		return err
 	}
 
-	execMigration := func(tx Transaction) error {
+	execMigration := func(tx dbutil.Transaction) error {
 		// rollback migration
 		result, err := tx.Exec(down.Contents)
 		if err != nil {
@@ -509,7 +532,7 @@ func (db *DB) Status(quiet bool) (int, error) {
 		return -1, err
 	}
 
-	results, err := db.checkMigrationsStatus(drv)
+	results, err := db.CheckMigrationsStatus(drv)
 	if err != nil {
 		return -1, err
 	}
@@ -518,11 +541,11 @@ func (db *DB) Status(quiet bool) (int, error) {
 	var line string
 
 	for _, res := range results {
-		if res.applied {
-			line = fmt.Sprintf("[X] %s", res.filename)
+		if res.Applied {
+			line = fmt.Sprintf("[X] %s", res.Filename)
 			totalApplied++
 		} else {
-			line = fmt.Sprintf("[ ] %s", res.filename)
+			line = fmt.Sprintf("[ ] %s", res.Filename)
 		}
 		if !quiet {
 			fmt.Println(line)
@@ -539,7 +562,8 @@ func (db *DB) Status(quiet bool) (int, error) {
 	return totalPending, nil
 }
 
-func (db *DB) checkMigrationsStatus(drv Driver) ([]statusResult, error) {
+// CheckMigrationsStatus returns the status of all available mgirations
+func (db *DB) CheckMigrationsStatus(drv Driver) ([]StatusResult, error) {
 	files, err := findMigrationFiles(db.MigrationsDir, migrationFileRegexp)
 	if err != nil {
 		return nil, err
@@ -553,22 +577,22 @@ func (db *DB) checkMigrationsStatus(drv Driver) ([]statusResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer mustClose(sqlDB)
+	defer dbutil.MustClose(sqlDB)
 
 	applied, err := drv.SelectMigrations(sqlDB, -1)
 	if err != nil {
 		return nil, err
 	}
 
-	var results []statusResult
+	var results []StatusResult
 
 	for _, filename := range files {
 		ver := migrationVersion(filename)
-		res := statusResult{filename: filename}
+		res := StatusResult{Filename: filename}
 		if ok := applied[ver]; ok {
-			res.applied = true
+			res.Applied = true
 		} else {
-			res.applied = false
+			res.Applied = false
 		}
 
 		results = append(results, res)

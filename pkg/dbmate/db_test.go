@@ -1,4 +1,4 @@
-package dbmate
+package dbmate_test
 
 import (
 	"io/ioutil"
@@ -8,13 +8,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/amacneil/dbmate/pkg/dbmate"
+	"github.com/amacneil/dbmate/pkg/dbutil"
+	_ "github.com/amacneil/dbmate/pkg/driver/mysql"
+	"github.com/amacneil/dbmate/pkg/driver/postgres"
+	_ "github.com/amacneil/dbmate/pkg/driver/sqlite"
+
 	"github.com/kami-zh/go-capturer"
 	"github.com/stretchr/testify/require"
 )
 
 var testdataDir string
 
-func newTestDB(t *testing.T, u *url.URL) *DB {
+func newTestDB(t *testing.T, u *url.URL) *dbmate.DB {
 	var err error
 
 	// only chdir once, because testdata is relative to current directory
@@ -26,26 +32,16 @@ func newTestDB(t *testing.T, u *url.URL) *DB {
 		require.NoError(t, err)
 	}
 
-	db := New(u)
+	db := dbmate.New(u)
 	db.AutoDumpSchema = false
 
 	return db
 }
 
-func urlMustParse(s string) *url.URL {
-	u, err := url.Parse(s)
-	if err != nil {
-		panic(err)
-	}
-
-	return u
-}
-
 func TestNew(t *testing.T) {
-	u := postgresTestURL(t)
-	db := New(u)
+	db := dbmate.New(dbutil.MustParseURL("foo:test"))
 	require.True(t, db.AutoDumpSchema)
-	require.Equal(t, u.String(), db.DatabaseURL.String())
+	require.Equal(t, "foo:test", db.DatabaseURL.String())
 	require.Equal(t, "./db/migrations", db.MigrationsDir)
 	require.Equal(t, "schema_migrations", db.MigrationsTableName)
 	require.Equal(t, "./db/schema.sql", db.SchemaFile)
@@ -56,45 +52,30 @@ func TestNew(t *testing.T) {
 
 func TestGetDriver(t *testing.T) {
 	t.Run("postgres", func(t *testing.T) {
-		db := New(urlMustParse("postgres://"))
+		db := dbmate.New(dbutil.MustParseURL("postgres://"))
 		drv, err := db.GetDriver()
 		require.NoError(t, err)
 
-		// driver should have URL and default migrations table set
-		pgDrv, ok := drv.(*PostgresDriver)
+		_, ok := drv.(*postgres.Driver)
 		require.Equal(t, true, ok)
-		require.Equal(t, db.DatabaseURL.String(), pgDrv.databaseURL.String())
-		require.Equal(t, "schema_migrations", pgDrv.migrationsTableName)
-	})
-
-	t.Run("mysql", func(t *testing.T) {
-		db := New(urlMustParse("mysql://"))
-		drv, err := db.GetDriver()
-		require.NoError(t, err)
-
-		// driver should have URL and default migrations table set
-		pgDrv, ok := drv.(*MySQLDriver)
-		require.Equal(t, true, ok)
-		require.Equal(t, db.DatabaseURL.String(), pgDrv.databaseURL.String())
-		require.Equal(t, "schema_migrations", pgDrv.migrationsTableName)
 	})
 
 	t.Run("missing URL", func(t *testing.T) {
-		db := New(nil)
+		db := dbmate.New(nil)
 		drv, err := db.GetDriver()
 		require.Nil(t, drv)
 		require.EqualError(t, err, "invalid url")
 	})
 
-	t.Run("missing scheme", func(t *testing.T) {
-		db := New(urlMustParse("//hi"))
+	t.Run("missing schema", func(t *testing.T) {
+		db := dbmate.New(dbutil.MustParseURL("//hi"))
 		drv, err := db.GetDriver()
 		require.Nil(t, drv)
 		require.EqualError(t, err, "invalid url")
 	})
 
 	t.Run("invalid driver", func(t *testing.T) {
-		db := New(urlMustParse("foo://bar"))
+		db := dbmate.New(dbutil.MustParseURL("foo://bar"))
 		drv, err := db.GetDriver()
 		require.EqualError(t, err, "unsupported driver: foo")
 		require.Nil(t, drv)
@@ -102,7 +83,7 @@ func TestGetDriver(t *testing.T) {
 }
 
 func TestWait(t *testing.T) {
-	u := postgresTestURL(t)
+	u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
 	db := newTestDB(t, u)
 
 	// speed up our retry loop for testing
@@ -126,7 +107,7 @@ func TestWait(t *testing.T) {
 }
 
 func TestDumpSchema(t *testing.T) {
-	u := postgresTestURL(t)
+	u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
 	db := newTestDB(t, u)
 
 	// create custom schema file directory
@@ -163,7 +144,7 @@ func TestDumpSchema(t *testing.T) {
 }
 
 func TestAutoDumpSchema(t *testing.T) {
-	u := postgresTestURL(t)
+	u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
 	db := newTestDB(t, u)
 	db.AutoDumpSchema = true
 
@@ -220,7 +201,7 @@ func checkWaitCalled(t *testing.T, u *url.URL, command func() error) {
 }
 
 func testWaitBefore(t *testing.T, verbose bool) {
-	u := postgresTestURL(t)
+	u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
 	db := newTestDB(t, u)
 	db.Verbose = verbose
 	db.WaitBefore = true
@@ -277,11 +258,11 @@ Rows affected: 0`)
 Rows affected: 0`)
 }
 
-func testURLs(t *testing.T) []*url.URL {
+func testURLs() []*url.URL {
 	return []*url.URL{
-		postgresTestURL(t),
-		mySQLTestURL(t),
-		sqliteTestURL(t),
+		dbutil.MustParseURL(os.Getenv("MYSQL_TEST_URL")),
+		dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL")),
+		dbutil.MustParseURL(os.Getenv("SQLITE_TEST_URL")),
 	}
 }
 
@@ -303,7 +284,7 @@ func testMigrateURL(t *testing.T, u *url.URL) {
 	// verify results
 	sqlDB, err := drv.Open()
 	require.NoError(t, err)
-	defer mustClose(sqlDB)
+	defer dbutil.MustClose(sqlDB)
 
 	count := 0
 	err = sqlDB.QueryRow(`select count(*) from schema_migrations
@@ -317,7 +298,7 @@ func testMigrateURL(t *testing.T, u *url.URL) {
 }
 
 func TestMigrate(t *testing.T) {
-	for _, u := range testURLs(t) {
+	for _, u := range testURLs() {
 		t.Run(u.Scheme, func(t *testing.T) {
 			testMigrateURL(t, u)
 		})
@@ -340,7 +321,7 @@ func testUpURL(t *testing.T, u *url.URL) {
 	// verify results
 	sqlDB, err := drv.Open()
 	require.NoError(t, err)
-	defer mustClose(sqlDB)
+	defer dbutil.MustClose(sqlDB)
 
 	count := 0
 	err = sqlDB.QueryRow(`select count(*) from schema_migrations
@@ -354,7 +335,7 @@ func testUpURL(t *testing.T, u *url.URL) {
 }
 
 func TestUp(t *testing.T) {
-	for _, u := range testURLs(t) {
+	for _, u := range testURLs() {
 		t.Run(u.Scheme, func(t *testing.T) {
 			testUpURL(t, u)
 		})
@@ -377,7 +358,7 @@ func testRollbackURL(t *testing.T, u *url.URL) {
 	// verify migration
 	sqlDB, err := drv.Open()
 	require.NoError(t, err)
-	defer mustClose(sqlDB)
+	defer dbutil.MustClose(sqlDB)
 
 	count := 0
 	err = sqlDB.QueryRow(`select count(*) from schema_migrations
@@ -403,7 +384,7 @@ func testRollbackURL(t *testing.T, u *url.URL) {
 }
 
 func TestRollback(t *testing.T) {
-	for _, u := range testURLs(t) {
+	for _, u := range testURLs() {
 		t.Run(u.Scheme, func(t *testing.T) {
 			testRollbackURL(t, u)
 		})
@@ -424,40 +405,40 @@ func testStatusURL(t *testing.T, u *url.URL) {
 	// verify migration
 	sqlDB, err := drv.Open()
 	require.NoError(t, err)
-	defer mustClose(sqlDB)
+	defer dbutil.MustClose(sqlDB)
 
 	// two pending
-	results, err := db.checkMigrationsStatus(drv)
+	results, err := db.CheckMigrationsStatus(drv)
 	require.NoError(t, err)
 	require.Len(t, results, 2)
-	require.False(t, results[0].applied)
-	require.False(t, results[1].applied)
+	require.False(t, results[0].Applied)
+	require.False(t, results[1].Applied)
 
 	// run migrations
 	err = db.Migrate()
 	require.NoError(t, err)
 
 	// two applied
-	results, err = db.checkMigrationsStatus(drv)
+	results, err = db.CheckMigrationsStatus(drv)
 	require.NoError(t, err)
 	require.Len(t, results, 2)
-	require.True(t, results[0].applied)
-	require.True(t, results[1].applied)
+	require.True(t, results[0].Applied)
+	require.True(t, results[1].Applied)
 
 	// rollback last migration
 	err = db.Rollback()
 	require.NoError(t, err)
 
 	// one applied, one pending
-	results, err = db.checkMigrationsStatus(drv)
+	results, err = db.CheckMigrationsStatus(drv)
 	require.NoError(t, err)
 	require.Len(t, results, 2)
-	require.True(t, results[0].applied)
-	require.False(t, results[1].applied)
+	require.True(t, results[0].Applied)
+	require.False(t, results[1].Applied)
 }
 
 func TestStatus(t *testing.T) {
-	for _, u := range testURLs(t) {
+	for _, u := range testURLs() {
 		t.Run(u.Scheme, func(t *testing.T) {
 			testStatusURL(t, u)
 		})

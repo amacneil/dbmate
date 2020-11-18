@@ -1,21 +1,26 @@
-package dbmate
+package dbutil
 
 import (
 	"bufio"
 	"bytes"
 	"database/sql"
 	"errors"
-	"fmt"
 	"io"
 	"net/url"
-	"os"
 	"os/exec"
 	"strings"
 	"unicode"
 )
 
-// databaseName returns the database name from a URL
-func databaseName(u *url.URL) string {
+// Transaction can represent a database or open transaction
+type Transaction interface {
+	Exec(query string, args ...interface{}) (sql.Result, error)
+	Query(query string, args ...interface{}) (*sql.Rows, error)
+	QueryRow(query string, args ...interface{}) *sql.Row
+}
+
+// DatabaseName returns the database name from a URL
+func DatabaseName(u *url.URL) string {
 	name := u.Path
 	if len(name) > 0 && name[:1] == "/" {
 		name = name[1:]
@@ -24,24 +29,15 @@ func databaseName(u *url.URL) string {
 	return name
 }
 
-// mustClose ensures a stream is closed
-func mustClose(c io.Closer) {
+// MustClose ensures a stream is closed
+func MustClose(c io.Closer) {
 	if err := c.Close(); err != nil {
 		panic(err)
 	}
 }
 
-// ensureDir creates a directory if it does not already exist
-func ensureDir(dir string) error {
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("unable to create directory `%s`", dir)
-	}
-
-	return nil
-}
-
-// runCommand runs a command and returns the stdout if successful
-func runCommand(name string, args ...string) ([]byte, error) {
+// RunCommand runs a command and returns the stdout if successful
+func RunCommand(name string, args ...string) ([]byte, error) {
 	var stdout, stderr bytes.Buffer
 	cmd := exec.Command(name, args...)
 	cmd.Stdout = &stdout
@@ -61,10 +57,10 @@ func runCommand(name string, args ...string) ([]byte, error) {
 	return stdout.Bytes(), nil
 }
 
-// trimLeadingSQLComments removes sql comments and blank lines from the beginning of text
+// TrimLeadingSQLComments removes sql comments and blank lines from the beginning of text
 // generally when performing sql dumps these contain host-specific information such as
 // client/server version numbers
-func trimLeadingSQLComments(data []byte) ([]byte, error) {
+func TrimLeadingSQLComments(data []byte) ([]byte, error) {
 	// create decent size buffer
 	out := bytes.NewBuffer(make([]byte, 0, len(data)))
 
@@ -101,15 +97,15 @@ func trimLeadingSQLComments(data []byte) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-// queryColumn runs a SQL statement and returns a slice of strings
+// QueryColumn runs a SQL statement and returns a slice of strings
 // it is assumed that the statement returns only one column
 // e.g. schema_migrations table
-func queryColumn(db Transaction, query string, args ...interface{}) ([]string, error) {
+func QueryColumn(db Transaction, query string, args ...interface{}) ([]string, error) {
 	rows, err := db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
-	defer mustClose(rows)
+	defer MustClose(rows)
 
 	// read into slice
 	var result []string
@@ -128,10 +124,10 @@ func queryColumn(db Transaction, query string, args ...interface{}) ([]string, e
 	return result, nil
 }
 
-// queryValue runs a SQL statement and returns a single string
+// QueryValue runs a SQL statement and returns a single string
 // it is assumed that the statement returns only one row and one column
 // sql NULL is returned as empty string
-func queryValue(db Transaction, query string, args ...interface{}) (string, error) {
+func QueryValue(db Transaction, query string, args ...interface{}) (string, error) {
 	var result sql.NullString
 	err := db.QueryRow(query, args...).Scan(&result)
 	if err != nil || !result.Valid {
@@ -141,13 +137,13 @@ func queryValue(db Transaction, query string, args ...interface{}) (string, erro
 	return result.String, nil
 }
 
-func printVerbose(result sql.Result) {
-	lastInsertID, err := result.LastInsertId()
-	if err == nil {
-		fmt.Printf("Last insert ID: %d\n", lastInsertID)
+// MustParseURL parses a URL from string, and panics if it fails.
+// It is used during testing and in cases where we are parsing a generated URL.
+func MustParseURL(s string) *url.URL {
+	u, err := url.Parse(s)
+	if err != nil {
+		panic(err)
 	}
-	rowsAffected, err := result.RowsAffected()
-	if err == nil {
-		fmt.Printf("Rows affected: %d\n", rowsAffected)
-	}
+
+	return u
 }

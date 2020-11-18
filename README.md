@@ -152,16 +152,16 @@ DATABASE_URL="postgres://username:password@127.0.0.1:5432/database_name?search_p
 
 **SQLite**
 
-SQLite databases are stored on the filesystem, so you do not need to specify a host. By default, files are relative to the current directory. For example, the following will create a database at `./db/database_name.sqlite3`:
+SQLite databases are stored on the filesystem, so you do not need to specify a host. By default, files are relative to the current directory. For example, the following will create a database at `./db/database.sqlite3`:
 
 ```sh
-DATABASE_URL="sqlite:///db/database_name.sqlite3"
+DATABASE_URL="sqlite:db/database.sqlite3"
 ```
 
-To specify an absolute path, add an additional forward slash to the path. The following will create a database at `/tmp/database_name.sqlite3`:
+To specify an absolute path, add a forward slash to the path. The following will create a database at `/tmp/database.sqlite3`:
 
 ```sh
-DATABASE_URL="sqlite:////tmp/database_name.sqlite3"
+DATABASE_URL="sqlite:/tmp/database.sqlite3"
 ```
 
 **ClickHouse**

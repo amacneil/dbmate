@@ -3,14 +3,14 @@ LDFLAGS := -ldflags '-s'
 # statically link binaries (to support alpine + scratch containers)
 STATICLDFLAGS := -ldflags '-s -extldflags "-static"'
 # avoid building code that is incompatible with static linking
-TAGS := -tags netgo,osusergo,sqlite_omit_load_extension
+TAGS := -tags netgo,osusergo,sqlite_omit_load_extension,sqlite_json
 
 .PHONY: all
 all: build lint test
 
 .PHONY: test
 test:
-	go test -v $(TAGS) $(STATICLDFLAGS) ./...
+	go test $(TAGS) $(STATICLDFLAGS) ./...
 
 .PHONY: fix
 fix:
@@ -22,9 +22,9 @@ lint:
 
 .PHONY: wait
 wait:
-	dist/dbmate-linux-amd64 -e MYSQL_URL wait
-	dist/dbmate-linux-amd64 -e POSTGRESQL_URL wait
-	dist/dbmate-linux-amd64 -e CLICKHOUSE_URL wait
+	dist/dbmate-linux-amd64 -e MYSQL_TEST_URL wait
+	dist/dbmate-linux-amd64 -e POSTGRES_TEST_URL wait
+	dist/dbmate-linux-amd64 -e CLICKHOUSE_TEST_URL wait
 
 .PHONY: clean
 clean:
