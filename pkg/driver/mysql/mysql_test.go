@@ -1,137 +1,146 @@
-package dbmate
+package mysql
 
 import (
 	"database/sql"
 	"net/url"
+	"os"
 	"testing"
+
+	"github.com/amacneil/dbmate/pkg/dbmate"
+	"github.com/amacneil/dbmate/pkg/dbutil"
 
 	"github.com/stretchr/testify/require"
 )
 
-func mySQLTestURL(t *testing.T) *url.URL {
-	u, err := url.Parse("mysql://root:root@mysql/dbmate")
+func testMySQLDriver(t *testing.T) *Driver {
+	u := dbutil.MustParseURL(os.Getenv("MYSQL_TEST_URL"))
+	drv, err := dbmate.New(u).GetDriver()
 	require.NoError(t, err)
 
-	return u
+	return drv.(*Driver)
 }
 
-func testMySQLDriver() *MySQLDriver {
-	drv := &MySQLDriver{}
-	drv.SetMigrationsTableName(DefaultMigrationsTableName)
-
-	return drv
-}
-
-func prepTestMySQLDB(t *testing.T, u *url.URL) *sql.DB {
-	drv := testMySQLDriver()
+func prepTestMySQLDB(t *testing.T) *sql.DB {
+	drv := testMySQLDriver(t)
 
 	// drop any existing database
-	err := drv.DropDatabase(u)
+	err := drv.DropDatabase()
 	require.NoError(t, err)
 
 	// create database
-	err = drv.CreateDatabase(u)
+	err = drv.CreateDatabase()
 	require.NoError(t, err)
 
 	// connect database
-	db, err := drv.Open(u)
+	db, err := drv.Open()
 	require.NoError(t, err)
 
 	return db
 }
 
-func TestNormalizeMySQLURLDefaults(t *testing.T) {
-	u, err := url.Parse("mysql://host/foo")
+func TestGetDriver(t *testing.T) {
+	db := dbmate.New(dbutil.MustParseURL("mysql://"))
+	drvInterface, err := db.GetDriver()
 	require.NoError(t, err)
-	require.Equal(t, "", u.Port())
 
-	s := normalizeMySQLURL(u)
-	require.Equal(t, "tcp(host:3306)/foo?multiStatements=true", s)
+	// driver should have URL and default migrations table set
+	drv, ok := drvInterface.(*Driver)
+	require.True(t, ok)
+	require.Equal(t, db.DatabaseURL.String(), drv.databaseURL.String())
+	require.Equal(t, "schema_migrations", drv.migrationsTableName)
 }
 
-func TestNormalizeMySQLURLCustom(t *testing.T) {
-	u, err := url.Parse("mysql://bob:secret@host:123/foo?flag=on")
-	require.NoError(t, err)
-	require.Equal(t, "123", u.Port())
+func TestConnectionString(t *testing.T) {
+	t.Run("defaults", func(t *testing.T) {
+		u, err := url.Parse("mysql://host/foo")
+		require.NoError(t, err)
+		require.Equal(t, "", u.Port())
 
-	s := normalizeMySQLURL(u)
-	require.Equal(t, "bob:secret@tcp(host:123)/foo?flag=on&multiStatements=true", s)
-}
+		s := connectionString(u)
+		require.Equal(t, "tcp(host:3306)/foo?multiStatements=true", s)
+	})
 
-func TestNormalizeMySQLURLCustomSpecialChars(t *testing.T) {
-	u, err := url.Parse("mysql://duhfsd7s:123!@123!@@host:123/foo?flag=on")
-	require.NoError(t, err)
-	require.Equal(t, "123", u.Port())
+	t.Run("custom", func(t *testing.T) {
+		u, err := url.Parse("mysql://bob:secret@host:123/foo?flag=on")
+		require.NoError(t, err)
+		require.Equal(t, "123", u.Port())
 
-	s := normalizeMySQLURL(u)
-	require.Equal(t, "duhfsd7s:123!@123!@@tcp(host:123)/foo?flag=on&multiStatements=true", s)
-}
+		s := connectionString(u)
+		require.Equal(t, "bob:secret@tcp(host:123)/foo?flag=on&multiStatements=true", s)
+	})
 
-func TestNormalizeMySQLURLSocket(t *testing.T) {
-	// test with no user/pass
-	u, err := url.Parse("mysql:///foo?socket=/var/run/mysqld/mysqld.sock&flag=on")
-	require.NoError(t, err)
-	require.Equal(t, "", u.Host)
+	t.Run("special chars", func(t *testing.T) {
+		u, err := url.Parse("mysql://duhfsd7s:123!@123!@@host:123/foo?flag=on")
+		require.NoError(t, err)
+		require.Equal(t, "123", u.Port())
 
-	s := normalizeMySQLURL(u)
-	require.Equal(t, "unix(/var/run/mysqld/mysqld.sock)/foo?flag=on&multiStatements=true", s)
+		s := connectionString(u)
+		require.Equal(t, "duhfsd7s:123!@123!@@tcp(host:123)/foo?flag=on&multiStatements=true", s)
+	})
 
-	// test with user/pass
-	u, err = url.Parse("mysql://bob:secret@fakehost/foo?socket=/var/run/mysqld/mysqld.sock&flag=on")
-	require.NoError(t, err)
+	t.Run("socket", func(t *testing.T) {
+		// test with no user/pass
+		u, err := url.Parse("mysql:///foo?socket=/var/run/mysqld/mysqld.sock&flag=on")
+		require.NoError(t, err)
+		require.Equal(t, "", u.Host)
 
-	s = normalizeMySQLURL(u)
-	require.Equal(t, "bob:secret@unix(/var/run/mysqld/mysqld.sock)/foo?flag=on&multiStatements=true", s)
+		s := connectionString(u)
+		require.Equal(t, "unix(/var/run/mysqld/mysqld.sock)/foo?flag=on&multiStatements=true", s)
+
+		// test with user/pass
+		u, err = url.Parse("mysql://bob:secret@fakehost/foo?socket=/var/run/mysqld/mysqld.sock&flag=on")
+		require.NoError(t, err)
+
+		s = connectionString(u)
+		require.Equal(t, "bob:secret@unix(/var/run/mysqld/mysqld.sock)/foo?flag=on&multiStatements=true", s)
+	})
 }
 
 func TestMySQLCreateDropDatabase(t *testing.T) {
-	drv := testMySQLDriver()
-	u := mySQLTestURL(t)
+	drv := testMySQLDriver(t)
 
 	// drop any existing database
-	err := drv.DropDatabase(u)
+	err := drv.DropDatabase()
 	require.NoError(t, err)
 
 	// create database
-	err = drv.CreateDatabase(u)
+	err = drv.CreateDatabase()
 	require.NoError(t, err)
 
 	// check that database exists and we can connect to it
 	func() {
-		db, err := drv.Open(u)
+		db, err := drv.Open()
 		require.NoError(t, err)
-		defer mustClose(db)
+		defer dbutil.MustClose(db)
 
 		err = db.Ping()
 		require.NoError(t, err)
 	}()
 
 	// drop the database
-	err = drv.DropDatabase(u)
+	err = drv.DropDatabase()
 	require.NoError(t, err)
 
 	// check that database no longer exists
 	func() {
-		db, err := drv.Open(u)
+		db, err := drv.Open()
 		require.NoError(t, err)
-		defer mustClose(db)
+		defer dbutil.MustClose(db)
 
 		err = db.Ping()
-		require.NotNil(t, err)
-		require.Regexp(t, "Unknown database 'dbmate'", err.Error())
+		require.Error(t, err)
+		require.Regexp(t, "Unknown database 'dbmate_test'", err.Error())
 	}()
 }
 
 func TestMySQLDumpSchema(t *testing.T) {
-	drv := testMySQLDriver()
-	drv.SetMigrationsTableName("test_migrations")
-
-	u := mySQLTestURL(t)
+	drv := testMySQLDriver(t)
+	drv.migrationsTableName = "test_migrations"
 
 	// prepare database
-	db := prepTestMySQLDB(t, u)
-	defer mustClose(db)
-	err := drv.CreateMigrationsTable(u, db)
+	db := prepTestMySQLDB(t)
+	defer dbutil.MustClose(db)
+	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
 	// insert migration
@@ -141,7 +150,7 @@ func TestMySQLDumpSchema(t *testing.T) {
 	require.NoError(t, err)
 
 	// DumpSchema should return schema
-	schema, err := drv.DumpSchema(u, db)
+	schema, err := drv.DumpSchema(db)
 	require.NoError(t, err)
 	require.Contains(t, string(schema), "CREATE TABLE `test_migrations`")
 	require.Contains(t, string(schema), "\n-- Dump completed\n\n"+
@@ -155,8 +164,8 @@ func TestMySQLDumpSchema(t *testing.T) {
 		"UNLOCK TABLES;\n")
 
 	// DumpSchema should return error if command fails
-	u.Path = "/fakedb"
-	schema, err = drv.DumpSchema(u, db)
+	drv.databaseURL.Path = "/fakedb"
+	schema, err = drv.DumpSchema(db)
 	require.Nil(t, schema)
 	require.EqualError(t, err, "mysqldump: [Warning] Using a password "+
 		"on the command line interface can be insecure.\n"+
@@ -165,54 +174,52 @@ func TestMySQLDumpSchema(t *testing.T) {
 }
 
 func TestMySQLDatabaseExists(t *testing.T) {
-	drv := testMySQLDriver()
-	u := mySQLTestURL(t)
+	drv := testMySQLDriver(t)
 
 	// drop any existing database
-	err := drv.DropDatabase(u)
+	err := drv.DropDatabase()
 	require.NoError(t, err)
 
 	// DatabaseExists should return false
-	exists, err := drv.DatabaseExists(u)
+	exists, err := drv.DatabaseExists()
 	require.NoError(t, err)
 	require.Equal(t, false, exists)
 
 	// create database
-	err = drv.CreateDatabase(u)
+	err = drv.CreateDatabase()
 	require.NoError(t, err)
 
 	// DatabaseExists should return true
-	exists, err = drv.DatabaseExists(u)
+	exists, err = drv.DatabaseExists()
 	require.NoError(t, err)
 	require.Equal(t, true, exists)
 }
 
 func TestMySQLDatabaseExists_Error(t *testing.T) {
-	drv := testMySQLDriver()
-	u := mySQLTestURL(t)
-	u.User = url.User("invalid")
+	drv := testMySQLDriver(t)
+	drv.databaseURL.User = url.User("invalid")
 
-	exists, err := drv.DatabaseExists(u)
+	exists, err := drv.DatabaseExists()
+	require.Error(t, err)
 	require.Regexp(t, "Access denied for user 'invalid'@", err.Error())
 	require.Equal(t, false, exists)
 }
 
 func TestMySQLCreateMigrationsTable(t *testing.T) {
-	drv := testMySQLDriver()
-	drv.SetMigrationsTableName("test_migrations")
+	drv := testMySQLDriver(t)
+	drv.migrationsTableName = "test_migrations"
 
-	u := mySQLTestURL(t)
-	db := prepTestMySQLDB(t, u)
-	defer mustClose(db)
+	db := prepTestMySQLDB(t)
+	defer dbutil.MustClose(db)
 
 	// migrations table should not exist
 	count := 0
 	err := db.QueryRow("select count(*) from test_migrations").Scan(&count)
 	require.Error(t, err)
-	require.Regexp(t, "Table 'dbmate.test_migrations' doesn't exist", err.Error())
+	require.Regexp(t, "Table 'dbmate_test.test_migrations' doesn't exist", err.Error())
 
 	// create table
-	err = drv.CreateMigrationsTable(u, db)
+	err = drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
 	// migrations table should exist
@@ -220,19 +227,18 @@ func TestMySQLCreateMigrationsTable(t *testing.T) {
 	require.NoError(t, err)
 
 	// create table should be idempotent
-	err = drv.CreateMigrationsTable(u, db)
+	err = drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 }
 
 func TestMySQLSelectMigrations(t *testing.T) {
-	drv := testMySQLDriver()
-	drv.SetMigrationsTableName("test_migrations")
+	drv := testMySQLDriver(t)
+	drv.migrationsTableName = "test_migrations"
 
-	u := mySQLTestURL(t)
-	db := prepTestMySQLDB(t, u)
-	defer mustClose(db)
+	db := prepTestMySQLDB(t)
+	defer dbutil.MustClose(db)
 
-	err := drv.CreateMigrationsTable(u, db)
+	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
 	_, err = db.Exec(`insert into test_migrations (version)
@@ -254,14 +260,13 @@ func TestMySQLSelectMigrations(t *testing.T) {
 }
 
 func TestMySQLInsertMigration(t *testing.T) {
-	drv := testMySQLDriver()
-	drv.SetMigrationsTableName("test_migrations")
+	drv := testMySQLDriver(t)
+	drv.migrationsTableName = "test_migrations"
 
-	u := mySQLTestURL(t)
-	db := prepTestMySQLDB(t, u)
-	defer mustClose(db)
+	db := prepTestMySQLDB(t)
+	defer dbutil.MustClose(db)
 
-	err := drv.CreateMigrationsTable(u, db)
+	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
 	count := 0
@@ -280,14 +285,13 @@ func TestMySQLInsertMigration(t *testing.T) {
 }
 
 func TestMySQLDeleteMigration(t *testing.T) {
-	drv := testMySQLDriver()
-	drv.SetMigrationsTableName("test_migrations")
+	drv := testMySQLDriver(t)
+	drv.migrationsTableName = "test_migrations"
 
-	u := mySQLTestURL(t)
-	db := prepTestMySQLDB(t, u)
-	defer mustClose(db)
+	db := prepTestMySQLDB(t)
+	defer dbutil.MustClose(db)
 
-	err := drv.CreateMigrationsTable(u, db)
+	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
 	_, err = db.Exec(`insert into test_migrations (version)
@@ -304,34 +308,33 @@ func TestMySQLDeleteMigration(t *testing.T) {
 }
 
 func TestMySQLPing(t *testing.T) {
-	drv := testMySQLDriver()
-	u := mySQLTestURL(t)
+	drv := testMySQLDriver(t)
 
 	// drop any existing database
-	err := drv.DropDatabase(u)
+	err := drv.DropDatabase()
 	require.NoError(t, err)
 
 	// ping database
-	err = drv.Ping(u)
+	err = drv.Ping()
 	require.NoError(t, err)
 
 	// ping invalid host should return error
-	u.Host = "mysql:404"
-	err = drv.Ping(u)
+	drv.databaseURL.Host = "mysql:404"
+	err = drv.Ping()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "connect: connection refused")
 }
 
 func TestMySQLQuotedMigrationsTableName(t *testing.T) {
 	t.Run("default name", func(t *testing.T) {
-		drv := testMySQLDriver()
+		drv := testMySQLDriver(t)
 		name := drv.quotedMigrationsTableName()
 		require.Equal(t, "`schema_migrations`", name)
 	})
 
 	t.Run("custom name", func(t *testing.T) {
-		drv := testMySQLDriver()
-		drv.SetMigrationsTableName("fooMigrations")
+		drv := testMySQLDriver(t)
+		drv.migrationsTableName = "fooMigrations"
 
 		name := drv.quotedMigrationsTableName()
 		require.Equal(t, "`fooMigrations`", name)

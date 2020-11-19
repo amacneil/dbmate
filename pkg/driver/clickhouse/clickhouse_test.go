@@ -1,108 +1,117 @@
-package dbmate
+package clickhouse
 
 import (
 	"database/sql"
 	"net/url"
+	"os"
 	"testing"
+
+	"github.com/amacneil/dbmate/pkg/dbmate"
+	"github.com/amacneil/dbmate/pkg/dbutil"
 
 	"github.com/stretchr/testify/require"
 )
 
-func clickhouseTestURL(t *testing.T) *url.URL {
-	u, err := url.Parse("clickhouse://clickhouse:9000?database=dbmate")
+func testClickHouseDriver(t *testing.T) *Driver {
+	u := dbutil.MustParseURL(os.Getenv("CLICKHOUSE_TEST_URL"))
+	drv, err := dbmate.New(u).GetDriver()
 	require.NoError(t, err)
 
-	return u
+	return drv.(*Driver)
 }
 
-func testClickHouseDriver() *ClickHouseDriver {
-	drv := &ClickHouseDriver{}
-	drv.SetMigrationsTableName(DefaultMigrationsTableName)
-
-	return drv
-}
-
-func prepTestClickHouseDB(t *testing.T, u *url.URL) *sql.DB {
-	drv := testClickHouseDriver()
+func prepTestClickHouseDB(t *testing.T) *sql.DB {
+	drv := testClickHouseDriver(t)
 
 	// drop any existing database
-	err := drv.DropDatabase(u)
+	err := drv.DropDatabase()
 	require.NoError(t, err)
 
 	// create database
-	err = drv.CreateDatabase(u)
+	err = drv.CreateDatabase()
 	require.NoError(t, err)
 
 	// connect database
-	db, err := sql.Open("clickhouse", u.String())
+	db, err := sql.Open("clickhouse", drv.databaseURL.String())
 	require.NoError(t, err)
 
 	return db
 }
 
-func TestNormalizeClickHouseURLSimplified(t *testing.T) {
-	u, err := url.Parse("clickhouse://user:pass@host/db")
+func TestGetDriver(t *testing.T) {
+	db := dbmate.New(dbutil.MustParseURL("clickhouse://"))
+	drvInterface, err := db.GetDriver()
 	require.NoError(t, err)
 
-	s := normalizeClickHouseURL(u).String()
-	require.Equal(t, "tcp://host:9000?database=db&password=pass&username=user", s)
+	// driver should have URL and default migrations table set
+	drv, ok := drvInterface.(*Driver)
+	require.True(t, ok)
+	require.Equal(t, db.DatabaseURL.String(), drv.databaseURL.String())
+	require.Equal(t, "schema_migrations", drv.migrationsTableName)
 }
 
-func TestNormalizeClickHouseURLCanonical(t *testing.T) {
-	u, err := url.Parse("clickhouse://host:9000?database=db&password=pass&username=user")
-	require.NoError(t, err)
+func TestConnectionString(t *testing.T) {
+	t.Run("simple", func(t *testing.T) {
+		u, err := url.Parse("clickhouse://user:pass@host/db")
+		require.NoError(t, err)
 
-	s := normalizeClickHouseURL(u).String()
-	require.Equal(t, "tcp://host:9000?database=db&password=pass&username=user", s)
+		s := connectionString(u)
+		require.Equal(t, "tcp://host:9000?database=db&password=pass&username=user", s)
+	})
+
+	t.Run("canonical", func(t *testing.T) {
+		u, err := url.Parse("clickhouse://host:9000?database=db&password=pass&username=user")
+		require.NoError(t, err)
+
+		s := connectionString(u)
+		require.Equal(t, "tcp://host:9000?database=db&password=pass&username=user", s)
+	})
 }
 
 func TestClickHouseCreateDropDatabase(t *testing.T) {
-	drv := testClickHouseDriver()
-	u := clickhouseTestURL(t)
+	drv := testClickHouseDriver(t)
 
 	// drop any existing database
-	err := drv.DropDatabase(u)
+	err := drv.DropDatabase()
 	require.NoError(t, err)
 
 	// create database
-	err = drv.CreateDatabase(u)
+	err = drv.CreateDatabase()
 	require.NoError(t, err)
 
 	// check that database exists and we can connect to it
 	func() {
-		db, err := sql.Open("clickhouse", u.String())
+		db, err := sql.Open("clickhouse", drv.databaseURL.String())
 		require.NoError(t, err)
-		defer mustClose(db)
+		defer dbutil.MustClose(db)
 
 		err = db.Ping()
 		require.NoError(t, err)
 	}()
 
 	// drop the database
-	err = drv.DropDatabase(u)
+	err = drv.DropDatabase()
 	require.NoError(t, err)
 
 	// check that database no longer exists
 	func() {
-		db, err := sql.Open("clickhouse", u.String())
+		db, err := sql.Open("clickhouse", drv.databaseURL.String())
 		require.NoError(t, err)
-		defer mustClose(db)
+		defer dbutil.MustClose(db)
 
 		err = db.Ping()
-		require.EqualError(t, err, "code: 81, message: Database dbmate doesn't exist")
+		require.EqualError(t, err, "code: 81, message: Database dbmate_test doesn't exist")
 	}()
 }
 
 func TestClickHouseDumpSchema(t *testing.T) {
-	drv := testClickHouseDriver()
-	drv.SetMigrationsTableName("test_migrations")
-
-	u := clickhouseTestURL(t)
+	drv := testClickHouseDriver(t)
+	drv.migrationsTableName = "test_migrations"
 
 	// prepare database
-	db := prepTestClickHouseDB(t, u)
-	defer mustClose(db)
-	err := drv.CreateMigrationsTable(u, db)
+	db := prepTestClickHouseDB(t)
+	defer dbutil.MustClose(db)
+	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
 	// insert migration
@@ -120,9 +129,9 @@ func TestClickHouseDumpSchema(t *testing.T) {
 	require.NoError(t, err)
 
 	// DumpSchema should return schema
-	schema, err := drv.DumpSchema(u, db)
+	schema, err := drv.DumpSchema(db)
 	require.NoError(t, err)
-	require.Contains(t, string(schema), "CREATE TABLE "+drv.databaseName(u)+".test_migrations")
+	require.Contains(t, string(schema), "CREATE TABLE "+drv.databaseName()+".test_migrations")
 	require.Contains(t, string(schema), "--\n"+
 		"-- Dbmate schema migrations\n"+
 		"--\n\n"+
@@ -131,66 +140,63 @@ func TestClickHouseDumpSchema(t *testing.T) {
 		"    ('abc2');\n")
 
 	// DumpSchema should return error if command fails
-	values := u.Query()
+	values := drv.databaseURL.Query()
 	values.Set("database", "fakedb")
-	u.RawQuery = values.Encode()
-	db, err = sql.Open("clickhouse", u.String())
+	drv.databaseURL.RawQuery = values.Encode()
+	db, err = sql.Open("clickhouse", drv.databaseURL.String())
 	require.NoError(t, err)
 
-	schema, err = drv.DumpSchema(u, db)
+	schema, err = drv.DumpSchema(db)
 	require.Nil(t, schema)
 	require.EqualError(t, err, "code: 81, message: Database fakedb doesn't exist")
 }
 
 func TestClickHouseDatabaseExists(t *testing.T) {
-	drv := testClickHouseDriver()
-	u := clickhouseTestURL(t)
+	drv := testClickHouseDriver(t)
 
 	// drop any existing database
-	err := drv.DropDatabase(u)
+	err := drv.DropDatabase()
 	require.NoError(t, err)
 
 	// DatabaseExists should return false
-	exists, err := drv.DatabaseExists(u)
+	exists, err := drv.DatabaseExists()
 	require.NoError(t, err)
 	require.Equal(t, false, exists)
 
 	// create database
-	err = drv.CreateDatabase(u)
+	err = drv.CreateDatabase()
 	require.NoError(t, err)
 
 	// DatabaseExists should return true
-	exists, err = drv.DatabaseExists(u)
+	exists, err = drv.DatabaseExists()
 	require.NoError(t, err)
 	require.Equal(t, true, exists)
 }
 
 func TestClickHouseDatabaseExists_Error(t *testing.T) {
-	drv := testClickHouseDriver()
-	u := clickhouseTestURL(t)
-	values := u.Query()
+	drv := testClickHouseDriver(t)
+	values := drv.databaseURL.Query()
 	values.Set("username", "invalid")
-	u.RawQuery = values.Encode()
+	drv.databaseURL.RawQuery = values.Encode()
 
-	exists, err := drv.DatabaseExists(u)
+	exists, err := drv.DatabaseExists()
 	require.EqualError(t, err, "code: 192, message: Unknown user invalid")
 	require.Equal(t, false, exists)
 }
 
 func TestClickHouseCreateMigrationsTable(t *testing.T) {
 	t.Run("default table", func(t *testing.T) {
-		drv := testClickHouseDriver()
-		u := clickhouseTestURL(t)
-		db := prepTestClickHouseDB(t, u)
-		defer mustClose(db)
+		drv := testClickHouseDriver(t)
+		db := prepTestClickHouseDB(t)
+		defer dbutil.MustClose(db)
 
 		// migrations table should not exist
 		count := 0
 		err := db.QueryRow("select count(*) from schema_migrations").Scan(&count)
-		require.EqualError(t, err, "code: 60, message: Table dbmate.schema_migrations doesn't exist.")
+		require.EqualError(t, err, "code: 60, message: Table dbmate_test.schema_migrations doesn't exist.")
 
 		// create table
-		err = drv.CreateMigrationsTable(u, db)
+		err = drv.CreateMigrationsTable(db)
 		require.NoError(t, err)
 
 		// migrations table should exist
@@ -198,25 +204,24 @@ func TestClickHouseCreateMigrationsTable(t *testing.T) {
 		require.NoError(t, err)
 
 		// create table should be idempotent
-		err = drv.CreateMigrationsTable(u, db)
+		err = drv.CreateMigrationsTable(db)
 		require.NoError(t, err)
 	})
 
 	t.Run("custom table", func(t *testing.T) {
-		drv := testClickHouseDriver()
-		drv.SetMigrationsTableName("testMigrations")
+		drv := testClickHouseDriver(t)
+		drv.migrationsTableName = "testMigrations"
 
-		u := clickhouseTestURL(t)
-		db := prepTestClickHouseDB(t, u)
-		defer mustClose(db)
+		db := prepTestClickHouseDB(t)
+		defer dbutil.MustClose(db)
 
 		// migrations table should not exist
 		count := 0
 		err := db.QueryRow("select count(*) from \"testMigrations\"").Scan(&count)
-		require.EqualError(t, err, "code: 60, message: Table dbmate.testMigrations doesn't exist.")
+		require.EqualError(t, err, "code: 60, message: Table dbmate_test.testMigrations doesn't exist.")
 
 		// create table
-		err = drv.CreateMigrationsTable(u, db)
+		err = drv.CreateMigrationsTable(db)
 		require.NoError(t, err)
 
 		// migrations table should exist
@@ -224,20 +229,19 @@ func TestClickHouseCreateMigrationsTable(t *testing.T) {
 		require.NoError(t, err)
 
 		// create table should be idempotent
-		err = drv.CreateMigrationsTable(u, db)
+		err = drv.CreateMigrationsTable(db)
 		require.NoError(t, err)
 	})
 }
 
 func TestClickHouseSelectMigrations(t *testing.T) {
-	drv := testClickHouseDriver()
-	drv.SetMigrationsTableName("test_migrations")
+	drv := testClickHouseDriver(t)
+	drv.migrationsTableName = "test_migrations"
 
-	u := clickhouseTestURL(t)
-	db := prepTestClickHouseDB(t, u)
-	defer mustClose(db)
+	db := prepTestClickHouseDB(t)
+	defer dbutil.MustClose(db)
 
-	err := drv.CreateMigrationsTable(u, db)
+	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
 	tx, err := db.Begin()
@@ -268,14 +272,13 @@ func TestClickHouseSelectMigrations(t *testing.T) {
 }
 
 func TestClickHouseInsertMigration(t *testing.T) {
-	drv := testClickHouseDriver()
-	drv.SetMigrationsTableName("test_migrations")
+	drv := testClickHouseDriver(t)
+	drv.migrationsTableName = "test_migrations"
 
-	u := clickhouseTestURL(t)
-	db := prepTestClickHouseDB(t, u)
-	defer mustClose(db)
+	db := prepTestClickHouseDB(t)
+	defer dbutil.MustClose(db)
 
-	err := drv.CreateMigrationsTable(u, db)
+	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
 	count := 0
@@ -297,14 +300,13 @@ func TestClickHouseInsertMigration(t *testing.T) {
 }
 
 func TestClickHouseDeleteMigration(t *testing.T) {
-	drv := testClickHouseDriver()
-	drv.SetMigrationsTableName("test_migrations")
+	drv := testClickHouseDriver(t)
+	drv.migrationsTableName = "test_migrations"
 
-	u := clickhouseTestURL(t)
-	db := prepTestClickHouseDB(t, u)
-	defer mustClose(db)
+	db := prepTestClickHouseDB(t)
+	defer dbutil.MustClose(db)
 
-	err := drv.CreateMigrationsTable(u, db)
+	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
 	tx, err := db.Begin()
@@ -332,42 +334,41 @@ func TestClickHouseDeleteMigration(t *testing.T) {
 }
 
 func TestClickHousePing(t *testing.T) {
-	drv := testClickHouseDriver()
-	u := clickhouseTestURL(t)
+	drv := testClickHouseDriver(t)
 
 	// drop any existing database
-	err := drv.DropDatabase(u)
+	err := drv.DropDatabase()
 	require.NoError(t, err)
 
 	// ping database
-	err = drv.Ping(u)
+	err = drv.Ping()
 	require.NoError(t, err)
 
 	// ping invalid host should return error
-	u.Host = "clickhouse:404"
-	err = drv.Ping(u)
+	drv.databaseURL.Host = "clickhouse:404"
+	err = drv.Ping()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "connect: connection refused")
 }
 
 func TestClickHouseQuotedMigrationsTableName(t *testing.T) {
 	t.Run("default name", func(t *testing.T) {
-		drv := testClickHouseDriver()
+		drv := testClickHouseDriver(t)
 		name := drv.quotedMigrationsTableName()
 		require.Equal(t, "schema_migrations", name)
 	})
 
 	t.Run("custom name", func(t *testing.T) {
-		drv := testClickHouseDriver()
-		drv.SetMigrationsTableName("fooMigrations")
+		drv := testClickHouseDriver(t)
+		drv.migrationsTableName = "fooMigrations"
 
 		name := drv.quotedMigrationsTableName()
 		require.Equal(t, "fooMigrations", name)
 	})
 
 	t.Run("quoted name", func(t *testing.T) {
-		drv := testClickHouseDriver()
-		drv.SetMigrationsTableName("bizarre\"$name")
+		drv := testClickHouseDriver(t)
+		drv.migrationsTableName = "bizarre\"$name"
 
 		name := drv.quotedMigrationsTableName()
 		require.Equal(t, `"bizarre""$name"`, name)

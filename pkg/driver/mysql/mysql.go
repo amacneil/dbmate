@@ -1,4 +1,4 @@
-package dbmate
+package mysql
 
 import (
 	"bytes"
@@ -7,19 +7,31 @@ import (
 	"net/url"
 	"strings"
 
-	_ "github.com/go-sql-driver/mysql" // mysql driver for database/sql
+	"github.com/amacneil/dbmate/pkg/dbmate"
+	"github.com/amacneil/dbmate/pkg/dbutil"
+
+	_ "github.com/go-sql-driver/mysql" // database/sql driver
 )
 
 func init() {
-	RegisterDriver(&MySQLDriver{}, "mysql")
+	dbmate.RegisterDriver(NewDriver, "mysql")
 }
 
-// MySQLDriver provides top level database functions
-type MySQLDriver struct {
+// Driver provides top level database functions
+type Driver struct {
 	migrationsTableName string
+	databaseURL         *url.URL
 }
 
-func normalizeMySQLURL(u *url.URL) string {
+// NewDriver initializes the driver
+func NewDriver(config dbmate.DriverConfig) dbmate.Driver {
+	return &Driver{
+		migrationsTableName: config.MigrationsTableName,
+		databaseURL:         config.DatabaseURL,
+	}
+}
+
+func connectionString(u *url.URL) string {
 	query := u.Query()
 	query.Set("multiStatements", "true")
 
@@ -53,40 +65,40 @@ func normalizeMySQLURL(u *url.URL) string {
 	return normalizedString
 }
 
-// SetMigrationsTableName sets the schema migrations table name
-func (drv *MySQLDriver) SetMigrationsTableName(name string) {
-	drv.migrationsTableName = name
-}
-
 // Open creates a new database connection
-func (drv *MySQLDriver) Open(u *url.URL) (*sql.DB, error) {
-	return sql.Open("mysql", normalizeMySQLURL(u))
+func (drv *Driver) Open() (*sql.DB, error) {
+	return sql.Open("mysql", connectionString(drv.databaseURL))
 }
 
-func (drv *MySQLDriver) openRootDB(u *url.URL) (*sql.DB, error) {
+func (drv *Driver) openRootDB() (*sql.DB, error) {
+	// clone databaseURL
+	rootURL, err := url.Parse(drv.databaseURL.String())
+	if err != nil {
+		return nil, err
+	}
+
 	// connect to no particular database
-	rootURL := *u
 	rootURL.Path = "/"
 
-	return drv.Open(&rootURL)
+	return sql.Open("mysql", connectionString(rootURL))
 }
 
-func (drv *MySQLDriver) quoteIdentifier(str string) string {
+func (drv *Driver) quoteIdentifier(str string) string {
 	str = strings.Replace(str, "`", "\\`", -1)
 
 	return fmt.Sprintf("`%s`", str)
 }
 
 // CreateDatabase creates the specified database
-func (drv *MySQLDriver) CreateDatabase(u *url.URL) error {
-	name := databaseName(u)
+func (drv *Driver) CreateDatabase() error {
+	name := dbutil.DatabaseName(drv.databaseURL)
 	fmt.Printf("Creating: %s\n", name)
 
-	db, err := drv.openRootDB(u)
+	db, err := drv.openRootDB()
 	if err != nil {
 		return err
 	}
-	defer mustClose(db)
+	defer dbutil.MustClose(db)
 
 	_, err = db.Exec(fmt.Sprintf("create database %s",
 		drv.quoteIdentifier(name)))
@@ -95,15 +107,15 @@ func (drv *MySQLDriver) CreateDatabase(u *url.URL) error {
 }
 
 // DropDatabase drops the specified database (if it exists)
-func (drv *MySQLDriver) DropDatabase(u *url.URL) error {
-	name := databaseName(u)
+func (drv *Driver) DropDatabase() error {
+	name := dbutil.DatabaseName(drv.databaseURL)
 	fmt.Printf("Dropping: %s\n", name)
 
-	db, err := drv.openRootDB(u)
+	db, err := drv.openRootDB()
 	if err != nil {
 		return err
 	}
-	defer mustClose(db)
+	defer dbutil.MustClose(db)
 
 	_, err = db.Exec(fmt.Sprintf("drop database if exists %s",
 		drv.quoteIdentifier(name)))
@@ -111,37 +123,37 @@ func (drv *MySQLDriver) DropDatabase(u *url.URL) error {
 	return err
 }
 
-func (drv *MySQLDriver) mysqldumpArgs(u *url.URL) []string {
+func (drv *Driver) mysqldumpArgs() []string {
 	// generate CLI arguments
 	args := []string{"--opt", "--routines", "--no-data",
 		"--skip-dump-date", "--skip-add-drop-table"}
 
-	if hostname := u.Hostname(); hostname != "" {
+	if hostname := drv.databaseURL.Hostname(); hostname != "" {
 		args = append(args, "--host="+hostname)
 	}
-	if port := u.Port(); port != "" {
+	if port := drv.databaseURL.Port(); port != "" {
 		args = append(args, "--port="+port)
 	}
-	if username := u.User.Username(); username != "" {
+	if username := drv.databaseURL.User.Username(); username != "" {
 		args = append(args, "--user="+username)
 	}
 	// mysql recommends against using environment variables to supply password
 	// https://dev.mysql.com/doc/refman/5.7/en/password-security-user.html
-	if password, set := u.User.Password(); set {
+	if password, set := drv.databaseURL.User.Password(); set {
 		args = append(args, "--password="+password)
 	}
 
 	// add database name
-	args = append(args, strings.TrimLeft(u.Path, "/"))
+	args = append(args, dbutil.DatabaseName(drv.databaseURL))
 
 	return args
 }
 
-func (drv *MySQLDriver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
+func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 	migrationsTable := drv.quotedMigrationsTableName()
 
 	// load applied migrations
-	migrations, err := queryColumn(db,
+	migrations, err := dbutil.QueryColumn(db,
 		fmt.Sprintf("select quote(version) from %s order by version asc", migrationsTable))
 	if err != nil {
 		return nil, err
@@ -165,8 +177,8 @@ func (drv *MySQLDriver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 }
 
 // DumpSchema returns the current database schema
-func (drv *MySQLDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
-	schema, err := runCommand("mysqldump", drv.mysqldumpArgs(u)...)
+func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
+	schema, err := dbutil.RunCommand("mysqldump", drv.mysqldumpArgs()...)
 	if err != nil {
 		return nil, err
 	}
@@ -177,18 +189,18 @@ func (drv *MySQLDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
 	}
 
 	schema = append(schema, migrations...)
-	return trimLeadingSQLComments(schema)
+	return dbutil.TrimLeadingSQLComments(schema)
 }
 
 // DatabaseExists determines whether the database exists
-func (drv *MySQLDriver) DatabaseExists(u *url.URL) (bool, error) {
-	name := databaseName(u)
+func (drv *Driver) DatabaseExists() (bool, error) {
+	name := dbutil.DatabaseName(drv.databaseURL)
 
-	db, err := drv.openRootDB(u)
+	db, err := drv.openRootDB()
 	if err != nil {
 		return false, err
 	}
-	defer mustClose(db)
+	defer dbutil.MustClose(db)
 
 	exists := false
 	err = db.QueryRow("select true from information_schema.schemata "+
@@ -201,7 +213,7 @@ func (drv *MySQLDriver) DatabaseExists(u *url.URL) (bool, error) {
 }
 
 // CreateMigrationsTable creates the schema_migrations table
-func (drv *MySQLDriver) CreateMigrationsTable(u *url.URL, db *sql.DB) error {
+func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 	_, err := db.Exec(fmt.Sprintf("create table if not exists %s "+
 		"(version varchar(255) primary key) character set latin1 collate latin1_bin",
 		drv.quotedMigrationsTableName()))
@@ -211,7 +223,7 @@ func (drv *MySQLDriver) CreateMigrationsTable(u *url.URL, db *sql.DB) error {
 
 // SelectMigrations returns a list of applied migrations
 // with an optional limit (in descending order)
-func (drv *MySQLDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
+func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
 	query := fmt.Sprintf("select version from %s order by version desc", drv.quotedMigrationsTableName())
 	if limit >= 0 {
 		query = fmt.Sprintf("%s limit %d", query, limit)
@@ -221,7 +233,7 @@ func (drv *MySQLDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool
 		return nil, err
 	}
 
-	defer mustClose(rows)
+	defer dbutil.MustClose(rows)
 
 	migrations := map[string]bool{}
 	for rows.Next() {
@@ -241,7 +253,7 @@ func (drv *MySQLDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool
 }
 
 // InsertMigration adds a new migration record
-func (drv *MySQLDriver) InsertMigration(db Transaction, version string) error {
+func (drv *Driver) InsertMigration(db dbutil.Transaction, version string) error {
 	_, err := db.Exec(
 		fmt.Sprintf("insert into %s (version) values (?)", drv.quotedMigrationsTableName()),
 		version)
@@ -250,7 +262,7 @@ func (drv *MySQLDriver) InsertMigration(db Transaction, version string) error {
 }
 
 // DeleteMigration removes a migration record
-func (drv *MySQLDriver) DeleteMigration(db Transaction, version string) error {
+func (drv *Driver) DeleteMigration(db dbutil.Transaction, version string) error {
 	_, err := db.Exec(
 		fmt.Sprintf("delete from %s where version = ?", drv.quotedMigrationsTableName()),
 		version)
@@ -260,16 +272,16 @@ func (drv *MySQLDriver) DeleteMigration(db Transaction, version string) error {
 
 // Ping verifies a connection to the database server. It does not verify whether the
 // specified database exists.
-func (drv *MySQLDriver) Ping(u *url.URL) error {
-	db, err := drv.openRootDB(u)
+func (drv *Driver) Ping() error {
+	db, err := drv.openRootDB()
 	if err != nil {
 		return err
 	}
-	defer mustClose(db)
+	defer dbutil.MustClose(db)
 
 	return db.Ping()
 }
 
-func (drv *MySQLDriver) quotedMigrationsTableName() string {
+func (drv *Driver) quotedMigrationsTableName() string {
 	return drv.quoteIdentifier(drv.migrationsTableName)
 }

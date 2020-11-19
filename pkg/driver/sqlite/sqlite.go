@@ -1,6 +1,6 @@
 // +build cgo
 
-package dbmate
+package sqlite
 
 import (
 	"bytes"
@@ -11,58 +11,68 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/amacneil/dbmate/pkg/dbmate"
+	"github.com/amacneil/dbmate/pkg/dbutil"
+
 	"github.com/lib/pq"
-	_ "github.com/mattn/go-sqlite3" // sqlite driver for database/sql
+	_ "github.com/mattn/go-sqlite3" // database/sql driver
 )
 
 func init() {
-	drv := &SQLiteDriver{}
-	RegisterDriver(drv, "sqlite")
-	RegisterDriver(drv, "sqlite3")
+	dbmate.RegisterDriver(NewDriver, "sqlite")
+	dbmate.RegisterDriver(NewDriver, "sqlite3")
 }
 
-// SQLiteDriver provides top level database functions
-type SQLiteDriver struct {
+// Driver provides top level database functions
+type Driver struct {
 	migrationsTableName string
+	databaseURL         *url.URL
 }
 
-func sqlitePath(u *url.URL) string {
-	// strip one leading slash
-	// absolute URLs can be specified as sqlite:////tmp/foo.sqlite3
-	str := regexp.MustCompile("^/").ReplaceAllString(u.Path, "")
+// NewDriver initializes the driver
+func NewDriver(config dbmate.DriverConfig) dbmate.Driver {
+	return &Driver{
+		migrationsTableName: config.MigrationsTableName,
+		databaseURL:         config.DatabaseURL,
+	}
+}
+
+// ConnectionString converts a URL into a valid connection string
+func ConnectionString(u *url.URL) string {
+	// duplicate URL and remove scheme
+	newURL := *u
+	newURL.Scheme = ""
+
+	// trim duplicate leading slashes
+	str := regexp.MustCompile("^//+").ReplaceAllString(newURL.String(), "/")
 
 	return str
 }
 
-// SetMigrationsTableName sets the schema migrations table name
-func (drv *SQLiteDriver) SetMigrationsTableName(name string) {
-	drv.migrationsTableName = name
-}
-
 // Open creates a new database connection
-func (drv *SQLiteDriver) Open(u *url.URL) (*sql.DB, error) {
-	return sql.Open("sqlite3", sqlitePath(u))
+func (drv *Driver) Open() (*sql.DB, error) {
+	return sql.Open("sqlite3", ConnectionString(drv.databaseURL))
 }
 
 // CreateDatabase creates the specified database
-func (drv *SQLiteDriver) CreateDatabase(u *url.URL) error {
-	fmt.Printf("Creating: %s\n", sqlitePath(u))
+func (drv *Driver) CreateDatabase() error {
+	fmt.Printf("Creating: %s\n", ConnectionString(drv.databaseURL))
 
-	db, err := drv.Open(u)
+	db, err := drv.Open()
 	if err != nil {
 		return err
 	}
-	defer mustClose(db)
+	defer dbutil.MustClose(db)
 
 	return db.Ping()
 }
 
 // DropDatabase drops the specified database (if it exists)
-func (drv *SQLiteDriver) DropDatabase(u *url.URL) error {
-	path := sqlitePath(u)
+func (drv *Driver) DropDatabase() error {
+	path := ConnectionString(drv.databaseURL)
 	fmt.Printf("Dropping: %s\n", path)
 
-	exists, err := drv.DatabaseExists(u)
+	exists, err := drv.DatabaseExists()
 	if err != nil {
 		return err
 	}
@@ -73,11 +83,11 @@ func (drv *SQLiteDriver) DropDatabase(u *url.URL) error {
 	return os.Remove(path)
 }
 
-func (drv *SQLiteDriver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
+func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 	migrationsTable := drv.quotedMigrationsTableName()
 
 	// load applied migrations
-	migrations, err := queryColumn(db,
+	migrations, err := dbutil.QueryColumn(db,
 		fmt.Sprintf("select quote(version) from %s order by version asc", migrationsTable))
 	if err != nil {
 		return nil, err
@@ -98,9 +108,9 @@ func (drv *SQLiteDriver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 }
 
 // DumpSchema returns the current database schema
-func (drv *SQLiteDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
-	path := sqlitePath(u)
-	schema, err := runCommand("sqlite3", path, ".schema")
+func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
+	path := ConnectionString(drv.databaseURL)
+	schema, err := dbutil.RunCommand("sqlite3", path, ".schema")
 	if err != nil {
 		return nil, err
 	}
@@ -111,12 +121,12 @@ func (drv *SQLiteDriver) DumpSchema(u *url.URL, db *sql.DB) ([]byte, error) {
 	}
 
 	schema = append(schema, migrations...)
-	return trimLeadingSQLComments(schema)
+	return dbutil.TrimLeadingSQLComments(schema)
 }
 
 // DatabaseExists determines whether the database exists
-func (drv *SQLiteDriver) DatabaseExists(u *url.URL) (bool, error) {
-	_, err := os.Stat(sqlitePath(u))
+func (drv *Driver) DatabaseExists() (bool, error) {
+	_, err := os.Stat(ConnectionString(drv.databaseURL))
 	if os.IsNotExist(err) {
 		return false, nil
 	}
@@ -128,7 +138,7 @@ func (drv *SQLiteDriver) DatabaseExists(u *url.URL) (bool, error) {
 }
 
 // CreateMigrationsTable creates the schema migrations table
-func (drv *SQLiteDriver) CreateMigrationsTable(u *url.URL, db *sql.DB) error {
+func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 	_, err := db.Exec(
 		fmt.Sprintf("create table if not exists %s ", drv.quotedMigrationsTableName()) +
 			"(version varchar(255) primary key)")
@@ -138,7 +148,7 @@ func (drv *SQLiteDriver) CreateMigrationsTable(u *url.URL, db *sql.DB) error {
 
 // SelectMigrations returns a list of applied migrations
 // with an optional limit (in descending order)
-func (drv *SQLiteDriver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
+func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
 	query := fmt.Sprintf("select version from %s order by version desc", drv.quotedMigrationsTableName())
 	if limit >= 0 {
 		query = fmt.Sprintf("%s limit %d", query, limit)
@@ -148,7 +158,7 @@ func (drv *SQLiteDriver) SelectMigrations(db *sql.DB, limit int) (map[string]boo
 		return nil, err
 	}
 
-	defer mustClose(rows)
+	defer dbutil.MustClose(rows)
 
 	migrations := map[string]bool{}
 	for rows.Next() {
@@ -168,7 +178,7 @@ func (drv *SQLiteDriver) SelectMigrations(db *sql.DB, limit int) (map[string]boo
 }
 
 // InsertMigration adds a new migration record
-func (drv *SQLiteDriver) InsertMigration(db Transaction, version string) error {
+func (drv *Driver) InsertMigration(db dbutil.Transaction, version string) error {
 	_, err := db.Exec(
 		fmt.Sprintf("insert into %s (version) values (?)", drv.quotedMigrationsTableName()),
 		version)
@@ -177,7 +187,7 @@ func (drv *SQLiteDriver) InsertMigration(db Transaction, version string) error {
 }
 
 // DeleteMigration removes a migration record
-func (drv *SQLiteDriver) DeleteMigration(db Transaction, version string) error {
+func (drv *Driver) DeleteMigration(db dbutil.Transaction, version string) error {
 	_, err := db.Exec(
 		fmt.Sprintf("delete from %s where version = ?", drv.quotedMigrationsTableName()),
 		version)
@@ -188,23 +198,23 @@ func (drv *SQLiteDriver) DeleteMigration(db Transaction, version string) error {
 // Ping verifies a connection to the database. Due to the way SQLite works, by
 // testing whether the database is valid, it will automatically create the database
 // if it does not already exist.
-func (drv *SQLiteDriver) Ping(u *url.URL) error {
-	db, err := drv.Open(u)
+func (drv *Driver) Ping() error {
+	db, err := drv.Open()
 	if err != nil {
 		return err
 	}
-	defer mustClose(db)
+	defer dbutil.MustClose(db)
 
 	return db.Ping()
 }
 
-func (drv *SQLiteDriver) quotedMigrationsTableName() string {
+func (drv *Driver) quotedMigrationsTableName() string {
 	return drv.quoteIdentifier(drv.migrationsTableName)
 }
 
 // quoteIdentifier quotes a table or column name
 // we fall back to lib/pq implementation since both use ansi standard (double quotes)
 // and mattn/go-sqlite3 doesn't provide a sqlite-specific equivalent
-func (drv *SQLiteDriver) quoteIdentifier(s string) string {
+func (drv *Driver) quoteIdentifier(s string) string {
 	return pq.QuoteIdentifier(s)
 }
