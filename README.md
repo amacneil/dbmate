@@ -10,6 +10,29 @@ It is a standalone command line tool, which can be used with Go, Node.js, Python
 
 For a comparison between dbmate and other popular database schema migration tools, please see the [Alternatives](#alternatives) table.
 
+## Table of Contents
+
+* [Features](#features)
+* [Installation](#installation)
+* [Commands](#commands)
+    * [Command Line Options](#command-line-options)
+* [Usage](#usage)
+    * [Connecting to the Database](#connecting-to-the-database)
+      * [PostgreSQL](#postgresql)
+      * [MySQL](#mysql)
+      * [SQLite](#sqlite)
+      * [ClickHouse](#clickhouse)
+    * [Creating Migrations](#creating-migrations)
+    * [Running Migrations](#running-migrations)
+    * [Rolling Back Migrations](#rolling-back-migrations)
+    * [Migration Options](#migration-options)
+    * [Waiting For The Database](#waiting-for-the-database)
+    * [Exporting Schema File](#exporting-schema-file)
+* [Internals](#internals)
+    * [schema_migrations table](#schema_migrations-table)
+* [Alternatives](#alternatives)
+* [Contributing](#contributing)
+
 ## Features
 
 * Supports MySQL, PostgreSQL, SQLite, and ClickHouse.
@@ -77,7 +100,7 @@ $ heroku run bin/dbmate up
 ## Commands
 
 ```sh
-dbmate           # print help
+dbmate --help    # print usage help
 dbmate new       # generate a new migration file
 dbmate up        # create the database (if it does not already exist) and run any pending migrations
 dbmate create    # create the database
@@ -90,7 +113,22 @@ dbmate dump      # write the database schema.sql file
 dbmate wait      # wait for the database server to become available
 ```
 
+### Command Line Options
+
+The following options are available with all commands. You must use command line arguments in the order `dbmate [global options] command [command options]`. Most options can also be configured via environment variables (and loaded from your `.env` file, which is helpful to share configuration between team members).
+
+* `--url, -u "protocol://host:port/dbname"` - specify the database url directly. _(env: `$DATABASE_URL`)_
+* `--env, -e "DATABASE_URL"` - specify an environment variable to read the database connection URL from.
+* `--migrations-dir, -d "./db/migrations"` - where to keep the migration files. _(env: `$DBMATE_MIGRATIONS_DIR`)_
+* `--migrations-table "schema_migrations"` - database table to record migrations in. _(env: `$DBMATE_MIGRATIONS_TABLE`)_
+* `--schema-file, -s "./db/schema.sql"` - a path to keep the schema.sql file. _(env: `$DBMATE_SCHEMA_FILE`)_
+* `--no-dump-schema` - don't auto-update the schema.sql file on migrate/rollback _(env: `$DBMATE_NO_DUMP_SCHEMA`)_
+* `--wait` - wait for the db to become available before executing the subsequent command _(env: `$DBMATE_WAIT`)_
+* `--wait-timeout 60s` - timeout for --wait flag _(env: `$DBMATE_WAIT_TIMEOUT`)_
+
 ## Usage
+
+### Connecting to the Database
 
 Dbmate locates your database using the `DATABASE_URL` environment variable by default. If you are writing a [twelve-factor app](http://12factor.net/), you should be storing all connection strings in environment variables.
 
@@ -113,19 +151,33 @@ protocol://username:password@host:port/database_name?options
 * `host` can be either a hostname or IP address
 * `options` are driver-specific (refer to the underlying Go SQL drivers if you wish to use these)
 
-**MySQL**
+Dbmate can also load the connection URL from a different environment variable. For example, before running your test suite, you may wish to drop and recreate the test database. One easy way to do this is to store your test database connection URL in the `TEST_DATABASE_URL` environment variable:
 
 ```sh
-DATABASE_URL="mysql://username:password@127.0.0.1:3306/database_name"
+$ cat .env
+DATABASE_URL="postgres://postgres@127.0.0.1:5432/myapp_dev?sslmode=disable"
+TEST_DATABASE_URL="postgres://postgres@127.0.0.1:5432/myapp_test?sslmode=disable"
 ```
 
-A `socket` parameter can be specified to connect through a unix socket:
+You can then specify this environment variable in your test script (Makefile or similar):
 
 ```sh
-DATABASE_URL="mysql://username:password@/database_name?socket=/var/run/mysqld/mysqld.sock"
+$ dbmate -e TEST_DATABASE_URL drop
+Dropping: myapp_test
+$ dbmate -e TEST_DATABASE_URL --no-dump-schema up
+Creating: myapp_test
+Applying: 20151127184807_create_users_table.sql
 ```
 
-**PostgreSQL**
+Alternatively, you can specify the url directly on the command line:
+
+```sh
+$ dbmate -u "postgres://postgres@127.0.0.1:5432/myapp_test?sslmode=disable" up
+```
+
+The only advantage of using `dbmate -e TEST_DATABASE_URL` over `dbmate -u $TEST_DATABASE_URL` is that the former takes advantage of dbmate's automatic `.env` file loading.
+
+#### PostgreSQL
 
 When connecting to Postgres, you may need to add the `sslmode=disable` option to your connection string, as dbmate by default requires a TLS connection (some other frameworks/languages allow unencrypted connections by default).
 
@@ -150,7 +202,19 @@ DATABASE_URL="postgres://username:password@127.0.0.1:5432/database_name?search_p
 DATABASE_URL="postgres://username:password@127.0.0.1:5432/database_name?search_path=myschema,public"
 ```
 
-**SQLite**
+#### MySQL
+
+```sh
+DATABASE_URL="mysql://username:password@127.0.0.1:3306/database_name"
+```
+
+A `socket` parameter can be specified to connect through a unix socket:
+
+```sh
+DATABASE_URL="mysql://username:password@/database_name?socket=/var/run/mysqld/mysqld.sock"
+```
+
+#### SQLite
 
 SQLite databases are stored on the filesystem, so you do not need to specify a host. By default, files are relative to the current directory. For example, the following will create a database at `./db/database.sqlite3`:
 
@@ -164,7 +228,7 @@ To specify an absolute path, add a forward slash to the path. The following will
 DATABASE_URL="sqlite:/tmp/database.sqlite3"
 ```
 
-**ClickHouse**
+#### ClickHouse
 
 ```sh
 DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name"
@@ -248,7 +312,7 @@ dbmate supports options passed to a migration block in the form of `key:value` p
 
 * `transaction`
 
-#### transaction
+**transaction**
 
 `transaction` is useful if you need to run some SQL which cannot be executed from within a transaction. For example, in Postgres, you would need to disable transactions for migrations that alter an enum type to add a value:
 
@@ -258,23 +322,6 @@ ALTER TYPE colors ADD VALUE 'orange' AFTER 'red';
 ```
 
 `transaction` will default to `true` if your database supports it.
-
-### Schema File
-
-When you run the `up`, `migrate`, or `rollback` commands, dbmate will automatically create a `./db/schema.sql` file containing a complete representation of your database schema. Dbmate keeps this file up to date for you, so you should not manually edit it.
-
-It is recommended to check this file into source control, so that you can easily review changes to the schema in commits or pull requests. It's also possible to use this file when you want to quickly load a database schema, without running each migration sequentially (for example in your test harness). However, if you do not wish to save this file, you could add it to `.gitignore`, or pass the `--no-dump-schema` command line option.
-
-To dump the `schema.sql` file without performing any other actions, run `dbmate dump`. Unlike other dbmate actions, this command relies on the respective `pg_dump`, `mysqldump`, or `sqlite3` commands being available in your PATH. If these tools are not available, dbmate will silenty skip the schema dump step during `up`, `migrate`, or `rollback` actions. You can diagnose the issue by running `dbmate dump` and looking at the output:
-
-```sh
-$ dbmate dump
-exec: "pg_dump": executable file not found in $PATH
-```
-
-On Ubuntu or Debian systems, you can fix this by installing `postgresql-client`, `mysql-client`, or `sqlite3` respectively. Ensure that the package version you install is greater than or equal to the version running on your database server.
-
-> Note: The `schema.sql` file will contain a complete schema for your database, even if some tables or columns were created outside of dbmate migrations.
 
 ### Waiting For The Database
 
@@ -313,64 +360,61 @@ Error: unable to connect to database: dial tcp 127.0.0.1:5432: connect: connecti
 
 Please note that the `wait` command does not verify whether your specified database exists, only that the server is available and ready (so it will return success if the database server is available, but your database has not yet been created).
 
-### Options
+### Exporting Schema File
 
-The following command line options are available with all commands. You must use command line arguments in the order `dbmate [global options] command [command options]`. Most options can also be configured via environment variables (and loaded from your `.env` file, which is helpful to share configuration between team members).
+When you run the `up`, `migrate`, or `rollback` commands, dbmate will automatically create a `./db/schema.sql` file containing a complete representation of your database schema. Dbmate keeps this file up to date for you, so you should not manually edit it.
 
-* `--url, -u "protocol://host:port/dbname"` - specify the database url directly. _(env: `$DATABASE_URL`)_
-* `--env, -e "DATABASE_URL"` - specify an environment variable to read the database connection URL from.
-* `--migrations-dir, -d "./db/migrations"` - where to keep the migration files. _(env: `$DBMATE_MIGRATIONS_DIR`)_
-* `--schema-file, -s "./db/schema.sql"` - a path to keep the schema.sql file. _(env: `$DBMATE_SCHEMA_FILE`)_
-* `--no-dump-schema` - don't auto-update the schema.sql file on migrate/rollback _(env: `$DBMATE_NO_DUMP_SCHEMA`)_
-* `--wait` - wait for the db to become available before executing the subsequent command _(env: `$DBMATE_WAIT`)_
-* `--wait-timeout 60s` - timeout for --wait flag _(env: `$DBMATE_WAIT_TIMEOUT`)_
+It is recommended to check this file into source control, so that you can easily review changes to the schema in commits or pull requests. It's also possible to use this file when you want to quickly load a database schema, without running each migration sequentially (for example in your test harness). However, if you do not wish to save this file, you could add it to your `.gitignore`, or pass the `--no-dump-schema` command line option.
 
-For example, before running your test suite, you may wish to drop and recreate the test database. One easy way to do this is to store your test database connection URL in the `TEST_DATABASE_URL` environment variable:
+To dump the `schema.sql` file without performing any other actions, run `dbmate dump`. Unlike other dbmate actions, this command relies on the respective `pg_dump`, `mysqldump`, or `sqlite3` commands being available in your PATH. If these tools are not available, dbmate will silenty skip the schema dump step during `up`, `migrate`, or `rollback` actions. You can diagnose the issue by running `dbmate dump` and looking at the output:
 
 ```sh
-$ cat .env
-TEST_DATABASE_URL="postgres://postgres@127.0.0.1:5432/myapp_test?sslmode=disable"
+$ dbmate dump
+exec: "pg_dump": executable file not found in $PATH
 ```
 
-You can then specify this environment variable in your test script (Makefile or similar):
+On Ubuntu or Debian systems, you can fix this by installing `postgresql-client`, `mysql-client`, or `sqlite3` respectively. Ensure that the package version you install is greater than or equal to the version running on your database server.
 
-```sh
-$ dbmate -e TEST_DATABASE_URL drop
-Dropping: myapp_test
-$ dbmate -e TEST_DATABASE_URL --no-dump-schema up
-Creating: myapp_test
-Applying: 20151127184807_create_users_table.sql
+> Note: The `schema.sql` file will contain a complete schema for your database, even if some tables or columns were created outside of dbmate migrations.
+
+## Internals
+
+### schema_migrations table
+
+By default, dbmate stores a record of each applied migration in a `schema_migrations` table. This table will be created for you automatically if it does not already exist. The table schema is very simple:
+
+```sql
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  version VARCHAR(255) PRIMARY KEY
+)
 ```
 
-Alternatively, you can specify the url directly on the command line:
+Dbmate records only the version number of applied migrations, so you can safely rename a migration file without affecting its applied status.
 
-```sh
-$ dbmate -u "postgres://postgres@127.0.0.1:5432/myapp_test?sslmode=disable" up
-```
-
-The only advantage of using `dbmate -e TEST_DATABASE_URL` over `dbmate -u $TEST_DATABASE_URL` is that the former takes advantage of dbmate's automatic `.env` file loading.
+You can customize the name of this table using the `--migrations-table` flag or `$DBMATE_MIGRATIONS_TABLE` environment variable. If you already have a table with this name (possibly from a previous migration tool), you should either manually update it to conform to this schema, or configure dbmate to use a different table name.
 
 ## Alternatives
 
 Why another database schema migration tool? Dbmate was inspired by many other tools, primarily [Active Record Migrations](http://guides.rubyonrails.org/active_record_migrations.html), with the goals of being trivial to configure, and language & framework independent. Here is a comparison between dbmate and other popular migration tools.
 
-| | [goose](https://bitbucket.org/liamstask/goose/) | [sql-migrate](https://github.com/rubenv/sql-migrate) | [golang-migrate/migrate](https://github.com/golang-migrate/migrate) | [activerecord](http://guides.rubyonrails.org/active_record_migrations.html) | [sequelize](http://docs.sequelizejs.com/manual/tutorial/migrations.html) | [dbmate](https://github.com/amacneil/dbmate) |
+| | [dbmate](https://github.com/amacneil/dbmate) | [goose](https://github.com/pressly/goose) | [sql-migrate](https://github.com/rubenv/sql-migrate) | [golang-migrate](https://github.com/golang-migrate/migrate) | [activerecord](http://guides.rubyonrails.org/active_record_migrations.html) | [sequelize](http://docs.sequelizejs.com/manual/tutorial/migrations.html) |
 | --- |:---:|:---:|:---:|:---:|:---:|:---:|
 | **Features** |
-|Plain SQL migration files|:white_check_mark:|:white_check_mark:|:white_check_mark:|||:white_check_mark:|
-|Support for creating and dropping databases||||:white_check_mark:||:white_check_mark:|
-|Support for saving schema dump files||||:white_check_mark:||:white_check_mark:|
-|Timestamp-versioned migration files|:white_check_mark:|||:white_check_mark:|:white_check_mark:|:white_check_mark:|
-|Ability to wait for database to become ready||||||:white_check_mark:|
-|Database connection string loaded from environment variables||||||:white_check_mark:|
-|Automatically load .env file||||||:white_check_mark:|
-|No separate configuration file||||:white_check_mark:|:white_check_mark:|:white_check_mark:|
-|Language/framework independent|:eight_pointed_black_star:|:eight_pointed_black_star:|:eight_pointed_black_star:|||:white_check_mark:|
+|Plain SQL migration files|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|||
+|Support for creating and dropping databases|:white_check_mark:||||:white_check_mark:||
+|Support for saving schema dump files|:white_check_mark:||||:white_check_mark:||
+|Timestamp-versioned migration files|:white_check_mark:|:white_check_mark:|||:white_check_mark:|:white_check_mark:|
+|Custom schema migrations table|:white_check_mark:||:white_check_mark:|||:white_check_mark:|
+|Ability to wait for database to become ready|:white_check_mark:||||||
+|Database connection string loaded from environment variables|:white_check_mark:||||||
+|Automatically load .env file|:white_check_mark:||||||
+|No separate configuration file|:white_check_mark:||||:white_check_mark:|:white_check_mark:|
+|Language/framework independent|:white_check_mark:|:eight_pointed_black_star:|:eight_pointed_black_star:|:eight_pointed_black_star:|||
 | **Drivers** |
 |PostgreSQL|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
 |MySQL|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
 |SQLite|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
-|CliсkHouse|||:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
+|CliсkHouse|:white_check_mark:|||:white_check_mark:|:white_check_mark:|:white_check_mark:|
 
 > :eight_pointed_black_star: In theory these tools could be used with other languages, but a Go development environment is required because binary builds are not provided.
 
@@ -383,11 +427,11 @@ Dbmate is written in Go, pull requests are welcome.
 Tests are run against a real database using docker-compose. To build a docker image and run the tests:
 
 ```sh
-$ make docker-all
+$ make docker-make
 ```
 
 To start a development shell:
 
 ```sh
-$ make docker-bash
+$ make docker-sh
 ```
