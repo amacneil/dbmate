@@ -83,6 +83,7 @@ func (db *DB) GetDriver() (Driver, error) {
 	config := DriverConfig{
 		DatabaseURL:         db.DatabaseURL,
 		MigrationsTableName: db.MigrationsTableName,
+		Log:                 db.Log,
 	}
 
 	return driverFunc(config), nil
