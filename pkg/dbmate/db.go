@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -30,19 +29,6 @@ const DefaultWaitInterval = time.Second
 // DefaultWaitTimeout specifies maximum time for connection attempts
 const DefaultWaitTimeout = 60 * time.Second
 
-// DB allows dbmate actions to be performed on a specified database
-type DB struct {
-	AutoDumpSchema      bool
-	DatabaseURL         *url.URL
-	MigrationsDir       string
-	MigrationsTableName string
-	SchemaFile          string
-	Verbose             bool
-	WaitBefore          bool
-	WaitInterval        time.Duration
-	WaitTimeout         time.Duration
-}
-
 // migrationFileRegexp pattern for valid migration files
 var migrationFileRegexp = regexp.MustCompile(`^\d.*\.sql$`)
 
@@ -50,20 +36,6 @@ var migrationFileRegexp = regexp.MustCompile(`^\d.*\.sql$`)
 type StatusResult struct {
 	Filename string
 	Applied  bool
-}
-
-// New initializes a new dbmate database
-func New(databaseURL *url.URL) *DB {
-	return &DB{
-		AutoDumpSchema:      true,
-		DatabaseURL:         databaseURL,
-		MigrationsDir:       DefaultMigrationsDir,
-		MigrationsTableName: DefaultMigrationsTableName,
-		SchemaFile:          DefaultSchemaFile,
-		WaitBefore:          false,
-		WaitInterval:        DefaultWaitInterval,
-		WaitTimeout:         DefaultWaitTimeout,
-	}
 }
 
 // GetDriver initializes the appropriate database driver
@@ -347,7 +319,7 @@ func (db *DB) migrate(drv Driver) error {
 
 		fmt.Printf("Applying: %s\n", filename)
 
-		contents, err := ioutil.ReadFile(filepath.Join(db.MigrationsDir, filename))
+		contents, err := db.readFile(filepath.Join(db.MigrationsDir, filename))
 		if err != nil {
 			return err
 		}
@@ -402,9 +374,9 @@ func printVerbose(result sql.Result) {
 }
 
 func (db *DB) findMigrationFiles(re *regexp.Regexp) ([]string, error) {
-	files, err := ioutil.ReadDir(db.MigrationsDir)
+	files, err := db.readDir(db.MigrationsDir)
 	if err != nil {
-		return nil, fmt.Errorf("could not find migrations directory `%s`", db.MigrationsDir)
+		return nil, fmt.Errorf("could not find migrations directory `%s`: %w", db.MigrationsDir, err)
 	}
 
 	matches := []string{}
@@ -491,7 +463,7 @@ func (db *DB) Rollback() error {
 
 	fmt.Printf("Rolling back: %s\n", filename)
 
-	contents, err := ioutil.ReadFile(filepath.Join(db.MigrationsDir, filename))
+	contents, err := db.readFile(filepath.Join(db.MigrationsDir, filename))
 	if err != nil {
 		return err
 	}
