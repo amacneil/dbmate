@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"fmt"
+	"io"
 	"net/url"
 	"strings"
 
@@ -22,6 +23,7 @@ func init() {
 type Driver struct {
 	migrationsTableName string
 	databaseURL         *url.URL
+	log                 io.Writer
 }
 
 // NewDriver initializes the driver
@@ -112,7 +114,7 @@ func (drv *Driver) openPostgresDB() (*sql.DB, error) {
 // CreateDatabase creates the specified database
 func (drv *Driver) CreateDatabase() error {
 	name := dbutil.DatabaseName(drv.databaseURL)
-	fmt.Printf("Creating: %s\n", name)
+	fmt.Fprintf(drv.log, "Creating: %s\n", name)
 
 	db, err := drv.openPostgresDB()
 	if err != nil {
@@ -129,7 +131,7 @@ func (drv *Driver) CreateDatabase() error {
 // DropDatabase drops the specified database (if it exists)
 func (drv *Driver) DropDatabase() error {
 	name := dbutil.DatabaseName(drv.databaseURL)
-	fmt.Printf("Dropping: %s\n", name)
+	fmt.Fprintf(drv.log, "Dropping: %s\n", name)
 
 	db, err := drv.openPostgresDB()
 	if err != nil {
@@ -233,7 +235,7 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 
 	// in theory we could attempt to create the schema every time, but we avoid that
 	// in case the user doesn't have permissions to create schemas
-	fmt.Printf("Creating schema: %s\n", schema)
+	fmt.Fprintf(drv.log, "Creating schema: %s\n", schema)
 	_, err = db.Exec(fmt.Sprintf("create schema if not exists %s", schema))
 	if err != nil {
 		return err

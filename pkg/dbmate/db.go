@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -41,6 +42,7 @@ type DB struct {
 	WaitBefore          bool
 	WaitInterval        time.Duration
 	WaitTimeout         time.Duration
+	Log                 io.Writer
 }
 
 // migrationFileRegexp pattern for valid migration files
@@ -63,6 +65,7 @@ func New(databaseURL *url.URL) *DB {
 		WaitBefore:          false,
 		WaitInterval:        DefaultWaitInterval,
 		WaitTimeout:         DefaultWaitTimeout,
+		Log:                 os.Stdout,
 	}
 }
 
@@ -104,22 +107,22 @@ func (db *DB) wait(drv Driver) error {
 		return nil
 	}
 
-	fmt.Print("Waiting for database")
+	fmt.Fprint(db.Log, "Waiting for database")
 	for i := 0 * time.Second; i < db.WaitTimeout; i += db.WaitInterval {
-		fmt.Print(".")
+		fmt.Fprint(db.Log, ".")
 		time.Sleep(db.WaitInterval)
 
 		// attempt connection to database server
 		err = drv.Ping()
 		if err == nil {
 			// connection successful
-			fmt.Print("\n")
+			fmt.Fprint(db.Log, "\n")
 			return nil
 		}
 	}
 
 	// if we find outselves here, we could not connect within the timeout
-	fmt.Print("\n")
+	fmt.Fprint(db.Log, "\n")
 	return fmt.Errorf("unable to connect to database: %s", err)
 }
 
@@ -214,7 +217,7 @@ func (db *DB) dumpSchema(drv Driver) error {
 		return err
 	}
 
-	fmt.Printf("Writing: %s\n", db.SchemaFile)
+	fmt.Fprintf(db.Log, "Writing: %s\n", db.SchemaFile)
 
 	// ensure schema directory exists
 	if err = ensureDir(filepath.Dir(db.SchemaFile)); err != nil {
@@ -252,7 +255,7 @@ func (db *DB) NewMigration(name string) error {
 
 	// check file does not already exist
 	path := filepath.Join(db.MigrationsDir, name)
-	fmt.Printf("Creating migration: %s\n", path)
+	fmt.Fprintf(db.Log, "Creating migration: %s\n", path)
 
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		return fmt.Errorf("file already exists")
@@ -345,7 +348,7 @@ func (db *DB) migrate(drv Driver) error {
 			continue
 		}
 
-		fmt.Printf("Applying: %s\n", filename)
+		fmt.Fprintf(db.Log, "Applying: %s\n", filename)
 
 		up, _, err := parseMigration(filepath.Join(db.MigrationsDir, filename))
 		if err != nil {
@@ -358,7 +361,7 @@ func (db *DB) migrate(drv Driver) error {
 			if err != nil {
 				return err
 			} else if db.Verbose {
-				printVerbose(result)
+				db.printVerbose(result)
 			}
 
 			// record migration
@@ -386,14 +389,14 @@ func (db *DB) migrate(drv Driver) error {
 	return nil
 }
 
-func printVerbose(result sql.Result) {
+func (db *DB) printVerbose(result sql.Result) {
 	lastInsertID, err := result.LastInsertId()
 	if err == nil {
-		fmt.Printf("Last insert ID: %d\n", lastInsertID)
+		fmt.Fprintf(db.Log, "Last insert ID: %d\n", lastInsertID)
 	}
 	rowsAffected, err := result.RowsAffected()
 	if err == nil {
-		fmt.Printf("Rows affected: %d\n", rowsAffected)
+		fmt.Fprintf(db.Log, "Rows affected: %d\n", rowsAffected)
 	}
 }
 
@@ -485,7 +488,7 @@ func (db *DB) Rollback() error {
 		return err
 	}
 
-	fmt.Printf("Rolling back: %s\n", filename)
+	fmt.Fprintf(db.Log, "Rolling back: %s\n", filename)
 
 	_, down, err := parseMigration(filepath.Join(db.MigrationsDir, filename))
 	if err != nil {
@@ -498,7 +501,7 @@ func (db *DB) Rollback() error {
 		if err != nil {
 			return err
 		} else if db.Verbose {
-			printVerbose(result)
+			db.printVerbose(result)
 		}
 
 		// remove migration record
@@ -548,15 +551,15 @@ func (db *DB) Status(quiet bool) (int, error) {
 			line = fmt.Sprintf("[ ] %s", res.Filename)
 		}
 		if !quiet {
-			fmt.Println(line)
+			fmt.Fprintln(db.Log, line)
 		}
 	}
 
 	totalPending := len(results) - totalApplied
 	if !quiet {
-		fmt.Println()
-		fmt.Printf("Applied: %d\n", totalApplied)
-		fmt.Printf("Pending: %d\n", totalPending)
+		fmt.Fprintln(db.Log)
+		fmt.Fprintf(db.Log, "Applied: %d\n", totalApplied)
+		fmt.Fprintf(db.Log, "Pending: %d\n", totalPending)
 	}
 
 	return totalPending, nil
