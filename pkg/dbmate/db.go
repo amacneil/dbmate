@@ -311,7 +311,7 @@ func (db *DB) Migrate() error {
 }
 
 func (db *DB) migrate(drv Driver) error {
-	files, err := findMigrationFiles(db.MigrationsDir, migrationFileRegexp)
+	files, err := db.findMigrationFiles(migrationFileRegexp)
 	if err != nil {
 		return err
 	}
@@ -401,10 +401,10 @@ func printVerbose(result sql.Result) {
 	}
 }
 
-func findMigrationFiles(dir string, re *regexp.Regexp) ([]string, error) {
-	files, err := ioutil.ReadDir(dir)
+func (db *DB) findMigrationFiles(re *regexp.Regexp) ([]string, error) {
+	files, err := ioutil.ReadDir(db.MigrationsDir)
 	if err != nil {
-		return nil, fmt.Errorf("could not find migrations directory `%s`", dir)
+		return nil, fmt.Errorf("could not find migrations directory `%s`", db.MigrationsDir)
 	}
 
 	matches := []string{}
@@ -426,7 +426,7 @@ func findMigrationFiles(dir string, re *regexp.Regexp) ([]string, error) {
 	return matches, nil
 }
 
-func findMigrationFile(dir string, ver string) (string, error) {
+func (db *DB) findMigrationFile(ver string) (string, error) {
 	if ver == "" {
 		panic("migration version is required")
 	}
@@ -434,7 +434,7 @@ func findMigrationFile(dir string, ver string) (string, error) {
 	ver = regexp.QuoteMeta(ver)
 	re := regexp.MustCompile(fmt.Sprintf(`^%s.*\.sql$`, ver))
 
-	files, err := findMigrationFiles(dir, re)
+	files, err := db.findMigrationFiles(re)
 	if err != nil {
 		return "", err
 	}
@@ -484,7 +484,7 @@ func (db *DB) Rollback() error {
 		return fmt.Errorf("can't rollback: no migrations have been applied")
 	}
 
-	filename, err := findMigrationFile(db.MigrationsDir, latest)
+	filename, err := db.findMigrationFile(latest)
 	if err != nil {
 		return err
 	}
@@ -572,7 +572,7 @@ func (db *DB) Status(quiet bool) (int, error) {
 
 // CheckMigrationsStatus returns the status of all available mgirations
 func (db *DB) CheckMigrationsStatus(drv Driver) ([]StatusResult, error) {
-	files, err := findMigrationFiles(db.MigrationsDir, migrationFileRegexp)
+	files, err := db.findMigrationFiles(migrationFileRegexp)
 	if err != nil {
 		return nil, err
 	}
