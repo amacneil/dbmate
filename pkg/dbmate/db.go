@@ -347,7 +347,11 @@ func (db *DB) migrate(drv Driver) error {
 
 		fmt.Printf("Applying: %s\n", filename)
 
-		up, _, err := parseMigration(filepath.Join(db.MigrationsDir, filename))
+		contents, err := ioutil.ReadFile(filepath.Join(db.MigrationsDir, filename))
+		if err != nil {
+			return err
+		}
+		up, _, err := parseMigrationContents(string(contents))
 		if err != nil {
 			return err
 		}
@@ -487,7 +491,11 @@ func (db *DB) Rollback() error {
 
 	fmt.Printf("Rolling back: %s\n", filename)
 
-	_, down, err := parseMigration(filepath.Join(db.MigrationsDir, filename))
+	contents, err := ioutil.ReadFile(filepath.Join(db.MigrationsDir, filename))
+	if err != nil {
+		return err
+	}
+	_, down, err := parseMigrationContents(string(contents))
 	if err != nil {
 		return err
 	}

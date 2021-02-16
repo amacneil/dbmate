@@ -2,7 +2,6 @@ package dbmate
 
 import (
 	"fmt"
-	"io/ioutil"
 	"regexp"
 	"strings"
 )
@@ -29,16 +28,6 @@ type Migration struct {
 // NewMigration constructs a Migration object
 func NewMigration() Migration {
 	return Migration{Contents: "", Options: make(migrationOptions)}
-}
-
-// parseMigration reads a migration file and returns (up Migration, down Migration, error)
-func parseMigration(path string) (Migration, Migration, error) {
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
-		return NewMigration(), NewMigration(), err
-	}
-	up, down, err := parseMigrationContents(string(data))
-	return up, down, err
 }
 
 var upRegExp = regexp.MustCompile(`(?m)^--\s*migrate:up(\s*$|\s+\S+)`)
