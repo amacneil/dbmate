@@ -2,6 +2,7 @@ package dbmate
 
 import (
 	"database/sql"
+	"io"
 	"net/url"
 
 	"github.com/amacneil/dbmate/pkg/dbutil"
@@ -25,6 +26,7 @@ type Driver interface {
 type DriverConfig struct {
 	DatabaseURL         *url.URL
 	MigrationsTableName string
+	Log                 io.Writer
 }
 
 // DriverFunc represents a driver constructor

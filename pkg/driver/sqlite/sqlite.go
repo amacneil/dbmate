@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"database/sql"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"regexp"
@@ -27,6 +28,7 @@ func init() {
 type Driver struct {
 	migrationsTableName string
 	databaseURL         *url.URL
+	log                 io.Writer
 }
 
 // NewDriver initializes the driver
@@ -34,6 +36,7 @@ func NewDriver(config dbmate.DriverConfig) dbmate.Driver {
 	return &Driver{
 		migrationsTableName: config.MigrationsTableName,
 		databaseURL:         config.DatabaseURL,
+		log:                 config.Log,
 	}
 }
 
@@ -56,7 +59,7 @@ func (drv *Driver) Open() (*sql.DB, error) {
 
 // CreateDatabase creates the specified database
 func (drv *Driver) CreateDatabase() error {
-	fmt.Printf("Creating: %s\n", ConnectionString(drv.databaseURL))
+	fmt.Fprintf(drv.log, "Creating: %s\n", ConnectionString(drv.databaseURL))
 
 	db, err := drv.Open()
 	if err != nil {
@@ -70,7 +73,7 @@ func (drv *Driver) CreateDatabase() error {
 // DropDatabase drops the specified database (if it exists)
 func (drv *Driver) DropDatabase() error {
 	path := ConnectionString(drv.databaseURL)
-	fmt.Printf("Dropping: %s\n", path)
+	fmt.Fprintf(drv.log, "Dropping: %s\n", path)
 
 	exists, err := drv.DatabaseExists()
 	if err != nil {
