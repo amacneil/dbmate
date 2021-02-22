@@ -1,5 +1,5 @@
 # development image
-FROM techknowlogick/xgo:go-1.15.x as dev
+FROM techknowlogick/xgo:go-1.16.x as dev
 WORKDIR /src
 ENV GOCACHE /src/.cache/go-build
 
@@ -18,7 +18,7 @@ RUN apt-get update \
 # golangci-lint
 RUN curl -fsSL -o /tmp/lint-install.sh https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
 	&& chmod +x /tmp/lint-install.sh \
-	&& /tmp/lint-install.sh -b /usr/local/bin v1.32.2 \
+	&& /tmp/lint-install.sh -b /usr/local/bin v1.37.1 \
 	&& rm -f /tmp/lint-install.sh
 
 # download modules
