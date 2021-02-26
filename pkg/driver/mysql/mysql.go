@@ -52,7 +52,7 @@ func connectionString(u *url.URL) string {
 
 	// Get decoded user:pass
 	userPassEncoded := u.User.String()
-	userPass, _ := url.QueryUnescape(userPassEncoded)
+	userPass, _ := url.PathUnescape(userPassEncoded)
 
 	// Build DSN w/ user:pass percent-decoded
 	normalizedString := ""
