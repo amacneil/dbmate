@@ -1,6 +1,6 @@
 # Dbmate
 
-[![GitHub Build](https://img.shields.io/github/workflow/status/amacneil/dbmate/CI/master)](https://github.com/amacneil/dbmate/actions?query=branch%3Amaster+event%3Apush+workflow%3ACI)
+[![GitHub Build](https://img.shields.io/github/workflow/status/amacneil/dbmate/CI/main)](https://github.com/amacneil/dbmate/actions?query=branch%3Amain+event%3Apush+workflow%3ACI)
 [![Go Report Card](https://goreportcard.com/badge/github.com/amacneil/dbmate)](https://goreportcard.com/report/github.com/amacneil/dbmate)
 [![GitHub Release](https://img.shields.io/github/release/amacneil/dbmate.svg)](https://github.com/amacneil/dbmate/releases)
 
@@ -12,38 +12,38 @@ For a comparison between dbmate and other popular database schema migration tool
 
 ## Table of Contents
 
-* [Features](#features)
-* [Installation](#installation)
-* [Commands](#commands)
-    * [Command Line Options](#command-line-options)
-* [Usage](#usage)
-    * [Connecting to the Database](#connecting-to-the-database)
-      * [PostgreSQL](#postgresql)
-      * [MySQL](#mysql)
-      * [SQLite](#sqlite)
-      * [ClickHouse](#clickhouse)
-    * [Creating Migrations](#creating-migrations)
-    * [Running Migrations](#running-migrations)
-    * [Rolling Back Migrations](#rolling-back-migrations)
-    * [Migration Options](#migration-options)
-    * [Waiting For The Database](#waiting-for-the-database)
-    * [Exporting Schema File](#exporting-schema-file)
-* [Internals](#internals)
-    * [schema_migrations table](#schema_migrations-table)
-* [Alternatives](#alternatives)
-* [Contributing](#contributing)
+- [Features](#features)
+- [Installation](#installation)
+- [Commands](#commands)
+  - [Command Line Options](#command-line-options)
+- [Usage](#usage)
+  - [Connecting to the Database](#connecting-to-the-database)
+    - [PostgreSQL](#postgresql)
+    - [MySQL](#mysql)
+    - [SQLite](#sqlite)
+    - [ClickHouse](#clickhouse)
+  - [Creating Migrations](#creating-migrations)
+  - [Running Migrations](#running-migrations)
+  - [Rolling Back Migrations](#rolling-back-migrations)
+  - [Migration Options](#migration-options)
+  - [Waiting For The Database](#waiting-for-the-database)
+  - [Exporting Schema File](#exporting-schema-file)
+- [Internals](#internals)
+  - [schema_migrations table](#schema_migrations-table)
+- [Alternatives](#alternatives)
+- [Contributing](#contributing)
 
 ## Features
 
-* Supports MySQL, PostgreSQL, SQLite, and ClickHouse.
-* Uses plain SQL for writing schema migrations.
-* Migrations are timestamp-versioned, to avoid version number conflicts with multiple developers.
-* Migrations are run atomically inside a transaction.
-* Supports creating and dropping databases (handy in development/test).
-* Supports saving a `schema.sql` file to easily diff schema changes in git.
-* Database connection URL is definied using an environment variable (`DATABASE_URL` by default), or specified on the command line.
-* Built-in support for reading environment variables from your `.env` file.
-* Easy to distribute, single self-contained binary.
+- Supports MySQL, PostgreSQL, SQLite, and ClickHouse.
+- Uses plain SQL for writing schema migrations.
+- Migrations are timestamp-versioned, to avoid version number conflicts with multiple developers.
+- Migrations are run atomically inside a transaction.
+- Supports creating and dropping databases (handy in development/test).
+- Supports saving a `schema.sql` file to easily diff schema changes in git.
+- Database connection URL is definied using an environment variable (`DATABASE_URL` by default), or specified on the command line.
+- Built-in support for reading environment variables from your `.env` file.
+- Easy to distribute, single self-contained binary.
 
 ## Installation
 
@@ -117,14 +117,14 @@ dbmate wait      # wait for the database server to become available
 
 The following options are available with all commands. You must use command line arguments in the order `dbmate [global options] command [command options]`. Most options can also be configured via environment variables (and loaded from your `.env` file, which is helpful to share configuration between team members).
 
-* `--url, -u "protocol://host:port/dbname"` - specify the database url directly. _(env: `$DATABASE_URL`)_
-* `--env, -e "DATABASE_URL"` - specify an environment variable to read the database connection URL from.
-* `--migrations-dir, -d "./db/migrations"` - where to keep the migration files. _(env: `$DBMATE_MIGRATIONS_DIR`)_
-* `--migrations-table "schema_migrations"` - database table to record migrations in. _(env: `$DBMATE_MIGRATIONS_TABLE`)_
-* `--schema-file, -s "./db/schema.sql"` - a path to keep the schema.sql file. _(env: `$DBMATE_SCHEMA_FILE`)_
-* `--no-dump-schema` - don't auto-update the schema.sql file on migrate/rollback _(env: `$DBMATE_NO_DUMP_SCHEMA`)_
-* `--wait` - wait for the db to become available before executing the subsequent command _(env: `$DBMATE_WAIT`)_
-* `--wait-timeout 60s` - timeout for --wait flag _(env: `$DBMATE_WAIT_TIMEOUT`)_
+- `--url, -u "protocol://host:port/dbname"` - specify the database url directly. _(env: `$DATABASE_URL`)_
+- `--env, -e "DATABASE_URL"` - specify an environment variable to read the database connection URL from.
+- `--migrations-dir, -d "./db/migrations"` - where to keep the migration files. _(env: `$DBMATE_MIGRATIONS_DIR`)_
+- `--migrations-table "schema_migrations"` - database table to record migrations in. _(env: `$DBMATE_MIGRATIONS_TABLE`)_
+- `--schema-file, -s "./db/schema.sql"` - a path to keep the schema.sql file. _(env: `$DBMATE_SCHEMA_FILE`)_
+- `--no-dump-schema` - don't auto-update the schema.sql file on migrate/rollback _(env: `$DBMATE_NO_DUMP_SCHEMA`)_
+- `--wait` - wait for the db to become available before executing the subsequent command _(env: `$DBMATE_WAIT`)_
+- `--wait-timeout 60s` - timeout for --wait flag _(env: `$DBMATE_WAIT_TIMEOUT`)_
 
 ## Usage
 
@@ -147,9 +147,9 @@ DATABASE_URL="postgres://postgres@127.0.0.1:5432/myapp_development?sslmode=disab
 protocol://username:password@host:port/database_name?options
 ```
 
-* `protocol` must be one of `mysql`, `postgres`, `postgresql`, `sqlite`, `sqlite3`, `clickhouse`
-* `host` can be either a hostname or IP address
-* `options` are driver-specific (refer to the underlying Go SQL drivers if you wish to use these)
+- `protocol` must be one of `mysql`, `postgres`, `postgresql`, `sqlite`, `sqlite3`, `clickhouse`
+- `host` can be either a hostname or IP address
+- `options` are driver-specific (refer to the underlying Go SQL drivers if you wish to use these)
 
 Dbmate can also load the connection URL from a different environment variable. For example, before running your test suite, you may wish to drop and recreate the test database. One easy way to do this is to store your test database connection URL in the `TEST_DATABASE_URL` environment variable:
 
@@ -310,7 +310,7 @@ Writing: ./db/schema.sql
 
 dbmate supports options passed to a migration block in the form of `key:value` pairs. List of supported options:
 
-* `transaction`
+- `transaction`
 
 **transaction**
 
@@ -397,28 +397,28 @@ You can customize the name of this table using the `--migrations-table` flag or 
 
 Why another database schema migration tool? Dbmate was inspired by many other tools, primarily [Active Record Migrations](http://guides.rubyonrails.org/active_record_migrations.html), with the goals of being trivial to configure, and language & framework independent. Here is a comparison between dbmate and other popular migration tools.
 
-| | [dbmate](https://github.com/amacneil/dbmate) | [goose](https://github.com/pressly/goose) | [sql-migrate](https://github.com/rubenv/sql-migrate) | [golang-migrate](https://github.com/golang-migrate/migrate) | [activerecord](http://guides.rubyonrails.org/active_record_migrations.html) | [sequelize](http://docs.sequelizejs.com/manual/tutorial/migrations.html) |
-| --- |:---:|:---:|:---:|:---:|:---:|:---:|
-| **Features** |
-|Plain SQL migration files|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|||
-|Support for creating and dropping databases|:white_check_mark:||||:white_check_mark:||
-|Support for saving schema dump files|:white_check_mark:||||:white_check_mark:||
-|Timestamp-versioned migration files|:white_check_mark:|:white_check_mark:|||:white_check_mark:|:white_check_mark:|
-|Custom schema migrations table|:white_check_mark:||:white_check_mark:|||:white_check_mark:|
-|Ability to wait for database to become ready|:white_check_mark:||||||
-|Database connection string loaded from environment variables|:white_check_mark:||||||
-|Automatically load .env file|:white_check_mark:||||||
-|No separate configuration file|:white_check_mark:||||:white_check_mark:|:white_check_mark:|
-|Language/framework independent|:white_check_mark:|:eight_pointed_black_star:|:eight_pointed_black_star:|:eight_pointed_black_star:|||
-| **Drivers** |
-|PostgreSQL|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
-|MySQL|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
-|SQLite|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|:white_check_mark:|
-|CliсkHouse|:white_check_mark:|||:white_check_mark:|:white_check_mark:|:white_check_mark:|
+|                                                              | [dbmate](https://github.com/amacneil/dbmate) | [goose](https://github.com/pressly/goose) | [sql-migrate](https://github.com/rubenv/sql-migrate) | [golang-migrate](https://github.com/golang-migrate/migrate) | [activerecord](http://guides.rubyonrails.org/active_record_migrations.html) | [sequelize](http://docs.sequelizejs.com/manual/tutorial/migrations.html) |
+| ------------------------------------------------------------ | :------------------------------------------: | :---------------------------------------: | :--------------------------------------------------: | :---------------------------------------------------------: | :-------------------------------------------------------------------------: | :----------------------------------------------------------------------: |
+| **Features**                                                 |
+| Plain SQL migration files                                    |              :white_check_mark:              |            :white_check_mark:             |                  :white_check_mark:                  |                     :white_check_mark:                      |                                                                             |                                                                          |
+| Support for creating and dropping databases                  |              :white_check_mark:              |                                           |                                                      |                                                             |                             :white_check_mark:                              |                                                                          |
+| Support for saving schema dump files                         |              :white_check_mark:              |                                           |                                                      |                                                             |                             :white_check_mark:                              |                                                                          |
+| Timestamp-versioned migration files                          |              :white_check_mark:              |            :white_check_mark:             |                                                      |                                                             |                             :white_check_mark:                              |                            :white_check_mark:                            |
+| Custom schema migrations table                               |              :white_check_mark:              |                                           |                  :white_check_mark:                  |                                                             |                                                                             |                            :white_check_mark:                            |
+| Ability to wait for database to become ready                 |              :white_check_mark:              |                                           |                                                      |                                                             |                                                                             |                                                                          |
+| Database connection string loaded from environment variables |              :white_check_mark:              |                                           |                                                      |                                                             |                                                                             |                                                                          |
+| Automatically load .env file                                 |              :white_check_mark:              |                                           |                                                      |                                                             |                                                                             |                                                                          |
+| No separate configuration file                               |              :white_check_mark:              |                                           |                                                      |                                                             |                             :white_check_mark:                              |                            :white_check_mark:                            |
+| Language/framework independent                               |              :white_check_mark:              |        :eight_pointed_black_star:         |              :eight_pointed_black_star:              |                 :eight_pointed_black_star:                  |                                                                             |                                                                          |
+| **Drivers**                                                  |
+| PostgreSQL                                                   |              :white_check_mark:              |            :white_check_mark:             |                  :white_check_mark:                  |                     :white_check_mark:                      |                             :white_check_mark:                              |                            :white_check_mark:                            |
+| MySQL                                                        |              :white_check_mark:              |            :white_check_mark:             |                  :white_check_mark:                  |                     :white_check_mark:                      |                             :white_check_mark:                              |                            :white_check_mark:                            |
+| SQLite                                                       |              :white_check_mark:              |            :white_check_mark:             |                  :white_check_mark:                  |                     :white_check_mark:                      |                             :white_check_mark:                              |                            :white_check_mark:                            |
+| CliсkHouse                                                   |              :white_check_mark:              |                                           |                                                      |                     :white_check_mark:                      |                             :white_check_mark:                              |                            :white_check_mark:                            |
 
 > :eight_pointed_black_star: In theory these tools could be used with other languages, but a Go development environment is required because binary builds are not provided.
 
-*If you notice any inaccuracies in this table, please [propose a change](https://github.com/amacneil/dbmate/edit/master/README.md).*
+_If you notice any inaccuracies in this table, please [propose a change](https://github.com/amacneil/dbmate/edit/main/README.md)._
 
 ## Contributing
 
