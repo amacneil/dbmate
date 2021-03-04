@@ -78,6 +78,23 @@ func TestConnectionString(t *testing.T) {
 		require.Equal(t, "duhfsd7s:123!@123!@@tcp(host:123)/foo?flag=on&multiStatements=true", s)
 	})
 
+	// This test ensure that a connection string provided by a user containing URL encoded
+	// characters is properly passed on to the MySQL driver. The MySQL driver expects a plain
+	// password string, so the user-provided encoded URL be decoded.
+	//
+	// Special care is required here with '+' (encoded by user to '%2B'), since it can be decoded in two ways:
+	// - url.QueryUnescape will result in incorrect ' ' (a single space) being passed to the driver
+	// - url.PathUnescape will result in the correct '+' being passed to the driver
+	t.Run("url encoding", func(t *testing.T) {
+		u, err := url.Parse("mysql://bob%2Balice%3Asecret%5E%5B%2A%28%29@host:123/foo")
+		require.NoError(t, err)
+		require.Equal(t, "bob+alice:secret^[*()", u.User)
+		require.Equal(t, "123", u.Port())
+
+		s := connectionString(u)
+		require.Equal(t, "bob+alice:secret^[*()@tcp(host:123)/foo", s)
+	})
+
 	t.Run("socket", func(t *testing.T) {
 		// test with no user/pass
 		u, err := url.Parse("mysql:///foo?socket=/var/run/mysqld/mysqld.sock&flag=on")
