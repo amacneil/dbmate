@@ -372,9 +372,14 @@ func (db *DB) migrate(drv Driver) error {
 						return errors.Wrapf(err, "pos: %v", pqErr.Position)
 					}
 					// compute line number manually as pq driver does not provide it
+					column := 0
 					lineCount := 0
+					itColumn := 0
 					for _, c := range up.Contents[:pos] {
+						itColumn++
 						if c == '\n' {
+							column = itColumn
+							itColumn = 0
 							lineCount++
 						}
 					}
@@ -388,7 +393,7 @@ func (db *DB) migrate(drv Driver) error {
 						maxPos = len(up.Contents) - 1
 					}
 					areaOfFailure := up.Contents[minPos:maxPos]
-					return errors.Wrapf(err, "pos: %v, line: %v, sql: %s\n", pqErr.Position, lineCount, areaOfFailure)
+					return errors.Wrapf(err, "position: %v, line: %v, column: %v, sql: %s\n", pqErr.Position, lineCount, column, areaOfFailure)
 				}
 				return err
 			} else if db.Verbose {
