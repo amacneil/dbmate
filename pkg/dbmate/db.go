@@ -72,7 +72,7 @@ func New(databaseURL *url.URL) *DB {
 // GetDriver initializes the appropriate database driver
 func (db *DB) GetDriver() (Driver, error) {
 	if db.DatabaseURL == nil || db.DatabaseURL.Scheme == "" {
-		return nil, errors.New("invalid url, have you set your --url flag or DATABASE_HOST environment variable?")
+		return nil, errors.New("invalid url, have you set your --url flag or DATABASE_URL environment variable?")
 	}
 
 	driverFunc := drivers[db.DatabaseURL.Scheme]
