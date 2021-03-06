@@ -2,7 +2,6 @@ package dbmate
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,9 +10,13 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/amacneil/dbmate/pkg/dbutil"
+	"github.com/lib/pq"
 )
 
 // DefaultMigrationsDir specifies default directory to find migration files
@@ -360,6 +363,33 @@ func (db *DB) migrate(drv Driver) error {
 			// run actual migration
 			result, err := tx.Exec(up.Contents)
 			if err != nil {
+				if pqErr, ok := err.(*pq.Error); ok {
+					pos, posErr := strconv.Atoi(pqErr.Position)
+					if posErr != nil {
+						// if unable to parse position as number
+						// pq must be giving us a bad number string or number
+						// is too big to fit in an int
+						return errors.Wrapf(err, "pos: %v", pqErr.Position)
+					}
+					// compute line number manually as pq driver does not provide it
+					lineCount := 0
+					for _, c := range up.Contents[:pos] {
+						if c == '\n' {
+							lineCount++
+						}
+					}
+					const fuzzyRange = 50
+					minPos := pos - fuzzyRange
+					if minPos < 0 {
+						minPos = 0
+					}
+					maxPos := pos + fuzzyRange
+					if maxPos >= len(up.Contents) {
+						maxPos = len(up.Contents) - 1
+					}
+					areaOfFailure := up.Contents[minPos:maxPos]
+					return errors.Wrapf(err, "pos: %v, line: %v, sql: %s\n", pqErr.Position, lineCount, areaOfFailure)
+				}
 				return err
 			} else if db.Verbose {
 				db.printVerbose(result)
