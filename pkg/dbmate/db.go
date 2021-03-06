@@ -13,10 +13,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/amacneil/dbmate/pkg/dbutil"
+
 	"github.com/lib/pq"
+	"github.com/pkg/errors"
 )
 
 // DefaultMigrationsDir specifies default directory to find migration files
