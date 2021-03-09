@@ -78,6 +78,18 @@ func TestConnectionString(t *testing.T) {
 		require.Equal(t, "duhfsd7s:123!@123!@@tcp(host:123)/foo?flag=on&multiStatements=true", s)
 	})
 
+	t.Run("url encoding", func(t *testing.T) {
+		u, err := url.Parse("mysql://bob%2Balice:secret%5E%5B%2A%28%29@host:123/foo")
+		require.NoError(t, err)
+		require.Equal(t, "bob+alice:secret%5E%5B%2A%28%29", u.User.String())
+		require.Equal(t, "123", u.Port())
+
+		s := connectionString(u)
+		// ensure that '+' is correctly encoded by url.PathUnescape as '+'
+		// (not whitespace as url.QueryUnescape generates)
+		require.Equal(t, "bob+alice:secret^[*()@tcp(host:123)/foo?multiStatements=true", s)
+	})
+
 	t.Run("socket", func(t *testing.T) {
 		// test with no user/pass
 		u, err := url.Parse("mysql:///foo?socket=/var/run/mysqld/mysqld.sock&flag=on")
