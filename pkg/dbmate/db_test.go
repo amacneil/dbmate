@@ -55,14 +55,14 @@ func TestGetDriver(t *testing.T) {
 		db := dbmate.New(nil)
 		drv, err := db.GetDriver()
 		require.Nil(t, drv)
-		require.EqualError(t, err, "invalid url")
+		require.EqualError(t, err, "invalid url, have you set your --url flag or DATABASE_URL environment variable?")
 	})
 
 	t.Run("missing schema", func(t *testing.T) {
 		db := dbmate.New(dbutil.MustParseURL("//hi"))
 		drv, err := db.GetDriver()
 		require.Nil(t, drv)
-		require.EqualError(t, err, "invalid url")
+		require.EqualError(t, err, "invalid url, have you set your --url flag or DATABASE_URL environment variable?")
 	})
 
 	t.Run("invalid driver", func(t *testing.T) {
