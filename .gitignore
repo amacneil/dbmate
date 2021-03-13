@@ -4,5 +4,5 @@
 /db
 /dbmate
 /dist
-/testdata/db/schema.sql
+/testdata/*/db/schema.sql
 /vendor
