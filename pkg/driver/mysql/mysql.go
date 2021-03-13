@@ -285,7 +285,12 @@ func (drv *Driver) Ping() error {
 	return db.Ping()
 }
 
+// WrapAndDetailError allows the database driver to add additional error information
+// by inspecting the SQL error
 func (drv *Driver) WrapAndDetailError(err error, query string) error {
+	// do nothing as *mysql.MySQLError only gives us the fields:
+	// - Number (error code)
+	// - Message (message)
 	return err
 }
 

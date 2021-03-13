@@ -26,9 +26,6 @@ var (
 
 func initTestdataDir() error {
 	// only chdir once, because testdata is relative to current directory
-	if testdataSuccessDir != "" && testdataErrorDir != "" {
-		return nil
-	}
 	var err error
 	testdataSuccessDir, err = filepath.Abs("../../testdata/success")
 	if err != nil {
@@ -38,12 +35,6 @@ func initTestdataDir() error {
 	if err != nil {
 		return err
 	}
-	err = os.Chdir(testdataSuccessDir)
-	if err != nil {
-		return err
-	}
-
-	testdataDir = testdataSuccessDir
 	return nil
 }
 
@@ -293,9 +284,9 @@ Rows affected: 0`)
 
 func testURLs() []*url.URL {
 	return []*url.URL{
-		//dbutil.MustParseURL(os.Getenv("MYSQL_TEST_URL")),
+		dbutil.MustParseURL(os.Getenv("MYSQL_TEST_URL")),
 		dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL")),
-		//dbutil.MustParseURL(os.Getenv("SQLITE_TEST_URL")),
+		dbutil.MustParseURL(os.Getenv("SQLITE_TEST_URL")),
 	}
 }
 
@@ -351,12 +342,13 @@ func TestMigrateDetailedError(t *testing.T) {
 			err = db.Migrate()
 			require.Error(t, err)
 			detailedErr, ok := err.(*dbutil.DetailedSQLError)
-			if !ok {
-				t.FailNow()
+			if ok {
+				// if the driver supports returning detailed errors
+				// check that it's correct
+				require.Equal(t, 7, detailedErr.Line)
+				require.Equal(t, 15, detailedErr.Column)
+				require.Equal(t, 149, detailedErr.Position)
 			}
-			require.Equal(t, 9, detailedErr.Line)
-			require.Equal(t, 36, detailedErr.Column)
-			require.Equal(t, 238, detailedErr.Position)
 		})
 	}
 }

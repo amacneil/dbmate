@@ -13,6 +13,10 @@ import (
 	"unicode"
 )
 
+// DetailedSQLError contains an SQL error and also the line, column and position of the error
+//
+// This was initially created to work around deficiency in the PostgreSQL drivers for Go where
+// this kind of information must be manually computed
 type DetailedSQLError struct {
 	SQLError error
 	Line     int
@@ -22,14 +26,12 @@ type DetailedSQLError struct {
 
 var _ error = new(DetailedSQLError)
 
-func (err *DetailedSQLError) Unwrap() error {
-	return err.SQLError
-}
-
+// Error will return an SQL error with an additional information such as line number, column and position
 func (err *DetailedSQLError) Error() string {
 	return fmt.Sprintf("line: %d, column: %d, position: %d: %s", err.Line, err.Column, err.Position, err.SQLError.Error())
 }
 
+// NewDetailedSQLError creates a structure that computes the line and column of an SQL error based solely on position
 func NewDetailedSQLError(err error, query string, position int) *DetailedSQLError {
 	column := 0
 	line := 0

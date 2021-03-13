@@ -211,6 +211,8 @@ func (drv *Driver) Ping() error {
 	return db.Ping()
 }
 
+// WrapAndDetailError allows the database driver to add additional error information
+// by inspecting the SQL error
 func (drv *Driver) WrapAndDetailError(err error, query string) error {
 	return err
 }

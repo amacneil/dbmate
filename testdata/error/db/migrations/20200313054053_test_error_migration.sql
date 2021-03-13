@@ -1,14 +1,12 @@
 -- migrate:up
-CREATE TABLE test (
-    test_id uuid NOT NULL
+create table test (
+  id integer
 );
-COMMENT ON TABLE test IS 'Here is my test table';
-
-CREATE TABLE test_mistake (
-    -- uh oh, comma here on the last field, error!
-    test_mistake_id uuid NOT NULL,
+create table test_mistake (
+  -- uh oh, comma here on the last field, error!
+  id integer,
 );
 
 -- migrate:down
-DROP TABLE test;
-DROP TABLE test_mistake;
+drop table test;
+drop table test_mistake;
