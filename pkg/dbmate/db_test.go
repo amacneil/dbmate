@@ -18,17 +18,39 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testdataDir string
+var (
+	testdataDir        string
+	testdataSuccessDir string
+	testdataErrorDir   string
+)
+
+func initTestdataDir() error {
+	// only chdir once, because testdata is relative to current directory
+	if testdataSuccessDir != "" && testdataErrorDir != "" {
+		return nil
+	}
+	var err error
+	testdataSuccessDir, err = filepath.Abs("../../testdata/success")
+	if err != nil {
+		return err
+	}
+	testdataErrorDir, err = filepath.Abs("../../testdata/error")
+	if err != nil {
+		return err
+	}
+	err = os.Chdir(testdataSuccessDir)
+	if err != nil {
+		return err
+	}
+
+	testdataDir = testdataSuccessDir
+	return nil
+}
 
 func newTestDB(t *testing.T, u *url.URL) *dbmate.DB {
-	var err error
-
-	// only chdir once, because testdata is relative to current directory
-	if testdataDir == "" {
-		testdataDir, err = filepath.Abs("../../testdata")
-		require.NoError(t, err)
-
-		err = os.Chdir(testdataDir)
+	if expectedDir := testdataSuccessDir; testdataDir != expectedDir {
+		testdataDir = expectedDir
+		err := os.Chdir(testdataDir)
 		require.NoError(t, err)
 	}
 
@@ -36,6 +58,26 @@ func newTestDB(t *testing.T, u *url.URL) *dbmate.DB {
 	db.AutoDumpSchema = false
 
 	return db
+}
+
+func newTestErrorDB(t *testing.T, u *url.URL) *dbmate.DB {
+	if expectedDir := testdataErrorDir; testdataDir != expectedDir {
+		testdataDir = expectedDir
+		err := os.Chdir(testdataDir)
+		require.NoError(t, err)
+	}
+
+	db := dbmate.New(u)
+	db.AutoDumpSchema = false
+
+	return db
+}
+
+func TestMain(m *testing.M) {
+	if err := initTestdataDir(); err != nil {
+		panic(err)
+	}
+	os.Exit(m.Run())
 }
 
 func TestNew(t *testing.T) {
@@ -251,9 +293,9 @@ Rows affected: 0`)
 
 func testURLs() []*url.URL {
 	return []*url.URL{
-		dbutil.MustParseURL(os.Getenv("MYSQL_TEST_URL")),
+		//dbutil.MustParseURL(os.Getenv("MYSQL_TEST_URL")),
 		dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL")),
-		dbutil.MustParseURL(os.Getenv("SQLITE_TEST_URL")),
+		//dbutil.MustParseURL(os.Getenv("SQLITE_TEST_URL")),
 	}
 }
 
@@ -288,6 +330,33 @@ func TestMigrate(t *testing.T) {
 			err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
 			require.NoError(t, err)
 			require.Equal(t, 1, count)
+		})
+	}
+}
+
+func TestMigrateDetailedError(t *testing.T) {
+	for _, u := range testURLs() {
+		t.Run(u.Scheme, func(t *testing.T) {
+			db := newTestErrorDB(t, u)
+			_, err := db.GetDriver()
+			require.NoError(t, err)
+
+			// drop and recreate database
+			err = db.Drop()
+			require.NoError(t, err)
+			err = db.Create()
+			require.NoError(t, err)
+
+			// migrate
+			err = db.Migrate()
+			require.Error(t, err)
+			detailedErr, ok := err.(*dbutil.DetailedSQLError)
+			if !ok {
+				t.FailNow()
+			}
+			require.Equal(t, 9, detailedErr.Line)
+			require.Equal(t, 36, detailedErr.Column)
+			require.Equal(t, 238, detailedErr.Position)
 		})
 	}
 }

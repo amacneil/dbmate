@@ -324,6 +324,10 @@ func (drv *Driver) Ping() error {
 	return err
 }
 
+func (drv *Driver) WrapAndDetailError(err error, query string) error {
+	return err
+}
+
 func (drv *Driver) quotedMigrationsTableName() string {
 	return drv.quoteIdentifier(drv.migrationsTableName)
 }

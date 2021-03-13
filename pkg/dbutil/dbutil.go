@@ -5,12 +5,50 @@ import (
 	"bytes"
 	"database/sql"
 	"errors"
+	"fmt"
 	"io"
 	"net/url"
 	"os/exec"
 	"strings"
 	"unicode"
 )
+
+type DetailedSQLError struct {
+	SQLError error
+	Line     int
+	Column   int
+	Position int
+}
+
+var _ error = new(DetailedSQLError)
+
+func (err *DetailedSQLError) Unwrap() error {
+	return err.SQLError
+}
+
+func (err *DetailedSQLError) Error() string {
+	return fmt.Sprintf("line: %d, column: %d, position: %d: %s", err.Line, err.Column, err.Position, err.SQLError.Error())
+}
+
+func NewDetailedSQLError(err error, query string, position int) *DetailedSQLError {
+	column := 0
+	line := 0
+	itColumn := 0
+	for _, c := range query[:position] {
+		itColumn++
+		if c == '\n' {
+			column = itColumn
+			itColumn = 0
+			line++
+		}
+	}
+	return &DetailedSQLError{
+		SQLError: err,
+		Line:     line,
+		Column:   column,
+		Position: position,
+	}
+}
 
 // Transaction can represent a database or open transaction
 type Transaction interface {

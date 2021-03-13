@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/amacneil/dbmate/pkg/dbmate"
@@ -331,6 +332,21 @@ func (drv *Driver) Ping() error {
 	}
 
 	return err
+}
+
+func (drv *Driver) WrapAndDetailError(err error, query string) error {
+	pqErr, ok := err.(*pq.Error)
+	if !ok {
+		// fallback to non-detailed error message
+		return err
+	}
+	position, posErr := strconv.Atoi(pqErr.Position)
+	if posErr != nil {
+		// if unable to parse position as number
+		// fallback to non-detailed error message
+		return err
+	}
+	return dbutil.NewDetailedSQLError(err, query, position)
 }
 
 func (drv *Driver) quotedMigrationsTableName(db dbutil.Transaction) (string, error) {

@@ -20,6 +20,7 @@ type Driver interface {
 	InsertMigration(dbutil.Transaction, string) error
 	DeleteMigration(dbutil.Transaction, string) error
 	Ping() error
+	WrapAndDetailError(err error, query string) error
 }
 
 // DriverConfig holds configuration passed to driver constructors

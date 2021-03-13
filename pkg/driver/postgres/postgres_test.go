@@ -567,3 +567,28 @@ func TestPostgresQuotedMigrationsTableName(t *testing.T) {
 		require.Equal(t, "\"whyWould\".i.\"doThis\"", name)
 	})
 }
+
+func TestPostgresWrapAndDetailError(t *testing.T) {
+	drv := testPostgresDriver(t)
+	drv.migrationsTableName = "test_migration_error"
+
+	db := prepTestPostgresDB(t)
+	defer dbutil.MustClose(db)
+
+	err := drv.CreateMigrationsTable(db)
+	require.NoError(t, err)
+
+	count := 0
+	err = db.QueryRow("select count(*) from public.test_migration_error").Scan(&count)
+	require.NoError(t, err)
+	require.Equal(t, 0, count)
+
+	// insert migration
+	err = drv.InsertMigration(db, "err1")
+	require.Error(t, err)
+
+	err = db.QueryRow("select count(*) from public.test_migration_error where version = 'err1'").
+		Scan(&count)
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+}
