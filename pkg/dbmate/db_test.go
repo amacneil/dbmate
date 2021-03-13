@@ -347,7 +347,7 @@ func TestMigrateDetailedError(t *testing.T) {
 				// check that it's correct
 				require.Equal(t, 7, detailedErr.Line)
 				require.Equal(t, 14, detailedErr.Column)
-				require.Equal(t, 149, detailedErr.Position)
+				require.Equal(t, 142, detailedErr.Position)
 			}
 		})
 	}
