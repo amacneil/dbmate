@@ -37,12 +37,20 @@ func NewDetailedSQLError(err error, query string, position int) *DetailedSQLErro
 	line := 0
 	itColumn := 0
 	for _, c := range query[:position] {
-		itColumn++
+		if c == '\r' {
+			// ignore carriage return (Windows CRLF formatted files)
+			// when counting column
+			continue
+		}
 		if c == '\n' {
-			column = itColumn
+			// add 1 as column count starts at 1 (not 0) in most text editors
+			// and other tools
+			column = itColumn + 1
 			itColumn = 0
 			line++
+			continue
 		}
+		itColumn++
 	}
 	return &DetailedSQLError{
 		SQLError: err,

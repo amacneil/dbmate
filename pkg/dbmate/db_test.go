@@ -346,7 +346,7 @@ func TestMigrateDetailedError(t *testing.T) {
 				// if the driver supports returning detailed errors
 				// check that it's correct
 				require.Equal(t, 7, detailedErr.Line)
-				require.Equal(t, 15, detailedErr.Column)
+				require.Equal(t, 14, detailedErr.Column)
 				require.Equal(t, 149, detailedErr.Position)
 			}
 		})
