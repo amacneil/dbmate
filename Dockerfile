@@ -38,6 +38,7 @@ FROM alpine as release
 RUN apk add --no-cache \
 	mariadb-client \
 	postgresql-client \
-	sqlite
+	sqlite \
+	tzdata
 COPY --from=build /src/dist/dbmate-linux-amd64 /usr/local/bin/dbmate
 ENTRYPOINT ["dbmate"]
