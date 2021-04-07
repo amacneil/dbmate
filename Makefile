@@ -49,8 +49,8 @@ build-all: clean build-linux-amd64
 	     go build $(TAGS) $(STATICLDFLAGS) -o dist/dbmate-windows-amd64.exe .
 	ls -lh dist
 
-.PHONY: docker-make
-docker-make:
+.PHONY: docker-all
+docker-all:
 	docker-compose build
 	docker-compose run --rm dev make
 

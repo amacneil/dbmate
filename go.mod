@@ -6,11 +6,12 @@ require (
 	github.com/ClickHouse/clickhouse-go v1.4.3
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/go-sql-driver/mysql v1.5.0
+	github.com/frankban/quicktest v1.11.3 // indirect
+	github.com/go-sql-driver/mysql v1.6.0
 	github.com/joho/godotenv v1.3.0
 	github.com/kami-zh/go-capturer v0.0.0-20171211120116-e492ea43421d
 	github.com/kr/text v0.2.0 // indirect
-	github.com/lib/pq v1.9.0
+	github.com/lib/pq v1.10.0
 	github.com/mattn/go-sqlite3 v1.14.6
 	github.com/pierrec/lz4 v2.6.0+incompatible // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
