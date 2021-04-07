@@ -45,6 +45,8 @@ build-all: clean build-linux-amd64
 	     go build $(TAGS) $(STATICLDFLAGS) -o dist/dbmate-linux-arm64 .
 	GOOS=darwin GOARCH=amd64 CC=o64-clang CXX=o64-clang++ \
 	     go build $(TAGS) $(LDFLAGS) -o dist/dbmate-macos-amd64 .
+	GOOS=darwin GOARCH=arm64 CC=o64-clang CXX=o64-clang++ \
+	     go build $(TAGS) $(LDFLAGS) -o dist/dbmate-macos-arm64 .
 	GOOS=windows GOARCH=amd64 CC=x86_64-w64-mingw32-gcc-posix CXX=x86_64-w64-mingw32-g++-posix \
 	     go build $(TAGS) $(STATICLDFLAGS) -o dist/dbmate-windows-amd64.exe .
 	ls -lh dist
