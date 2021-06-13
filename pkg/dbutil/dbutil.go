@@ -5,12 +5,60 @@ import (
 	"bytes"
 	"database/sql"
 	"errors"
+	"fmt"
 	"io"
 	"net/url"
 	"os/exec"
 	"strings"
 	"unicode"
 )
+
+// DetailedSQLError contains an SQL error and also the line, column and position of the error
+//
+// This was initially created to work around deficiency in the PostgreSQL drivers for Go where
+// this kind of information must be manually computed
+type DetailedSQLError struct {
+	SQLError error
+	Line     int
+	Column   int
+	Position int
+}
+
+var _ error = new(DetailedSQLError)
+
+// Error will return an SQL error with an additional information such as line number, column and position
+func (err *DetailedSQLError) Error() string {
+	return fmt.Sprintf("line: %d, column: %d, position: %d: %s", err.Line, err.Column, err.Position, err.SQLError.Error())
+}
+
+// NewDetailedSQLError creates a structure that computes the line and column of an SQL error based solely on position
+func NewDetailedSQLError(err error, query string, position int) *DetailedSQLError {
+	column := 0
+	line := 0
+	itColumn := 0
+	for _, c := range query[:position] {
+		if c == '\r' {
+			// ignore carriage return (Windows CRLF formatted files)
+			// when counting column
+			continue
+		}
+		if c == '\n' {
+			// add 1 as column count starts at 1 (not 0) in most text editors
+			// and other tools
+			column = itColumn + 1
+			itColumn = 0
+			line++
+			continue
+		}
+		itColumn++
+	}
+	return &DetailedSQLError{
+		SQLError: err,
+		Line:     line,
+		Column:   column,
+		Position: position,
+	}
+}
 
 // Transaction can represent a database or open transaction
 type Transaction interface {

@@ -360,7 +360,7 @@ func (db *DB) migrate(drv Driver) error {
 			// run actual migration
 			result, err := tx.Exec(up.Contents)
 			if err != nil {
-				return err
+				return drv.WrapAndDetailError(err, up.Contents)
 			} else if db.Verbose {
 				db.printVerbose(result)
 			}
@@ -500,7 +500,7 @@ func (db *DB) Rollback() error {
 		// rollback migration
 		result, err := tx.Exec(down.Contents)
 		if err != nil {
-			return err
+			return drv.WrapAndDetailError(err, down.Contents)
 		} else if db.Verbose {
 			db.printVerbose(result)
 		}
