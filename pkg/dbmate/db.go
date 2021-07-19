@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/amacneil/dbmate/pkg/dbutil"
@@ -314,6 +315,19 @@ func (db *DB) Migrate() error {
 	return db.migrate(drv)
 }
 
+func splitContentOnQueries(content string) []string {
+	var queries []string
+	delimeterSepparator := func(c rune) bool {
+		return c == ';'
+	}
+	queries = strings.FieldsFunc(strings.TrimSpace(content), delimeterSepparator)
+	for i := range queries {
+		queries[i] += ";"
+	}
+
+	return queries
+}
+
 func (db *DB) migrate(drv Driver) error {
 	files, err := findMigrationFiles(db.MigrationsDir, migrationFileRegexp)
 	if err != nil {
@@ -358,11 +372,20 @@ func (db *DB) migrate(drv Driver) error {
 
 		execMigration := func(tx dbutil.Transaction) error {
 			// run actual migration
-			result, err := tx.Exec(up.Contents)
-			if err != nil {
-				return err
-			} else if db.Verbose {
-				db.printVerbose(result)
+			var content []string
+			if !up.Options.separate() {
+				content = append(content, up.Contents)
+			} else {
+				content = splitContentOnQueries(up.Contents)
+			}
+
+			for _, query := range content {
+				result, err := tx.Exec(query)
+				if err != nil {
+					return err
+				} else if db.Verbose {
+					db.printVerbose(result)
+				}
 			}
 
 			// record migration
@@ -498,11 +521,20 @@ func (db *DB) Rollback() error {
 
 	execMigration := func(tx dbutil.Transaction) error {
 		// rollback migration
-		result, err := tx.Exec(down.Contents)
-		if err != nil {
-			return err
-		} else if db.Verbose {
-			db.printVerbose(result)
+		var content []string
+		if !down.Options.separate() {
+			content = append(content, down.Contents)
+		} else {
+			content = splitContentOnQueries(down.Contents)
+		}
+
+		for _, query := range content {
+			result, err := tx.Exec(query)
+			if err != nil {
+				return err
+			} else if db.Verbose {
+				db.printVerbose(result)
+			}
 		}
 
 		// remove migration record

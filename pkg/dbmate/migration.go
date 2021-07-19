@@ -10,6 +10,7 @@ import (
 // MigrationOptions is an interface for accessing migration options
 type MigrationOptions interface {
 	Transaction() bool
+	Separate() bool
 }
 
 type migrationOptions map[string]string
@@ -18,6 +19,12 @@ type migrationOptions map[string]string
 // Defaults to true.
 func (m migrationOptions) Transaction() bool {
 	return m["transaction"] != "false"
+}
+
+// Separate returns whether or not this migration should splited into separate queries which will be applied one by one
+// Defaults to false.
+func (m migrationOptions) Separate() bool {
+	return m["separate"] == "true"
 }
 
 // Migration contains the migration contents and options
