@@ -9,8 +9,9 @@ on:
 
 jobs:
   build:
-    name: Build & Test
+    name: Build
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -54,7 +55,19 @@ jobs:
           docker-compose run --rm dev make wait
           docker-compose run --rm dev make test
 
-      - name: Release
+      - name: Publish docker image
+        if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
+        env:
+          SRC_IMAGE: dbmate_release
+          DOCKERHUB_IMAGE: ${{ github.repository }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          GHCR_IMAGE: ghcr.io/${{ github.repository }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: .github/workflows/publish-docker.sh
+
+      - name: Publish release binaries
         uses: softprops/action-gh-release@v1
         if: ${{ startsWith(github.ref, 'refs/tags/v') }}
         with:

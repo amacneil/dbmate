@@ -20,6 +20,7 @@ services:
     build:
       context: .
       target: release
+    image: dbmate_release
 
   mysql:
     image: mysql:5.7
