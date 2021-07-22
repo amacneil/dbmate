@@ -26,19 +26,17 @@ function publish {
     docker_push "$SRC_IMAGE" "$GHCR_IMAGE:$tag"
 }
 
-# Publish current branch/tag (e.g. `main` or `v1.2.3`)
-ver=${GITHUB_REF##*/}
-publish "$ver"
-
-# Publish major/minor/latest for version tags
 if [[ "$GITHUB_REF" = refs/tags/v* ]]; then
-    major_ver=${ver%%.*}  # e.g. `v1`
-    publish "$major_ver"
+    # Publish major/minor/patch/latest version tags
+    ver=${GITHUB_REF#refs/tags/v}
 
-    minor_ver=${ver%.*}  # e.g. `v1.2`
-    publish "$minor_ver"
-
+    publish "$ver"          # e.g. `1.2.3`
+    publish "${ver%.*}"     # e.g. `1.2`
+    publish "${ver%%.*}"    # e.g. `1`
     publish "latest"
+else
+    # Publish branch
+    publish "${GITHUB_REF##*/}"
 fi
 
 # Clear credentials
