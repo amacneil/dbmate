@@ -1,0 +1,4 @@
+// -*- jsonc -*-
+{
+  "recommendations": ["esbenp.prettier-vscode"]
+}
