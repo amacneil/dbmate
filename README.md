@@ -66,16 +66,18 @@ $ sudo chmod +x /usr/local/bin/dbmate
 
 **Docker**
 
-You can run dbmate using the official docker image (remember to set `--network=host` or see [this comment](https://github.com/amacneil/dbmate/issues/128#issuecomment-615924611) for more tips on using dbmate with docker networking):
+Docker images are published to both Docker Hub ([`amacneil/dbmate`](https://hub.docker.com/r/amacneil/dbmate)) and Github Container Registry ([`ghcr.io/amacneil/dbmate`](https://ghcr.io/amacneil/dbmate)).
+
+Remember to set `--network=host` or see [this comment](https://github.com/amacneil/dbmate/issues/128#issuecomment-615924611) for more tips on using dbmate with docker networking):
 
 ```sh
-$ docker run --rm -it --network=host amacneil/dbmate --help
+$ docker run --rm -it --network=host ghcr.io/amacneil/dbmate:1 --help
 ```
 
 If you wish to create or apply migrations, you will need to use Docker's [bind mount](https://docs.docker.com/storage/bind-mounts/) feature to make your local working directory (`pwd`) available inside the dbmate container:
 
 ```sh
-$ docker run --rm -it --network=host -v "$(pwd)/db:/db" amacneil/dbmate new create_users_table
+$ docker run --rm -it --network=host -v "$(pwd)/db:/db" ghcr.io/amacneil/dbmate:1 new create_users_table
 ```
 
 **Heroku**
