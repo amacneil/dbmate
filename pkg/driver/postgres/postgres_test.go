@@ -56,7 +56,7 @@ func TestConnectionString(t *testing.T) {
 		expected string
 	}{
 		// defaults
-		{"postgres:///foo", "postgres://localhost:5432/foo"},
+		{"postgres:///foo", "postgres://:5432/foo?host=%2Fvar%2Frun%2Fpostgresql"},
 		// support custom url params
 		{"postgres://bob:secret@myhost:1234/foo?bar=baz", "postgres://bob:secret@myhost:1234/foo?bar=baz"},
 		// support `host` and `port` via url params
@@ -85,11 +85,11 @@ func TestConnectionArgsForDump(t *testing.T) {
 		expected []string
 	}{
 		// defaults
-		{"postgres:///foo", []string{"postgres://localhost:5432/foo"}},
+		{"postgres:///foo", []string{"postgres://:5432/foo?host=%2Fvar%2Frun%2Fpostgresql"}},
 		// support single schema
-		{"postgres:///foo?search_path=foo", []string{"--schema", "foo", "postgres://localhost:5432/foo"}},
+		{"postgres:///foo?search_path=foo", []string{"--schema", "foo", "postgres://:5432/foo?host=%2Fvar%2Frun%2Fpostgresql"}},
 		// support multiple schemas
-		{"postgres:///foo?search_path=foo,public", []string{"--schema", "foo", "--schema", "public", "postgres://localhost:5432/foo"}},
+		{"postgres:///foo?search_path=foo,public", []string{"--schema", "foo", "--schema", "public", "postgres://:5432/foo?host=%2Fvar%2Frun%2Fpostgresql"}},
 	}
 
 	for _, c := range cases {

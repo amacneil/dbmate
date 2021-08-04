@@ -48,7 +48,7 @@ func connectionString(u *url.URL) string {
 
 	// default hostname
 	if hostname == "" {
-		hostname = "localhost"
+		query.Set("host", "/var/run/postgresql")
 	}
 
 	// host param overrides url hostname
