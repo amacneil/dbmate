@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"runtime"
 	"strings"
 
 	"github.com/amacneil/dbmate/pkg/dbmate"
@@ -48,7 +49,14 @@ func connectionString(u *url.URL) string {
 
 	// default hostname
 	if hostname == "" {
-		query.Set("host", "/var/run/postgresql")
+		switch runtime.GOOS {
+		case "windows":
+			hostname = "localhost"
+		case "linux":
+			query.Set("host", "/var/run/postgresql")
+		default:
+			query.Set("host", "/tmp")
+		}
 	}
 
 	// host param overrides url hostname
