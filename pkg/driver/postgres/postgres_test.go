@@ -186,8 +186,8 @@ func TestPostgresDumpSchema(t *testing.T) {
 		drv.databaseURL.Path = "/fakedb"
 		schema, err = drv.DumpSchema(db)
 		require.Nil(t, schema)
-		require.EqualError(t, err, "pg_dump: [archiver (db)] connection to database "+
-			"\"fakedb\" failed: FATAL:  database \"fakedb\" does not exist")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "database \"fakedb\" does not exist")
 	})
 
 	t.Run("custom migrations table with schema", func(t *testing.T) {

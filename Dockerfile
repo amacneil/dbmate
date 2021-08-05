@@ -1,16 +1,13 @@
 # development image
-FROM techknowlogick/xgo:go-1.16.x as dev
+FROM golang:1.17 as dev
 WORKDIR /src
-ENV GOCACHE /src/.cache/go-build
-
-# enable cgo to build sqlite
-ENV CGO_ENABLED 1
 
 # install database clients
 RUN apt-get update \
 	&& apt-get install -qq --no-install-recommends \
 		curl \
-		mysql-client \
+		file \
+		mariadb-client \
 		postgresql-client \
 		sqlite3 \
 	&& rm -rf /var/lib/apt/lists/*
@@ -20,15 +17,9 @@ RUN curl -fsSL https://raw.githubusercontent.com/golangci/golangci-lint/master/i
 	| sh -s -- -b /usr/local/bin v1.39.0
 
 # download modules
-COPY go.* ./
+COPY go.* /src/
 RUN go mod download
-
-ENTRYPOINT []
-CMD ["/bin/bash"]
-
-# build stage
-FROM dev as build
-COPY . ./
+COPY . /src/
 RUN make build
 
 # release stage
@@ -38,5 +29,5 @@ RUN apk add --no-cache \
 	postgresql-client \
 	sqlite \
 	tzdata
-COPY --from=build /src/dist/dbmate-linux-amd64 /usr/local/bin/dbmate
-ENTRYPOINT ["dbmate"]
+COPY --from=dev /src/dist/dbmate /usr/local/bin/dbmate
+ENTRYPOINT ["/usr/local/bin/dbmate"]
