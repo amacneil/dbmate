@@ -53,12 +53,12 @@ func TestGetDriver(t *testing.T) {
 
 func defaultConnString() string {
 	switch runtime.GOOS {
-	case "windows":
-		return "postgres://localhost:5432/foo"
 	case "linux":
 		return "postgres://:5432/foo?host=%2Fvar%2Frun%2Fpostgresql"
-	default:
+	case "darwin", "freebsd", "dragonfly", "openbsd", "netbsd":
 		return "postgres://:5432/foo?host=%2Ftmp"
+	default:
+		return "postgres://localhost:5432/foo"
 	}
 }
 

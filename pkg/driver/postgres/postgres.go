@@ -50,12 +50,12 @@ func connectionString(u *url.URL) string {
 	// default hostname
 	if hostname == "" {
 		switch runtime.GOOS {
-		case "windows":
-			hostname = "localhost"
 		case "linux":
 			query.Set("host", "/var/run/postgresql")
-		default:
+		case "darwin", "freebsd", "dragonfly", "openbsd", "netbsd":
 			query.Set("host", "/tmp")
+		default:
+			hostname = "localhost"
 		}
 	}
 
