@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"net/url"
 	"os"
+	"runtime"
 	"testing"
 
 	"github.com/amacneil/dbmate/pkg/dbmate"
@@ -50,13 +51,24 @@ func TestGetDriver(t *testing.T) {
 	require.Equal(t, "schema_migrations", drv.migrationsTableName)
 }
 
+func defaultConnString() string {
+	switch runtime.GOOS {
+	case "windows":
+		return "postgres://localhost:5432/foo"
+	case "linux":
+		return "postgres://:5432/foo?host=%2Fvar%2Frun%2Fpostgresql"
+	default:
+		return "postgres://:5432/foo?host=%2Ftmp"
+	}
+}
+
 func TestConnectionString(t *testing.T) {
 	cases := []struct {
 		input    string
 		expected string
 	}{
 		// defaults
-		{"postgres:///foo", "postgres://:5432/foo?host=%2Fvar%2Frun%2Fpostgresql"},
+		{"postgres:///foo", defaultConnString()},
 		// support custom url params
 		{"postgres://bob:secret@myhost:1234/foo?bar=baz", "postgres://bob:secret@myhost:1234/foo?bar=baz"},
 		// support `host` and `port` via url params
@@ -85,11 +97,11 @@ func TestConnectionArgsForDump(t *testing.T) {
 		expected []string
 	}{
 		// defaults
-		{"postgres:///foo", []string{"postgres://:5432/foo?host=%2Fvar%2Frun%2Fpostgresql"}},
+		{"postgres:///foo", []string{defaultConnString()}},
 		// support single schema
-		{"postgres:///foo?search_path=foo", []string{"--schema", "foo", "postgres://:5432/foo?host=%2Fvar%2Frun%2Fpostgresql"}},
+		{"postgres:///foo?search_path=foo", []string{"--schema", "foo", defaultConnString()}},
 		// support multiple schemas
-		{"postgres:///foo?search_path=foo,public", []string{"--schema", "foo", "--schema", "public", "postgres://:5432/foo?host=%2Fvar%2Frun%2Fpostgresql"}},
+		{"postgres:///foo?search_path=foo,public", []string{"--schema", "foo", "--schema", "public", defaultConnString()}},
 	}
 
 	for _, c := range cases {
