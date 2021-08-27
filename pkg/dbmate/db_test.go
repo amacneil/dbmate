@@ -1,7 +1,6 @@
 package dbmate_test
 
 import (
-	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -102,7 +101,7 @@ func TestDumpSchema(t *testing.T) {
 	db := newTestDB(t, u)
 
 	// create custom schema file directory
-	dir, err := ioutil.TempDir("", "dbmate")
+	dir, err := os.MkdirTemp("", "dbmate")
 	require.NoError(t, err)
 	defer func() {
 		err := os.RemoveAll(dir)
@@ -129,7 +128,7 @@ func TestDumpSchema(t *testing.T) {
 	require.NoError(t, err)
 
 	// verify schema
-	schema, err := ioutil.ReadFile(db.SchemaFile)
+	schema, err := os.ReadFile(db.SchemaFile)
 	require.NoError(t, err)
 	require.Contains(t, string(schema), "-- PostgreSQL database dump")
 }
@@ -140,7 +139,7 @@ func TestAutoDumpSchema(t *testing.T) {
 	db.AutoDumpSchema = true
 
 	// create custom schema file directory
-	dir, err := ioutil.TempDir("", "dbmate")
+	dir, err := os.MkdirTemp("", "dbmate")
 	require.NoError(t, err)
 	defer func() {
 		err := os.RemoveAll(dir)
@@ -163,7 +162,7 @@ func TestAutoDumpSchema(t *testing.T) {
 	require.NoError(t, err)
 
 	// verify schema
-	schema, err := ioutil.ReadFile(db.SchemaFile)
+	schema, err := os.ReadFile(db.SchemaFile)
 	require.NoError(t, err)
 	require.Contains(t, string(schema), "-- PostgreSQL database dump")
 
@@ -176,7 +175,7 @@ func TestAutoDumpSchema(t *testing.T) {
 	require.NoError(t, err)
 
 	// schema should be recreated
-	schema, err = ioutil.ReadFile(db.SchemaFile)
+	schema, err = os.ReadFile(db.SchemaFile)
 	require.NoError(t, err)
 	require.Contains(t, string(schema), "-- PostgreSQL database dump")
 }

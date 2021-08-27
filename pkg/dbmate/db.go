@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -226,7 +225,7 @@ func (db *DB) dumpSchema(drv Driver) error {
 	}
 
 	// write schema to file
-	return ioutil.WriteFile(db.SchemaFile, schema, 0644)
+	return os.WriteFile(db.SchemaFile, schema, 0644)
 }
 
 // ensureDir creates a directory if it does not already exist
@@ -402,7 +401,7 @@ func (db *DB) printVerbose(result sql.Result) {
 }
 
 func findMigrationFiles(dir string, re *regexp.Regexp) ([]string, error) {
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("could not find migrations directory `%s`", dir)
 	}
