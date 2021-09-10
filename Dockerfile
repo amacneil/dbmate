@@ -1,5 +1,5 @@
 # development image
-FROM techknowlogick/xgo:go-1.16.x as dev
+FROM --platform=linux/amd64 techknowlogick/xgo:go-1.16.x as dev
 WORKDIR /src
 ENV GOCACHE /src/.cache/go-build
 
@@ -33,10 +33,11 @@ RUN make build
 
 # release stage
 FROM alpine as release
+ARG TARGETARCH
 RUN apk add --no-cache \
 	mariadb-client \
 	postgresql-client \
 	sqlite \
 	tzdata
-COPY --from=build /src/dist/dbmate-linux-amd64 /usr/local/bin/dbmate
+COPY --from=build /src/dist/dbmate-linux-${TARGETARCH} /usr/local/bin/dbmate
 ENTRYPOINT ["dbmate"]
