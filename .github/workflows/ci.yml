@@ -16,10 +16,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
+      - name: Setu up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+        with:
+          config-inline: |
+            [worker.oci]
+              platforms = [ "linux/amd64", "linux/arm64" ]
+            [worker.containerd]
+              platforms = [ "linux/amd64", "linux/arm64" ]
+
       - name: Environment
         run: |
           set -x
           docker version
+          docker buildx version
           docker-compose version
 
       - name: Cache
@@ -31,7 +45,7 @@ jobs:
       - name: Build docker image
         run: |
           set -x
-          docker-compose build
+          docker buildx bake --set dbmate.platform="linux/arm64,linux/amd64"
           docker-compose run --rm --no-deps dbmate --version
 
       - name: Build binaries
