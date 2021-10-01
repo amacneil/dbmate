@@ -32,7 +32,6 @@ COPY . ./
 RUN make build
 
 # release stage
-ARG TARGETARCH
 FROM alpine as release
 ARG TARGETARCH
 RUN apk add --no-cache \
