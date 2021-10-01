@@ -45,7 +45,7 @@ jobs:
       - name: Build docker image
         run: |
           set -x
-          docker buildx bake --set dbmate.platform="linux/arm64,linux/amd64"
+          docker buildx bake --set dbmate.platform="linux/arm64,linux/amd64" --load
           docker-compose run --rm --no-deps dbmate --version
 
       - name: Build binaries
