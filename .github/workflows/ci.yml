@@ -23,12 +23,6 @@ jobs:
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v1
-        with:
-          config-inline: |
-            [worker.oci]
-              platforms = [ "linux/amd64", "linux/arm64" ]
-            [worker.containerd]
-              platforms = [ "linux/amd64", "linux/arm64" ]
 
       - name: Environment
         run: |
