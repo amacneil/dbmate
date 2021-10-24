@@ -252,14 +252,11 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 	onCluster := drv.onCluster()
 
 	onClusterClause := ""
+	engineClause := "engine = ReplacingMergeTree(ts)"
 
 	if onCluster {
 		onClusterClause = "on cluster '{cluster}'"
-	}
-
-	engine := "engine = ReplacingMergeTree(ts)"
-	if onCluster {
-		engine = "engine = ReplicatedReplacingMergeTree('/clickhouse/{installation}/{cluster}/tables/{table}', '{replica}', ts)"
+		engineClause = "engine = ReplicatedReplacingMergeTree('/clickhouse/{installation}/{cluster}/tables/{table}', '{replica}', ts)"
 	}
 
 	_, err := db.Exec(fmt.Sprintf(`
@@ -270,7 +267,7 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 		) %s 
 		primary key version
 		order by version
-	`, drv.quotedMigrationsTableName(), onClusterClause, engine))
+	`, drv.quotedMigrationsTableName(), onClusterClause, engineClause))
 
 	return err
 }
