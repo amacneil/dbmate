@@ -259,7 +259,7 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 
 	engine := "engine = ReplacingMergeTree(ts)"
 	if onCluster {
-		engine = fmt.Sprintf("engine = ReplicatedReplacingMergeTree('/clickhouse/{installation}/{cluster}/tables/{table}', '{replica}', ts)")
+		engine = "engine = ReplicatedReplacingMergeTree('/clickhouse/{installation}/{cluster}/tables/{table}', '{replica}', ts)"
 	}
 
 	_, err := db.Exec(fmt.Sprintf(`
