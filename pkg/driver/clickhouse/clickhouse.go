@@ -96,6 +96,11 @@ func (drv *Driver) databaseName() string {
 	return name
 }
 
+func (drv *Driver) onCluster() bool {
+	onCluster := dbutil.MustParseURL(connectionString(drv.databaseURL)).Query().Get("on_cluster")
+	return strings.ToLower(onCluster) == "true"
+}
+
 var clickhouseValidIdentifier = regexp.MustCompile(`^[a-zA-Z_][0-9a-zA-Z_]*$`)
 
 func (drv *Driver) quoteIdentifier(str string) string {
@@ -119,7 +124,11 @@ func (drv *Driver) CreateDatabase() error {
 	}
 	defer dbutil.MustClose(db)
 
-	_, err = db.Exec("create database " + drv.quoteIdentifier(name))
+	if drv.onCluster() {
+		_, err = db.Exec("create database " + drv.quoteIdentifier(name) + " on cluster '{cluster}'")
+	} else {
+		_, err = db.Exec("create database " + drv.quoteIdentifier(name))
+	}
 
 	return err
 }
@@ -135,7 +144,11 @@ func (drv *Driver) DropDatabase() error {
 	}
 	defer dbutil.MustClose(db)
 
-	_, err = db.Exec("drop database if exists " + drv.quoteIdentifier(name))
+	if drv.onCluster() {
+		_, err = db.Exec("drop database if exists " + drv.quoteIdentifier(name) + " on cluster '{cluster}'")
+	} else {
+		_, err = db.Exec("drop database if exists " + drv.quoteIdentifier(name))
+	}
 
 	return err
 }
@@ -143,7 +156,11 @@ func (drv *Driver) DropDatabase() error {
 func (drv *Driver) schemaDump(db *sql.DB, buf *bytes.Buffer, databaseName string) error {
 	buf.WriteString("\n--\n-- Database schema\n--\n\n")
 
-	buf.WriteString("CREATE DATABASE " + drv.quoteIdentifier(databaseName) + " IF NOT EXISTS;\n\n")
+	if drv.onCluster() {
+		buf.WriteString("CREATE DATABASE " + drv.quoteIdentifier(databaseName) + " IF NOT EXISTS ON CLUSTER '{cluster}';\n\n")
+	} else {
+		buf.WriteString("CREATE DATABASE " + drv.quoteIdentifier(databaseName) + " IF NOT EXISTS;\n\n")
+	}
 
 	tables, err := dbutil.QueryColumn(db, "show tables")
 	if err != nil {
@@ -232,15 +249,28 @@ func (drv *Driver) DatabaseExists() (bool, error) {
 
 // CreateMigrationsTable creates the schema migrations table
 func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
+	onCluster := drv.onCluster()
+
+	onClusterClause := ""
+
+	if onCluster {
+		onClusterClause = "on cluster '{cluster}'"
+	}
+
+	engine := "engine = ReplacingMergeTree(ts)"
+	if onCluster {
+		engine = fmt.Sprintf("engine = ReplicatedReplacingMergeTree('/clickhouse/{installation}/{cluster}/tables/{table}', '{replica}', ts)")
+	}
+
 	_, err := db.Exec(fmt.Sprintf(`
-		create table if not exists %s (
+		create table if not exists %s %s (
 			version String,
 			ts DateTime default now(),
 			applied UInt8 default 1
-		) engine = ReplacingMergeTree(ts)
+		) %s 
 		primary key version
 		order by version
-	`, drv.quotedMigrationsTableName()))
+	`, drv.quotedMigrationsTableName(), onClusterClause, engine))
 
 	return err
 }
