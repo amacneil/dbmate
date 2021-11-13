@@ -341,10 +341,13 @@ func (db *DB) migrate(drv Driver) error {
 		return err
 	}
 
+	var totalSkipped, totalApplied int
+
 	for _, filename := range files {
 		ver := migrationVersion(filename)
 		if ok := applied[ver]; ok {
 			// migration already applied
+			totalSkipped++
 			continue
 		}
 
@@ -379,12 +382,16 @@ func (db *DB) migrate(drv Driver) error {
 		if err != nil {
 			return err
 		}
+
+		totalApplied++
 	}
 
 	// automatically update schema file, silence errors
 	if db.AutoDumpSchema {
 		_ = db.dumpSchema(drv)
 	}
+
+	fmt.Fprintf(db.Log, "Finished: skipped: %d applied: %d\n", totalSkipped, totalApplied)
 
 	return nil
 }
