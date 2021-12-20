@@ -51,6 +51,7 @@ wait:
 
 .PHONY: docker-all
 docker-all:
+	docker-compose pull
 	docker-compose build
 	docker-compose run --rm dev make all
 

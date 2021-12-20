@@ -23,8 +23,9 @@ services:
     image: dbmate_release
 
   mysql:
-    image: mysql:5.7
+    image: mysql/mysql-server:8.0
     environment:
+      MYSQL_ROOT_HOST: "%"
       MYSQL_ROOT_PASSWORD: root
 
   postgres:
