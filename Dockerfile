@@ -14,7 +14,7 @@ RUN apt-get update \
 
 # golangci-lint
 RUN curl -fsSL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
-	| sh -s -- -b /usr/local/bin v1.39.0
+	| sh -s -- -b /usr/local/bin v1.43.0
 
 # download modules
 COPY go.* /src/
