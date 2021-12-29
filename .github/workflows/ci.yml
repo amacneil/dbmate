@@ -3,19 +3,77 @@ name: CI
 on:
   push:
     branches: [main]
-    tags:
-     - "v*"
+    tags: "*"
   pull_request:
-    branches: [main]
 
 jobs:
   build:
-    name: Build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            image: ubuntu-latest
+            arch: amd64
+            env: {}
+          - os: linux
+            image: ubuntu-latest
+            arch: arm64
+            setup: sudo apt-get update && sudo apt-get install -qq gcc-aarch64-linux-gnu
+            env:
+              CC: aarch64-linux-gnu-gcc
+              CXX: aarch64-linux-gnu-g++
+          - os: macos
+            image: macos-latest
+            arch: amd64
+            env: {}
+          - os: macos
+            image: macos-latest
+            arch: arm64
+            env: {}
+          - os: windows
+            image: windows-latest
+            arch: amd64
+            env: {}
+
+    name: Build (${{ matrix.os }}/${{ matrix.arch }})
+    runs-on: ${{ matrix.image }}
+    env: ${{ matrix.env }}
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-go@v2
+        with:
+          go-version: "1.17"
+
+      - name: Setup environment
+        run: ${{ matrix.setup }}
+
+      - run: go mod download
+
+      - run: make build ls
+        env:
+          GOARCH: ${{ matrix.arch }}
+          OUTPUT: dbmate-${{ matrix.os }}-${{ matrix.arch }}
+
+      - run: dist/dbmate-${{ matrix.os }}-${{ matrix.arch }} --help
+        if: ${{ matrix.arch == 'amd64' }}
+
+      - name: Publish binaries
+        uses: softprops/action-gh-release@v1
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        with:
+          files: dist/dbmate-*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  docker:
+    name: Docker Test (linux/amd64)
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
       - name: Setu up QEMU
         uses: docker/setup-qemu-action@v1
@@ -24,18 +82,12 @@ jobs:
         id: buildx
         uses: docker/setup-buildx-action@v1
 
-      - name: Environment
+      - name: Check docker environment
         run: |
           set -x
           docker version
           docker buildx version
           docker-compose version
-
-      - name: Cache
-        uses: actions/cache@v2
-        with:
-          key: cache
-          path: .cache
 
       - name: Build docker image
         run: |
@@ -43,13 +95,10 @@ jobs:
           docker buildx bake --load --set "*.platform=linux/amd64"
           docker-compose run --rm --no-deps dbmate --version
 
-      - name: Build binaries
-        run: |
-          set -x
-          docker-compose run --rm --no-deps dev make build-all
-          dist/dbmate-linux-amd64 --version
+      - name: Run make build
+        run: docker-compose run --rm --no-deps dev make build ls
 
-      - name: Lint
+      - name: Run make lint
         run: docker-compose run --rm --no-deps dev make lint
 
       - name: Start test dependencies
@@ -57,12 +106,10 @@ jobs:
           set -x
           docker-compose pull --quiet
           docker-compose up --detach
-
-      - name: Run tests
-        run: |
-          set -x
           docker-compose run --rm dev make wait
-          docker-compose run --rm dev make test
+
+      - name: Run make test
+        run: docker-compose run --rm dev make test
 
       - name: Docker meta
         id: meta
@@ -102,11 +149,3 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Publish release binaries
-        uses: softprops/action-gh-release@v1
-        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-        with:
-          files: dist/*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

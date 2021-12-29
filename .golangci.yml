@@ -5,12 +5,12 @@ linters:
     - depguard
     - errcheck
     - goimports
-    - golint
     - gosimple
     - govet
     - ineffassign
     - misspell
     - nakedret
+    - revive
     - rowserrcheck
     - staticcheck
     - structcheck
