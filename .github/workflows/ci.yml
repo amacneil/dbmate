@@ -75,13 +75,20 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Check docker environment
+      - name: Configure QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Configure Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Check Docker environment
         run: |
           set -x
           docker version
+          docker buildx version
           docker-compose version
 
-      - name: Build docker image
+      - name: Build Docker image
         run: |
           set -x
           docker-compose build
@@ -103,14 +110,42 @@ jobs:
       - name: Run make test
         run: docker-compose run --rm dev make test
 
-      - name: Publish docker image
+      - name: Login to Docker Hub
+        uses: docker/login-action@v1
         if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
-        env:
-          SRC_IMAGE: dbmate_release
-          DOCKERHUB_IMAGE: ${{ github.repository }}
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-          GHCR_IMAGE: ghcr.io/${{ github.repository }}
-          GHCR_USERNAME: ${{ github.actor }}
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ci/publish-docker.sh
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v1
+        if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate Docker image tags
+        id: meta
+        uses: docker/metadata-action@v3
+        if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
+        with:
+          images: |
+            ${{ github.repository }}
+            ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+      - name: Publish Docker image
+        uses: docker/build-push-action@v2
+        if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
+        with:
+          context: .
+          target: release
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
