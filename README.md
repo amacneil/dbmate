@@ -127,6 +127,7 @@ The following options are available with all commands. You must use command line
 - `--no-dump-schema` - don't auto-update the schema.sql file on migrate/rollback _(env: `$DBMATE_NO_DUMP_SCHEMA`)_
 - `--wait` - wait for the db to become available before executing the subsequent command _(env: `$DBMATE_WAIT`)_
 - `--wait-timeout 60s` - timeout for --wait flag _(env: `$DBMATE_WAIT_TIMEOUT`)_
+- `--timestamp-format=new` - use timestamp with underscore separating year, month, day, and time  _(env: `DBMATE_TIMESTAMP_FORMAT`)_
 
 ## Usage
 

@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"time"
 
 	"github.com/amacneil/dbmate/pkg/dbutil"
@@ -41,6 +40,7 @@ type DB struct {
 	WaitBefore          bool
 	WaitInterval        time.Duration
 	WaitTimeout         time.Duration
+	TimestampFormat     string
 	Log                 io.Writer
 }
 
@@ -241,8 +241,14 @@ const migrationTemplate = "-- migrate:up\n\n\n-- migrate:down\n\n"
 
 // NewMigration creates a new migration file
 func (db *DB) NewMigration(name string) error {
-	// new migration name
-	timestamp := time.Now().UTC().Format("20060102150405")
+	var timestamp string
+	if db.TimestampFormat == "old" {
+		// new migration name
+		timestamp = time.Now().UTC().Format(dbutil.DefaultTimestampLayout)
+	} else {
+		// new migration name with new timestamp format
+		timestamp = time.Now().UTC().Format(dbutil.NewTimestampLayout)
+	}
 	if name == "" {
 		return fmt.Errorf("please specify a name for the new migration")
 	}
@@ -342,7 +348,10 @@ func (db *DB) migrate(drv Driver) error {
 	}
 
 	for _, filename := range files {
-		ver := migrationVersion(filename)
+		ver, err := migrationVersion(filename)
+		if err != nil {
+			return err
+		}
 		if ok := applied[ver]; ok {
 			// migration already applied
 			continue
@@ -420,7 +429,10 @@ func findMigrationFiles(dir string, re *regexp.Regexp) ([]string, error) {
 		matches = append(matches, name)
 	}
 
-	sort.Strings(matches)
+	matches, err = dbutil.SortByDate(matches)
+	if err != nil {
+		return nil, err
+	}
 
 	return matches, nil
 }
@@ -445,8 +457,12 @@ func findMigrationFile(dir string, ver string) (string, error) {
 	return files[0], nil
 }
 
-func migrationVersion(filename string) string {
-	return regexp.MustCompile(`^\d+`).FindString(filename)
+func migrationVersion(filename string) (string, error) {
+	version, _, found := dbutil.Cut(filename, dbutil.DefaultTimestampSeparator)
+	if !found {
+		return "", errors.New("version not found")
+	}
+	return version, nil
 }
 
 // Rollback rolls back the most recent migration
@@ -590,7 +606,10 @@ func (db *DB) CheckMigrationsStatus(drv Driver) ([]StatusResult, error) {
 	var results []StatusResult
 
 	for _, filename := range files {
-		ver := migrationVersion(filename)
+		ver, err := migrationVersion(filename)
+		if err != nil {
+			return nil, err
+		}
 		res := StatusResult{Filename: filename}
 		if ok := applied[ver]; ok {
 			res.Applied = true

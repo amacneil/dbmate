@@ -69,6 +69,13 @@ func NewApp() *cli.App {
 			Value:   dbmate.DefaultSchemaFile,
 			Usage:   "specify the schema file location",
 		},
+		&cli.StringFlag{
+			Name:    "timestamp-format",
+			Aliases: []string{"t"},
+			EnvVars: []string{"DBMATE_TIMESTAMP_FORMAT"},
+			Value:   "old",
+			Usage:   "use the new timestamp format with (old) format: 20060102150405 or (new): 2006_01_02_150405",
+		},
 		&cli.BoolFlag{
 			Name:    "no-dump-schema",
 			EnvVars: []string{"DBMATE_NO_DUMP_SCHEMA"},
@@ -235,6 +242,7 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 		db.MigrationsTableName = c.String("migrations-table")
 		db.SchemaFile = c.String("schema-file")
 		db.WaitBefore = c.Bool("wait")
+		db.TimestampFormat = c.String("timestamp-format")
 		overrideTimeout := c.Duration("wait-timeout")
 		if overrideTimeout != 0 {
 			db.WaitTimeout = overrideTimeout
