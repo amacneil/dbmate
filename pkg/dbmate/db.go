@@ -340,7 +340,7 @@ func (db *DB) migrate(drv Driver) error {
 	}
 	defer dbutil.MustClose(sqlDB)
 
-	applied, err := drv.SelectMigrations(sqlDB, db.Limit)
+	applied, err := drv.SelectMigrations(sqlDB, -1)
 	if err != nil {
 		return err
 	}
