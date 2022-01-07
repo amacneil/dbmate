@@ -109,6 +109,7 @@ func NewApp() *cli.App {
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				db.TargetVersion = c.Args().First()
 				db.Verbose = c.Bool("verbose")
 				return db.CreateAndMigrate()
 			}),
@@ -129,7 +130,7 @@ func NewApp() *cli.App {
 		},
 		{
 			Name:  "migrate",
-			Usage: "Migrate to the latest version",
+			Usage: "Migrate to the specified or latest version",
 			Flags: []cli.Flag{
 				&cli.BoolFlag{
 					Name:    "verbose",
@@ -139,6 +140,7 @@ func NewApp() *cli.App {
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				db.TargetVersion = c.Args().First()
 				db.Verbose = c.Bool("verbose")
 				return db.Migrate()
 			}),
@@ -154,8 +156,16 @@ func NewApp() *cli.App {
 					EnvVars: []string{"DBMATE_VERBOSE"},
 					Usage:   "print the result of each statement execution",
 				},
+				&cli.IntFlag{
+					Name:    "limit",
+					Aliases: []string{"l"},
+					Usage:   "Limits the amount of rollbacks (defaults to 1 if no target version is specified)",
+					Value:   -1,
+				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				db.TargetVersion = c.Args().First()
+				db.Limit = c.Int("limit")
 				db.Verbose = c.Bool("verbose")
 				return db.Rollback()
 			}),
