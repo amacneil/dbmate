@@ -64,6 +64,15 @@ $ sudo curl -fsSL -o /usr/local/bin/dbmate https://github.com/amacneil/dbmate/re
 $ sudo chmod +x /usr/local/bin/dbmate
 ```
 
+**Windows**
+
+Download using [scoop](https://scoop.sh)
+
+```pwsh
+scoop bucket add extras
+scoop install dbmate
+```
+
 **Docker**
 
 Docker images are published to both Docker Hub ([`amacneil/dbmate`](https://hub.docker.com/r/amacneil/dbmate)) and Github Container Registry ([`ghcr.io/amacneil/dbmate`](https://ghcr.io/amacneil/dbmate)).
