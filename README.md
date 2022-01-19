@@ -69,7 +69,6 @@ $ sudo chmod +x /usr/local/bin/dbmate
 Download using [scoop](https://scoop.sh)
 
 ```pwsh
-scoop bucket add extras
 scoop install dbmate
 ```
 
