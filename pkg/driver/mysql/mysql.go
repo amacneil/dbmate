@@ -145,6 +145,9 @@ func (drv *Driver) mysqldumpArgs() []string {
 	if password, set := drv.databaseURL.User.Password(); set {
 		args = append(args, "--password="+password)
 	}
+	if socket := drv.databaseURL.Query().Get("socket"); drv.databaseURL.Hostname() == "" && socket != "" {
+		args = append(args, "--socket="+socket)
+	}
 
 	// add database name
 	args = append(args, dbutil.DatabaseName(drv.databaseURL))
