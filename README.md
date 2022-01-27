@@ -411,14 +411,14 @@ Why another database schema migration tool? Dbmate was inspired by many other to
 | Database connection string loaded from environment variables |    ✅    |         |               |                  |                |             |
 | Automatically load .env file                                 |    ✅    |         |               |                  |                |             |
 | No separate configuration file                               |    ✅    |         |               |        ✅        |       ✅       |     ✅      |
-| Language/framework independent                               |    ✅    |   ✴️    |      ✴️       |        ✅        |                |             |
+| Language/framework independent                               |    ✅    |    ¹    |       ¹       |        ✅        |                |             |
 | **Drivers**                                                  |
 | PostgreSQL                                                   |    ✅    |   ✅    |      ✅       |        ✅        |       ✅       |     ✅      |
 | MySQL                                                        |    ✅    |   ✅    |      ✅       |        ✅        |       ✅       |     ✅      |
 | SQLite                                                       |    ✅    |   ✅    |      ✅       |        ✅        |       ✅       |     ✅      |
 | CliсkHouse                                                   |    ✅    |         |               |        ✅        |       ✅       |     ✅      |
 
-> ✴️ In theory these tools could be used with other languages, but a Go development environment is required because binary builds are not provided.
+> ¹ In theory these tools could be used with other languages, but a Go development environment is required because binary builds are not provided.
 
 _If you notice any inaccuracies in this table, please [propose a change]._
 
