@@ -151,3 +151,18 @@ func MustParseURL(s string) *url.URL {
 
 	return u
 }
+
+// MustUnescapePath unescapes a URL path, and panics if it fails.
+// It is used during in cases where we are parsing a generated path.
+func MustUnescapePath(s string) string {
+	if s == "" {
+		panic("missing path")
+	}
+
+	path, err := url.PathUnescape(s)
+	if err != nil {
+		panic(err)
+	}
+
+	return path
+}
