@@ -399,26 +399,35 @@ You can customize the name of this table using the `--migrations-table` flag or 
 
 Why another database schema migration tool? Dbmate was inspired by many other tools, primarily [Active Record Migrations], with the goals of being trivial to configure, and language & framework independent. Here is a comparison between dbmate and other popular migration tools.
 
-|                                                              | [dbmate] | [goose] | [sql-migrate] | [golang-migrate] | [activerecord] | [sequelize] |
-| ------------------------------------------------------------ | :------: | :-----: | :-----------: | :--------------: | :------------: | :---------: |
+|                                                              | [dbmate] | [goose] | [sql-migrate] | [golang-migrate] | [activerecord] | [sequelize] | [sqitch] |
+| ------------------------------------------------------------ | :------: | :-----: | :-----------: | :--------------: | :------------: | :---------: | :------: |
 | **Features**                                                 |
-| Plain SQL migration files                                    |    ✅    |   ✅    |      ✅       |        ✅        |                |             |
-| Support for creating and dropping databases                  |    ✅    |         |               |                  |       ✅       |             |
-| Support for saving schema dump files                         |    ✅    |         |               |                  |       ✅       |             |
-| Timestamp-versioned migration files                          |    ✅    |   ✅    |               |        ✅        |       ✅       |     ✅      |
-| Custom schema migrations table                               |    ✅    |         |      ✅       |                  |                |     ✅      |
-| Ability to wait for database to become ready                 |    ✅    |         |               |                  |                |             |
-| Database connection string loaded from environment variables |    ✅    |         |               |                  |                |             |
-| Automatically load .env file                                 |    ✅    |         |               |                  |                |             |
-| No separate configuration file                               |    ✅    |         |               |        ✅        |       ✅       |     ✅      |
-| Language/framework independent                               |    ✅    |    ¹    |       ¹       |        ✅        |                |             |
+| Plain SQL migration files                                    |    ✅    |   ✅    |      ✅       |        ✅        |                |             |   ✅²    |
+| Support for creating and dropping databases                  |    ✅    |         |               |                  |       ✅       |             |          |
+| Support for saving schema dump files                         |    ✅    |         |               |                  |       ✅       |             |          |
+| Timestamp-versioned migration files                          |    ✅    |   ✅    |               |        ✅        |       ✅       |     ✅      |    ³     |
+| Custom schema migrations table                               |    ✅    |         |      ✅       |                  |                |     ✅      |    ³     |
+| Ability to wait for database to become ready                 |    ✅    |         |               |                  |                |             |          |
+| Database connection string loaded from environment variables |    ✅    |         |               |                  |                |             |    ³     |
+| Automatically load .env file                                 |    ✅    |         |               |                  |                |             |          |
+| No separate configuration file                               |    ✅    |         |               |        ✅        |       ✅       |     ✅      |          |
+| Language/framework independent                               |    ✅    |    ¹    |       ¹       |        ✅        |                |             |   ✅⁴    |
 | **Drivers**                                                  |
-| PostgreSQL                                                   |    ✅    |   ✅    |      ✅       |        ✅        |       ✅       |     ✅      |
-| MySQL                                                        |    ✅    |   ✅    |      ✅       |        ✅        |       ✅       |     ✅      |
-| SQLite                                                       |    ✅    |   ✅    |      ✅       |        ✅        |       ✅       |     ✅      |
-| CliсkHouse                                                   |    ✅    |         |               |        ✅        |       ✅       |     ✅      |
+| PostgreSQL                                                   |    ✅    |   ✅    |      ✅       |        ✅        |       ✅       |     ✅      |    ✅    |
+| MySQL                                                        |    ✅    |   ✅    |      ✅       |        ✅        |       ✅       |     ✅      |    ✅    |
+| SQLite                                                       |    ✅    |   ✅    |      ✅       |        ✅        |       ✅       |     ✅      |    ✅    |
+| CliсkHouse                                                   |    ✅    |         |               |        ✅        |       ✅       |     ✅      |          |
+| **Other Notes**                                              |          |         |               |                  |                |             |    ⁵     |
 
 > ¹ In theory these tools could be used with other languages, but a Go development environment is required because binary builds are not provided.
+>
+> ² Sqitch uses three separate migration in folders: up, down, and verify, which validates that the changes were applied correctly. Transactions are not applied automatically in the files, but the generated templates by default include transactions that can be removed as required.
+>
+> ³ Sqitch migration files are not timestamped, but they are recorded in a plan file and can have prerequisites specified. Sqitch records all migration actions (forward or backward) in multiple tables in the `sqitch` namespace, which can be customized.
+>
+> ⁴ Sqitch is framework independent, but requires a Perl installation or the use of a Docker image to run (which contains the Perl installation).
+>
+> ⁵ Sqitch has support for Firebird, Exasol, Oracle, Snowflake, and Vertica. Adding additional databases is possible but non-trivial. Sqitch also has direct support for integrating pgTAP (PostgreSQL unit tests) and support for Perl's App::Template so that common migrations can be templated (if you have tables that have the same basic definition). There are many other features to Sqitch.
 
 _If you notice any inaccuracies in this table, please [propose a change]._
 
