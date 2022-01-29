@@ -182,7 +182,7 @@ func TestSQLiteDumpSchema(t *testing.T) {
 	schema, err = drv.DumpSchema(db)
 	require.Nil(t, schema)
 	require.Error(t, err)
-	require.EqualError(t, err, "Error: unable to open database \".\": "+
+	require.EqualError(t, err, "Error: unable to open database \"/.\": "+
 		"unable to open database file")
 }
 
