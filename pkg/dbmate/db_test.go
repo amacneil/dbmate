@@ -393,6 +393,9 @@ func TestStatus(t *testing.T) {
 			require.Len(t, results, 2)
 			require.False(t, results[0].Applied)
 			require.False(t, results[1].Applied)
+			migrationsTableExists, err := drv.MigrationsTableExists(sqlDB)
+			require.NoError(t, err)
+			require.False(t, migrationsTableExists)
 
 			// run migrations
 			err = db.Migrate()

@@ -141,6 +141,20 @@ func (drv *Driver) DatabaseExists() (bool, error) {
 	return true, nil
 }
 
+// MigrationsTableExists checks if the schema_migrations table exists
+func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
+	exists := false
+	err := db.QueryRow("SELECT 1 FROM sqlite_master "+
+		"WHERE type='table' AND name=$1",
+		drv.migrationsTableName).
+		Scan(&exists)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+
+	return exists, err
+}
+
 // CreateMigrationsTable creates the schema migrations table
 func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 	_, err := db.Exec(

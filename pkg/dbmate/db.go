@@ -576,15 +576,24 @@ func (db *DB) CheckMigrationsStatus(drv Driver) ([]StatusResult, error) {
 		return nil, fmt.Errorf("no migration files found")
 	}
 
-	sqlDB, err := db.openDatabaseForMigration(drv)
+	sqlDB, err := drv.Open()
 	if err != nil {
 		return nil, err
 	}
 	defer dbutil.MustClose(sqlDB)
 
-	applied, err := drv.SelectMigrations(sqlDB, -1)
+	applied := map[string]bool{}
+
+	migrationsTableExists, err := drv.MigrationsTableExists(sqlDB)
 	if err != nil {
 		return nil, err
+	}
+
+	if migrationsTableExists {
+		applied, err = drv.SelectMigrations(sqlDB, -1)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var results []StatusResult

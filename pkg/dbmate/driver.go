@@ -15,6 +15,7 @@ type Driver interface {
 	CreateDatabase() error
 	DropDatabase() error
 	DumpSchema(*sql.DB) ([]byte, error)
+	MigrationsTableExists(*sql.DB) (bool, error)
 	CreateMigrationsTable(*sql.DB) error
 	SelectMigrations(*sql.DB, int) (map[string]bool, error)
 	InsertMigration(dbutil.Transaction, string) error
