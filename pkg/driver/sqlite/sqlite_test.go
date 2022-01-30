@@ -73,6 +73,12 @@ func TestConnectionString(t *testing.T) {
 		require.Equal(t, "/tmp/foo.sqlite3?mode=ro", ConnectionString(u))
 	})
 
+	t.Run("two slashes", func(t *testing.T) {
+		// interpreted as absolute path
+		u := dbutil.MustParseURL("sqlite://tmp/foo.sqlite3?mode=ro")
+		require.Equal(t, "/tmp/foo.sqlite3?mode=ro", ConnectionString(u))
+	})
+
 	t.Run("three slashes", func(t *testing.T) {
 		// interpreted as absolute path
 		u := dbutil.MustParseURL("sqlite:///tmp/foo.sqlite3?mode=ro")
@@ -104,6 +110,12 @@ func TestConnectionString(t *testing.T) {
 	t.Run("absolute with space", func(t *testing.T) {
 		u := dbutil.MustParseURL("sqlite:/foo bar.sqlite3?mode=ro")
 		require.Equal(t, "/foo bar.sqlite3?mode=ro", ConnectionString(u))
+	})
+
+	t.Run("two slashes with space in path", func(t *testing.T) {
+		// interpreted as absolute path
+		u := dbutil.MustParseURL("sqlite://tmp/foo bar.sqlite3?mode=ro")
+		require.Equal(t, "/tmp/foo bar.sqlite3?mode=ro", ConnectionString(u))
 	})
 
 	t.Run("three slashes with space in path", func(t *testing.T) {
