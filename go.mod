@@ -3,12 +3,12 @@ module github.com/amacneil/dbmate
 go 1.17
 
 require (
-	github.com/ClickHouse/clickhouse-go v1.5.2
+	github.com/ClickHouse/clickhouse-go v1.5.3
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/joho/godotenv v1.4.0
 	github.com/kami-zh/go-capturer v0.0.0-20171211120116-e492ea43421d
 	github.com/lib/pq v1.10.4
-	github.com/mattn/go-sqlite3 v1.14.10
+	github.com/mattn/go-sqlite3 v1.14.11
 	github.com/stretchr/testify v1.7.0
 	github.com/urfave/cli/v2 v2.3.0
 )
