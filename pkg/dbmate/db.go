@@ -355,6 +355,23 @@ func (db *DB) migrate(drv Driver) error {
 			return err
 		}
 
+		execMigrationStmt := func (tx dbutil.Transaction, stmt string, final bool) error {
+			// run actual migration
+			result, err := tx.Exec(stmt)
+			if err != nil {
+				return err
+			} else if db.Verbose {
+				db.printVerbose(result)
+			}
+
+			// record migration
+			if final {
+				return drv.InsertMigration(tx, ver)
+			}
+
+			return nil
+		}
+
 		execMigration := func(tx dbutil.Transaction) error {
 			// run actual migration
 			result, err := tx.Exec(up.Contents)
@@ -368,7 +385,16 @@ func (db *DB) migrate(drv Driver) error {
 			return drv.InsertMigration(tx, ver)
 		}
 
-		if up.Options.Transaction() {
+		if up.Options.MultiStatement() {
+			stmtSeparatorRegExp := regexp.MustCompile(`;`)
+			stmts := stmtSeparatorRegExp.Split(up.Contents, -1)
+			for i, stmt := range stmts {
+				err = execMigrationStmt(sqlDB, stmt, i+1 == len(stmts))
+				if err != nil {
+					break
+				}
+			}
+		} else if up.Options.Transaction() {
 			// begin transaction
 			err = doTransaction(sqlDB, execMigration)
 		} else {

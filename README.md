@@ -333,6 +333,18 @@ ALTER TYPE colors ADD VALUE 'orange' AFTER 'red';
 
 `transaction` will default to `true` if your database supports it.
 
+**multi-statement**
+
+`multi-statement` is useful if you need to run some SQL which cannot be executed from within a block. For example, in Postgres, you would need to run create index concurrently statements on its own, same can be achieved by having a single create index concurrently statement by setting transaction off:
+
+```sql
+-- migrate:up multi-statement:true
+create table users (id serial, name text);
+create index concurrently index_users_on_id on users(id);
+```
+
+`multi-statement` will default to `false`.
+
 ### Waiting For The Database
 
 If you use a Docker development environment for your project, you may encounter issues with the database not being immediately ready when running migrations or unit tests. This can be due to the database server having only just started.

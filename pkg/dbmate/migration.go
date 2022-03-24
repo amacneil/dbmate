@@ -10,6 +10,7 @@ import (
 // MigrationOptions is an interface for accessing migration options
 type MigrationOptions interface {
 	Transaction() bool
+	MultiStatement() bool
 }
 
 type migrationOptions map[string]string
@@ -18,6 +19,16 @@ type migrationOptions map[string]string
 // Defaults to true.
 func (m migrationOptions) Transaction() bool {
 	return m["transaction"] != "false"
+}
+
+// MultiStatement returns wheter or not this migration should run statement by statement
+// Defaults to false.
+func (m migrationOptions) MultiStatement() bool {
+	if val, ok := m["multi-statement"]; ok {
+		return val != "true"
+	}
+
+	return false
 }
 
 // Migration contains the migration contents and options

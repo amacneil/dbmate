@@ -72,6 +72,23 @@ ALTER TYPE colors ADD VALUE 'orange' AFTER 'red';
 	require.Equal(t, "", down.Contents)
 	require.Equal(t, true, down.Options.Transaction())
 
+	// It supports turning multi-statement on for a given migration block,
+	// e.g., the below would not work in Postgres in a multi-statement block.
+	// It also supports omitting the down block.
+	migration = `-- migrate:up multi-statement:false
+create table users (id serial, name text);
+create index concurrently index_users_on_id on users(id);
+`
+
+	up, down, err = parseMigrationContents(migration)
+	require.Nil(t, err)
+
+	require.Equal(t, "-- migrate:up multi-statement:false\ncreate table users (id serial, name text);\ncreate index concurrently index_users_on_id on users(id);\n", up.Contents)
+	require.Equal(t, true, up.Options.MultiStatement())
+
+	require.Equal(t, "", down.Contents)
+	require.Equal(t, false, down.Options.MultiStatement())
+
 	// It does *not* support omitting the up block.
 	migration = `-- migrate:down
 drop table users;
