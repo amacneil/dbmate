@@ -21,7 +21,7 @@ func (m migrationOptions) Transaction() bool {
 	return m["transaction"] != "false"
 }
 
-// MultiStatement returns wheter or not this migration should run statement by statement
+// MultiStatement returns whether or not this migration should run statement by statement
 // Defaults to false.
 func (m migrationOptions) MultiStatement() bool {
 	if val, ok := m["multi-statement"]; ok {
