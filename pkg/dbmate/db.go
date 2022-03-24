@@ -355,7 +355,7 @@ func (db *DB) migrate(drv Driver) error {
 			return err
 		}
 
-		execMigrationStmt := func (tx dbutil.Transaction, stmt string, final bool) error {
+		execMigrationStmt := func(tx dbutil.Transaction, stmt string, final bool) error {
 			// run actual migration
 			result, err := tx.Exec(stmt)
 			if err != nil {
