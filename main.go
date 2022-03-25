@@ -11,10 +11,6 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/amacneil/dbmate/pkg/dbmate"
-	_ "github.com/amacneil/dbmate/pkg/driver/clickhouse"
-	_ "github.com/amacneil/dbmate/pkg/driver/mysql"
-	_ "github.com/amacneil/dbmate/pkg/driver/postgres"
-	_ "github.com/amacneil/dbmate/pkg/driver/sqlite"
 )
 
 func main() {
