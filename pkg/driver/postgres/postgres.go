@@ -61,7 +61,7 @@ func connectionString(u *url.URL) string {
 
 	// host param overrides url hostname
 	if query.Get("host") != "" {
-		hostname = ""
+		hostname = query.Get("host")
 	}
 
 	// always specify a port
