@@ -23,6 +23,14 @@ jobs:
             env:
               CC: aarch64-linux-gnu-gcc
               CXX: aarch64-linux-gnu-g++
+          - os: linux
+            image: ubuntu-latest
+            arch: arm
+            setup: sudo apt-get update && sudo apt-get install -qq gcc-arm-linux-gnueabihf
+            env:
+              CC: arm-linux-gnueabihf-gcc
+              CXX: arm-linux-gnueabihf-g++
+              GOARM: 7
           - os: macos
             image: macos-latest
             arch: amd64
@@ -145,7 +153,7 @@ jobs:
         with:
           context: .
           target: release
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
