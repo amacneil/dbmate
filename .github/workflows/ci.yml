@@ -79,7 +79,7 @@ jobs:
         uses: docker/setup-qemu-action@v2
 
       - name: Configure Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
 
       - name: Check Docker environment
         run: |
