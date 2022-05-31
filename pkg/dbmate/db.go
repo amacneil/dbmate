@@ -30,6 +30,20 @@ const DefaultWaitInterval = time.Second
 // DefaultWaitTimeout specifies maximum time for connection attempts
 const DefaultWaitTimeout = 60 * time.Second
 
+// Error codes
+var (
+	ErrNoMigrationFiles      = errors.New("no migration files found")
+	ErrInvalidURL            = errors.New("invalid url, have you set your --url flag or DATABASE_URL environment variable?")
+	ErrNoRollback            = errors.New("can't rollback: no migrations have been applied")
+	ErrCantConnect           = errors.New("unable to connect to database")
+	ErrUnsupportedDriver     = errors.New("unsupported driver")
+	ErrNoMigrationName       = errors.New("please specify a name for the new migration")
+	ErrMigrationAlreadyExist = errors.New("file already exists")
+	ErrMigrationDirNotFound  = errors.New("could not find migrations directory")
+	ErrMigrationNotFound     = errors.New("can't find migration file")
+	ErrCreateDirectory       = errors.New("unable to create directory")
+)
+
 // DB allows dbmate actions to be performed on a specified database
 type DB struct {
 	AutoDumpSchema      bool
@@ -71,12 +85,12 @@ func New(databaseURL *url.URL) *DB {
 // GetDriver initializes the appropriate database driver
 func (db *DB) GetDriver() (Driver, error) {
 	if db.DatabaseURL == nil || db.DatabaseURL.Scheme == "" {
-		return nil, errors.New("invalid url, have you set your --url flag or DATABASE_URL environment variable?")
+		return nil, ErrInvalidURL
 	}
 
 	driverFunc := drivers[db.DatabaseURL.Scheme]
 	if driverFunc == nil {
-		return nil, fmt.Errorf("unsupported driver: %s", db.DatabaseURL.Scheme)
+		return nil, fmt.Errorf("%w: %s", ErrUnsupportedDriver, db.DatabaseURL.Scheme)
 	}
 
 	config := DriverConfig{
@@ -123,7 +137,7 @@ func (db *DB) wait(drv Driver) error {
 
 	// if we find outselves here, we could not connect within the timeout
 	fmt.Fprint(db.Log, "\n")
-	return fmt.Errorf("unable to connect to database: %s", err)
+	return fmt.Errorf("%w: %s", ErrCantConnect, err)
 }
 
 // CreateAndMigrate creates the database (if necessary) and runs migrations
@@ -225,13 +239,13 @@ func (db *DB) dumpSchema(drv Driver) error {
 	}
 
 	// write schema to file
-	return os.WriteFile(db.SchemaFile, schema, 0644)
+	return os.WriteFile(db.SchemaFile, schema, 0o644)
 }
 
 // ensureDir creates a directory if it does not already exist
 func ensureDir(dir string) error {
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("unable to create directory `%s`", dir)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("%w `%s`", ErrCreateDirectory, dir)
 	}
 
 	return nil
@@ -244,7 +258,7 @@ func (db *DB) NewMigration(name string) error {
 	// new migration name
 	timestamp := time.Now().UTC().Format("20060102150405")
 	if name == "" {
-		return fmt.Errorf("please specify a name for the new migration")
+		return ErrNoMigrationName
 	}
 	name = fmt.Sprintf("%s_%s.sql", timestamp, name)
 
@@ -258,7 +272,7 @@ func (db *DB) NewMigration(name string) error {
 	fmt.Fprintf(db.Log, "Creating migration: %s\n", path)
 
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		return fmt.Errorf("file already exists")
+		return ErrMigrationAlreadyExist
 	}
 
 	// write new migration
@@ -320,7 +334,7 @@ func (db *DB) migrate(drv Driver) error {
 	}
 
 	if len(files) == 0 {
-		return fmt.Errorf("no migration files found")
+		return ErrNoMigrationFiles
 	}
 
 	if db.WaitBefore {
@@ -403,7 +417,7 @@ func (db *DB) printVerbose(result sql.Result) {
 func findMigrationFiles(dir string, re *regexp.Regexp) ([]string, error) {
 	files, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, fmt.Errorf("could not find migrations directory `%s`", dir)
+		return nil, fmt.Errorf("%w `%s`", ErrMigrationDirNotFound, dir)
 	}
 
 	matches := []string{}
@@ -439,7 +453,7 @@ func findMigrationFile(dir string, ver string) (string, error) {
 	}
 
 	if len(files) == 0 {
-		return "", fmt.Errorf("can't find migration file: %s*.sql", ver)
+		return "", fmt.Errorf("%w: %s*.sql", ErrMigrationNotFound, ver)
 	}
 
 	return files[0], nil
@@ -480,7 +494,7 @@ func (db *DB) Rollback() error {
 		latest = ver
 	}
 	if latest == "" {
-		return fmt.Errorf("can't rollback: no migrations have been applied")
+		return ErrNoRollback
 	}
 
 	filename, err := findMigrationFile(db.MigrationsDir, latest)
@@ -573,7 +587,7 @@ func (db *DB) CheckMigrationsStatus(drv Driver) ([]StatusResult, error) {
 	}
 
 	if len(files) == 0 {
-		return nil, fmt.Errorf("no migration files found")
+		return nil, ErrNoMigrationFiles
 	}
 
 	sqlDB, err := drv.Open()
