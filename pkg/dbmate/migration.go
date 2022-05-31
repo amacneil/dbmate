@@ -1,7 +1,7 @@
 package dbmate
 
 import (
-	"fmt"
+	"errors"
 	"os"
 	"regexp"
 	"strings"
@@ -41,13 +41,21 @@ func parseMigration(path string) (Migration, Migration, error) {
 	return up, down, err
 }
 
-var upRegExp = regexp.MustCompile(`(?m)^--\s*migrate:up(\s*$|\s+\S+)`)
-var downRegExp = regexp.MustCompile(`(?m)^--\s*migrate:down(\s*$|\s+\S+)$`)
-var emptyLineRegExp = regexp.MustCompile(`^\s*$`)
-var commentLineRegExp = regexp.MustCompile(`^\s*--`)
-var whitespaceRegExp = regexp.MustCompile(`\s+`)
-var optionSeparatorRegExp = regexp.MustCompile(`:`)
-var blockDirectiveRegExp = regexp.MustCompile(`^--\s*migrate:[up|down]]`)
+var (
+	upRegExp              = regexp.MustCompile(`(?m)^--\s*migrate:up(\s*$|\s+\S+)`)
+	downRegExp            = regexp.MustCompile(`(?m)^--\s*migrate:down(\s*$|\s+\S+)$`)
+	emptyLineRegExp       = regexp.MustCompile(`^\s*$`)
+	commentLineRegExp     = regexp.MustCompile(`^\s*--`)
+	whitespaceRegExp      = regexp.MustCompile(`\s+`)
+	optionSeparatorRegExp = regexp.MustCompile(`:`)
+	blockDirectiveRegExp  = regexp.MustCompile(`^--\s*migrate:[up|down]]`)
+)
+
+// Error codes
+var (
+	ErrParseMissingUp      = errors.New("dbmate requires each migration to define an up bock with '-- migrate:up'")
+	ErrParseUnexpectedStmt = errors.New("dbmate does not support statements defined outside of the '-- migrate:up' or '-- migrate:down' blocks")
+)
 
 // parseMigrationContents parses the string contents of a migration.
 // It will return two Migration objects, the first representing the "up"
@@ -62,9 +70,9 @@ func parseMigrationContents(contents string) (Migration, Migration, error) {
 	downDirectiveStart, downDirectiveEnd, hasDefinedDownBlock := getMatchPositions(contents, downRegExp)
 
 	if !hasDefinedUpBlock {
-		return up, down, fmt.Errorf("dbmate requires each migration to define an up bock with '-- migrate:up'")
+		return up, down, ErrParseMissingUp
 	} else if statementsPrecedeMigrateBlocks(contents, upDirectiveStart, downDirectiveStart) {
-		return up, down, fmt.Errorf("dbmate does not support statements defined outside of the '-- migrate:up' or '-- migrate:down' blocks")
+		return up, down, ErrParseUnexpectedStmt
 	}
 
 	upEnd := len(contents)
