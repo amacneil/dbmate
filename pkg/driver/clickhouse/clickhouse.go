@@ -2,18 +2,20 @@ package clickhouse
 
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"database/sql"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/url"
 	"regexp"
 	"sort"
 	"strings"
 
+	"github.com/ClickHouse/clickhouse-go"
 	"github.com/amacneil/dbmate/pkg/dbmate"
 	"github.com/amacneil/dbmate/pkg/dbutil"
-
-	"github.com/ClickHouse/clickhouse-go"
 )
 
 func init() {
@@ -47,6 +49,29 @@ func connectionString(initialURL *url.URL) string {
 	u.Host = host
 
 	query := u.Query()
+
+	certPath := query.Get("cert_path")
+
+	if certPath != "" {
+		rootCertPool := x509.NewCertPool()
+
+		pem, err := ioutil.ReadFile(certPath)
+
+		if err != nil {
+			print("Cant find certificate on path: " + certPath + "\n")
+		}
+
+		if ok := rootCertPool.AppendCertsFromPEM(pem); !ok {
+			print("Certificate is wrong\n")
+		}
+
+		clickhouse.RegisterTLSConfig("custom", &tls.Config{
+			RootCAs: rootCertPool,
+		})
+
+		query.Set("tls_config", "custom")
+	}
+
 	if query.Get("username") == "" && u.User.Username() != "" {
 		query.Set("username", u.User.Username())
 	}
