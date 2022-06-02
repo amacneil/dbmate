@@ -65,9 +65,13 @@ func connectionString(initialURL *url.URL) string {
 			print("Certificate is wrong\n")
 		}
 
-		clickhouse.RegisterTLSConfig("custom", &tls.Config{
+		err = clickhouse.RegisterTLSConfig("custom", &tls.Config{
 			RootCAs: rootCertPool,
 		})
+
+		if err != nil {
+			print("Fail on register tlsConfig\n")
+		}
 
 		query.Set("tls_config", "custom")
 	}
