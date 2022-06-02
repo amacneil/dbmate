@@ -240,6 +240,10 @@ DATABASE_URL="sqlite:/tmp/database.sqlite3"
 
 #### ClickHouse
 
+Clickhouse driver has support for ssl certificate.
+
+`cert_path` - path for certificate.
+
 ```sh
 DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name"
 ```
@@ -248,6 +252,12 @@ or
 
 ```sh
 DATABASE_URL="clickhouse://127.0.0.1:9000?username=username&password=password&database=database_name"
+```
+
+or with certificate
+
+```sh
+DATABASE_URL="clickhouse://127.0.0.1:9000?username=username&password=password&database=database_name&cert_path=some_path"
 ```
 
 [See other supported connection options](https://github.com/ClickHouse/clickhouse-go#dsn).
