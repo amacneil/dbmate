@@ -284,6 +284,12 @@ Writing: ./db/schema.sql
 
 Pending migrations are always applied in numerical order. However, dbmate does not prevent migrations from being applied out of order if they are committed independently (for example: if a developer has been working on a branch for a long time, and commits a migration which has a lower version number than other already-applied migrations, dbmate will simply apply the pending migration). See [#159](https://github.com/amacneil/dbmate/issues/159) for a more detailed explanation.
 
+You can also specify a migration to up-to.
+
+```sh
+$ dbmate up 20151127184807
+```
+
 ### Rolling Back Migrations
 
 By default, dbmate doesn't know how to roll back a migration. In development, it's often useful to be able to revert your database to a previous state. To accomplish this, implement the `migrate:down` section:
@@ -306,6 +312,14 @@ Run `dbmate rollback` to roll back the most recent migration:
 $ dbmate rollback
 Rolling back: 20151127184807_create_users_table.sql
 Writing: ./db/schema.sql
+```
+
+You can also rollback to a specific migration.
+
+```sh
+$ dbmate rollback 20151127184807
+# or, with a limit option
+$ dbmate rollback -limit 2 # will rollback the last two migrations
 ```
 
 ### Migration Options
