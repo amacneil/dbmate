@@ -68,6 +68,12 @@ jobs:
       - run: dist/dbmate-${{ matrix.os }}-${{ matrix.arch }} --help
         if: ${{ matrix.arch == 'amd64' }}
 
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/dbmate-*
+
       - name: Publish binaries
         uses: softprops/action-gh-release@v1
         if: ${{ startsWith(github.ref, 'refs/tags/v') }}
