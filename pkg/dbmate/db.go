@@ -80,7 +80,6 @@ func New(databaseURL *url.URL) *DB {
 		WaitBefore:          false,
 		WaitInterval:        DefaultWaitInterval,
 		WaitTimeout:         DefaultWaitTimeout,
-		StatementTimeout:    DefaultStatementTimeout,
 		Log:                 os.Stdout,
 	}
 }

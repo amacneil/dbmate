@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"io"
 	"net/url"
+	"time"
 
 	"github.com/amacneil/dbmate/pkg/dbutil"
 )
@@ -21,6 +22,7 @@ type Driver interface {
 	InsertMigration(dbutil.Transaction, string) error
 	DeleteMigration(dbutil.Transaction, string) error
 	Ping() error
+	IncreaseStatementTimeout(*sql.DB, time.Duration) error
 }
 
 // DriverConfig holds configuration passed to driver constructors

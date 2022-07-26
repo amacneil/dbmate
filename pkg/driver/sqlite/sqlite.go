@@ -12,6 +12,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/amacneil/dbmate/pkg/dbmate"
 	"github.com/amacneil/dbmate/pkg/dbutil"
@@ -241,6 +242,10 @@ func (drv *Driver) Ping() error {
 	defer dbutil.MustClose(db)
 
 	return db.Ping()
+}
+
+func (drv *Driver) IncreaseStatementTimeout(db *sql.DB, timeout time.Duration) error {
+	return dbmate.ErrFeatureNotImplemented
 }
 
 func (drv *Driver) quotedMigrationsTableName() string {

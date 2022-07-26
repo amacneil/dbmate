@@ -7,7 +7,9 @@ import (
 	"io"
 	"net/url"
 	"runtime"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/amacneil/dbmate/pkg/dbmate"
 	"github.com/amacneil/dbmate/pkg/dbutil"
@@ -358,6 +360,11 @@ func (drv *Driver) Ping() error {
 		return nil
 	}
 
+	return err
+}
+
+func (drv *Driver) IncreaseStatementTimeout(db *sql.DB, timeout time.Duration) error {
+	_, err := db.Exec(fmt.Sprintf("SET statement_timeout = %s", strconv.Itoa(int(timeout.Milliseconds()))))
 	return err
 }
 

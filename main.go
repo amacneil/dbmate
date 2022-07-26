@@ -86,7 +86,6 @@ func NewApp() *cli.App {
 			EnvVars:  []string{"STATEMENT_TIMEOUT"},
 			Usage:    "the executing statement timeout",
 			Required: false,
-			Value:    dbmate.DefaultStatementTimeout,
 		},
 	}
 

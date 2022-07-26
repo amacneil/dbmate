@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/amacneil/dbmate/pkg/dbmate"
 	"github.com/amacneil/dbmate/pkg/dbutil"
@@ -379,6 +380,17 @@ func TestSQLitePing(t *testing.T) {
 	// ping database should fail
 	err = drv.Ping()
 	require.EqualError(t, err, "unable to open database file: is a directory")
+}
+
+func TestStatementTimeout(t *testing.T) {
+	drv := testSQLiteDriver(t)
+
+	db := prepTestSQLiteDB(t)
+	defer dbutil.MustClose(db)
+
+	err := drv.IncreaseStatementTimeout(db, time.Minute)
+	require.Error(t, err)
+	require.EqualValues(t, dbmate.ErrFeatureNotImplemented, err)
 }
 
 func TestSQLiteQuotedMigrationsTableName(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 	"os"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/amacneil/dbmate/pkg/dbmate"
 	"github.com/amacneil/dbmate/pkg/dbutil"
@@ -457,6 +458,27 @@ func TestPostgresPing(t *testing.T) {
 	err = drv.Ping()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "connect: connection refused")
+}
+
+func TestStatementTimeout(t *testing.T) {
+	drv := testPostgresDriver(t)
+
+	db := prepTestPostgresDB(t)
+	defer dbutil.MustClose(db)
+
+	err := drv.IncreaseStatementTimeout(db, time.Minute*5)
+	require.NoError(t, err)
+
+	row := db.QueryRow("show statement_timeout;")
+	require.NotNil(t, row)
+
+	var timeoutValue string
+	err = row.Scan(&timeoutValue)
+	require.NoError(t, err)
+
+	expectedTimeoutValue := "5min"
+
+	require.Equal(t, expectedTimeoutValue, timeoutValue)
 }
 
 func TestPostgresQuotedMigrationsTableName(t *testing.T) {
