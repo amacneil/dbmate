@@ -42,6 +42,7 @@ var (
 	ErrMigrationDirNotFound  = errors.New("could not find migrations directory")
 	ErrMigrationNotFound     = errors.New("can't find migration file")
 	ErrCreateDirectory       = errors.New("unable to create directory")
+	ErrFeatureNotImplemented = errors.New("this feature is not implemented for this database")
 )
 
 // DB allows dbmate actions to be performed on a specified database
