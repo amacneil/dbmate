@@ -56,6 +56,7 @@ type DB struct {
 	WaitBefore          bool
 	WaitInterval        time.Duration
 	WaitTimeout         time.Duration
+	StatementTimeout    time.Duration
 	Log                 io.Writer
 }
 
@@ -79,6 +80,7 @@ func New(databaseURL *url.URL) *DB {
 		WaitBefore:          false,
 		WaitInterval:        DefaultWaitInterval,
 		WaitTimeout:         DefaultWaitTimeout,
+		StatementTimeout:    DefaultStatementTimeout,
 		Log:                 os.Stdout,
 	}
 }
