@@ -358,6 +358,12 @@ func (db *DB) migrate(drv Driver) error {
 		return err
 	}
 
+	if db.StatementTimeout != 0 {
+		err = drv.IncreaseStatementTimeout(sqlDB, db.StatementTimeout)
+		if err != nil && err != ErrFeatureNotImplemented {
+			return err
+		}
+	}
 	for _, filename := range files {
 		ver := migrationVersion(filename)
 		if ok := applied[ver]; ok {
