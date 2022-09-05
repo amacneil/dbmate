@@ -171,7 +171,7 @@ func TestAutoDumpSchema(t *testing.T) {
 	require.NoError(t, err)
 
 	// rollback
-	err = db.Rollback()
+	err = db.Rollback(1)
 	require.NoError(t, err)
 
 	// schema should be recreated
@@ -220,9 +220,11 @@ func testWaitBefore(t *testing.T, verbose bool) {
 	checkWaitCalled(t, u, db.Migrate)
 
 	// rollback
-	err = db.Rollback()
+	err = db.Rollback(1)
 	require.NoError(t, err)
-	checkWaitCalled(t, u, db.Rollback)
+	checkWaitCalled(t, u, func() error {
+		return db.Rollback(1)
+	})
 
 	// dump
 	err = db.DumpSchema()
@@ -354,7 +356,7 @@ func TestRollback(t *testing.T) {
 			require.Nil(t, err)
 
 			// rollback
-			err = db.Rollback()
+			err = db.Rollback(1)
 			require.NoError(t, err)
 
 			// verify rollback
@@ -409,7 +411,7 @@ func TestStatus(t *testing.T) {
 			require.True(t, results[1].Applied)
 
 			// rollback last migration
-			err = db.Rollback()
+			err = db.Rollback(1)
 			require.NoError(t, err)
 
 			// one applied, one pending

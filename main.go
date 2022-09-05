@@ -150,10 +150,17 @@ func NewApp() *cli.App {
 					EnvVars: []string{"DBMATE_VERBOSE"},
 					Usage:   "print the result of each statement execution",
 				},
+				&cli.IntFlag{
+					Name:    "number",
+					Aliases: []string{"n"},
+					Usage:   "number of migrations to rollback (-1 means all)",
+					Value:   1,
+				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
 				db.Verbose = c.Bool("verbose")
-				return db.Rollback()
+				number := c.Int("number")
+				return db.Rollback(number)
 			}),
 		},
 		{
