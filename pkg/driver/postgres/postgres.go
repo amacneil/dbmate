@@ -48,7 +48,7 @@ func connectionString(u *url.URL) string {
 	}
 
 	// default hostname
-	if hostname == "" {
+	if hostname == "" && query.Get("host") == "" {
 		switch runtime.GOOS {
 		case "linux":
 			query.Set("host", "/var/run/postgresql")
