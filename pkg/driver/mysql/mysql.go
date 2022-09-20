@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"strings"
 	"regexp"
+	"strings"
 
 	"github.com/amacneil/dbmate/pkg/dbmate"
 	"github.com/amacneil/dbmate/pkg/dbutil"
@@ -201,7 +201,7 @@ func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
 }
 
 // TrimAutoincrementValues removes AUTO_INCREMENT values from MySQL schema dumps
-func TrimAutoincrementValues(data []byte) ([]byte) {
+func TrimAutoincrementValues(data []byte) []byte {
 	aiPattern := regexp.MustCompile(" AUTO_INCREMENT=[0-9]*")
 	return aiPattern.ReplaceAll(data, []byte(""))
 }
