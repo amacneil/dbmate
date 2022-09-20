@@ -202,8 +202,8 @@ func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
 
 // TrimAutoincrementValues removes AUTO_INCREMENT values from MySQL schema dumps
 func TrimAutoincrementValues(data []byte) ([]byte) {
-	ai_pattern := regexp.MustCompile(" AUTO_INCREMENT=[0-9]*")
-	return ai_pattern.ReplaceAll(data, []byte(""))
+	aiPattern := regexp.MustCompile(" AUTO_INCREMENT=[0-9]*")
+	return aiPattern.ReplaceAll(data, []byte(""))
 }
 
 // DatabaseExists determines whether the database exists
