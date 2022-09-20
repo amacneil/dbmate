@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/url"
 	"strings"
+	"regexp"
 
 	"github.com/amacneil/dbmate/pkg/dbmate"
 	"github.com/amacneil/dbmate/pkg/dbutil"
@@ -192,7 +193,17 @@ func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
 	}
 
 	schema = append(schema, migrations...)
-	return dbutil.TrimLeadingSQLComments(schema)
+	schema, err = dbutil.TrimLeadingSQLComments(schema)
+	if err != nil {
+		return nil, err
+	}
+	return TrimAutoincrementValues(schema), nil
+}
+
+// TrimAutoincrementValues removes AUTO_INCREMENT values from MySQL schema dumps
+func TrimAutoincrementValues(data []byte) ([]byte) {
+	ai_pattern := regexp.MustCompile(" AUTO_INCREMENT=[0-9]*")
+	return ai_pattern.ReplaceAll(data, []byte(""))
 }
 
 // DatabaseExists determines whether the database exists
