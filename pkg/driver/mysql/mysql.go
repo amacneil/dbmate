@@ -197,11 +197,11 @@ func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return TrimAutoincrementValues(schema), nil
+	return trimAutoincrementValues(schema), nil
 }
 
-// TrimAutoincrementValues removes AUTO_INCREMENT values from MySQL schema dumps
-func TrimAutoincrementValues(data []byte) []byte {
+// trimAutoincrementValues removes AUTO_INCREMENT values from MySQL schema dumps
+func trimAutoincrementValues(data []byte) []byte {
 	aiPattern := regexp.MustCompile(" AUTO_INCREMENT=[0-9]*")
 	return aiPattern.ReplaceAll(data, []byte(""))
 }
