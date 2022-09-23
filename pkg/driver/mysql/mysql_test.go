@@ -191,7 +191,7 @@ func TestMySQLDumpSchemaContainsNoAutoIncrement(t *testing.T) {
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
-	// create table with AI column
+	// create table with AUTO_INCREMENT column
 	_, err = db.Exec(`create table foo_table (id int not null primary key auto_increment)`)
 	require.NoError(t, err)
 
@@ -203,12 +203,12 @@ func TestMySQLDumpSchemaContainsNoAutoIncrement(t *testing.T) {
 	var tblName, tblCreate string
 	err = db.QueryRow(`show create table foo_table`).Scan(&tblName, &tblCreate)
 	require.NoError(t, err)
-	require.Contains(t, tblCreate, "AUTO_INCREMENT")
+	require.Contains(t, tblCreate, "AUTO_INCREMENT=")
 
 	// AUTO_INCREMENT should not appear in the dump
 	schema, err := drv.DumpSchema(db)
 	require.NoError(t, err)
-	require.NotContains(t, string(schema), "AUTO_INCREMENT")
+	require.NotContains(t, string(schema), "AUTO_INCREMENT=")
 }
 
 func TestMySQLDatabaseExists(t *testing.T) {
