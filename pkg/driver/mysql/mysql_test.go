@@ -204,12 +204,12 @@ func TestMySQLDumpSchemaContainsNoAutoIncrement(t *testing.T) {
 	err = db.QueryRow(`show create table foo_table`).Scan(&tblName, &tblCreate)
 	require.NoError(t, err)
 
-	require.Contains(t, tblCreate, "AUTO_INCREMENT=2")
+	require.Contains(t, tblCreate, "AUTO_INCREMENT")
 
 	// AUTO_INCREMENT should not appear in the dump
 	schema, err := drv.DumpSchema(db)
 	require.NoError(t, err)
-	require.NotContains(t, string(schema), "AUTO_INCREMENT=2")
+	require.NotContains(t, string(schema), "AUTO_INCREMENT")
 }
 
 func TestMySQLDatabaseExists(t *testing.T) {
