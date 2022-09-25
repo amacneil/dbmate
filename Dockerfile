@@ -26,6 +26,7 @@ RUN make build
 FROM alpine as release
 RUN apk add --no-cache \
 	mariadb-client \
+	mariadb-connector-c \
 	postgresql-client \
 	sqlite \
 	tzdata
