@@ -103,9 +103,8 @@ func parseMigrationContents(contents string) (Migration, Migration, error) {
 //
 // For example:
 //
-//     fmt.Printf("%#v", parseMigrationOptions("-- migrate:up transaction:false"))
-//     // migrationOptions{"transaction": "false"}
-//
+//	fmt.Printf("%#v", parseMigrationOptions("-- migrate:up transaction:false"))
+//	// migrationOptions{"transaction": "false"}
 func parseMigrationOptions(contents string) MigrationOptions {
 	options := make(migrationOptions)
 
@@ -154,7 +153,6 @@ func parseMigrationOptions(contents string) MigrationOptions {
 // -- migrate:up
 // create table users (id serial, status status_type);
 // `, 54, -1)
-//
 func statementsPrecedeMigrateBlocks(contents string, upDirectiveStart, downDirectiveStart int) bool {
 	until := upDirectiveStart
 
