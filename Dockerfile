@@ -1,5 +1,5 @@
 # development image
-FROM golang:1.18 as dev
+FROM golang:1.19 as dev
 WORKDIR /src
 
 # install database clients
