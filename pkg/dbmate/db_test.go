@@ -47,6 +47,8 @@ func TestNew(t *testing.T) {
 	require.False(t, db.WaitBefore)
 	require.Equal(t, time.Second, db.WaitInterval)
 	require.Equal(t, 60*time.Second, db.WaitTimeout)
+	require.Equal(t, -1, db.Limit)
+	require.Equal(t, "", db.TargetVersion)
 }
 
 func TestGetDriver(t *testing.T) {
@@ -242,9 +244,11 @@ func TestWaitBeforeVerbose(t *testing.T) {
 		`Applying: 20151129054053_test_migration.sql
 Rows affected: 1
 Applying: 20200227231541_test_posts.sql
+Rows affected: 0
+Applying: 20220607110405_test_category.sql
 Rows affected: 0`)
 	require.Contains(t, output,
-		`Rolling back: 20200227231541_test_posts.sql
+		`Rolling back: 20220607110405_test_category.sql
 Rows affected: 0`)
 }
 
@@ -285,6 +289,37 @@ func TestMigrate(t *testing.T) {
 			require.Equal(t, 1, count)
 
 			err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
+			require.NoError(t, err)
+			require.Equal(t, 1, count)
+		})
+	}
+}
+
+func TestMigrateToTarget(t *testing.T) {
+	for _, u := range testURLs() {
+		t.Run(u.Scheme, func(t *testing.T) {
+			db := newTestDB(t, u)
+			db.TargetVersion = "20151129054053"
+			drv, err := db.GetDriver()
+			require.NoError(t, err)
+
+			// drop and recreate database
+			err = db.Drop()
+			require.NoError(t, err)
+			err = db.Create()
+			require.NoError(t, err)
+
+			// migrate
+			err = db.Migrate()
+			require.NoError(t, err)
+
+			// verify results
+			sqlDB, err := drv.Open()
+			require.NoError(t, err)
+			defer dbutil.MustClose(sqlDB)
+
+			count := 0
+			err = sqlDB.QueryRow(`select count(*) from schema_migrations`).Scan(&count)
 			require.NoError(t, err)
 			require.Equal(t, 1, count)
 		})
@@ -350,7 +385,7 @@ func TestRollback(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, 1, count)
 
-			err = sqlDB.QueryRow("select count(*) from posts").Scan(&count)
+			err = sqlDB.QueryRow("select count(*) from categories").Scan(&count)
 			require.Nil(t, err)
 
 			// rollback
@@ -360,9 +395,109 @@ func TestRollback(t *testing.T) {
 			// verify rollback
 			err = sqlDB.QueryRow("select count(*) from schema_migrations").Scan(&count)
 			require.NoError(t, err)
+			require.Equal(t, 2, count)
+
+			err = sqlDB.QueryRow("select count(*) from categories").Scan(&count)
+			require.NotNil(t, err)
+			require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
+		})
+	}
+}
+
+func TestRollbackToTarget(t *testing.T) {
+	for _, u := range testURLs() {
+		t.Run(u.Scheme, func(t *testing.T) {
+			db := newTestDB(t, u)
+			drv, err := db.GetDriver()
+			require.NoError(t, err)
+
+			// drop, recreate, and migrate database
+			err = db.Drop()
+			require.NoError(t, err)
+			err = db.Create()
+			require.NoError(t, err)
+			err = db.Migrate()
+			require.NoError(t, err)
+
+			// verify migration
+			sqlDB, err := drv.Open()
+			require.NoError(t, err)
+			defer dbutil.MustClose(sqlDB)
+
+			count := 0
+			err = sqlDB.QueryRow(`select count(*) from schema_migrations
+				where version = '20151129054053'`).Scan(&count)
+			require.NoError(t, err)
+			require.Equal(t, 1, count)
+
+			err = sqlDB.QueryRow("select count(*) from categories").Scan(&count)
+			require.Nil(t, err)
+
+			// rollback
+			db.TargetVersion = "20151129054053"
+			err = db.Rollback()
+			require.NoError(t, err)
+
+			// verify rollback
+			err = sqlDB.QueryRow("select count(*) from schema_migrations").Scan(&count)
+			require.NoError(t, err)
 			require.Equal(t, 1, count)
 
 			err = sqlDB.QueryRow("select count(*) from posts").Scan(&count)
+			require.NotNil(t, err)
+			require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
+
+			err = sqlDB.QueryRow("select count(*) from categories").Scan(&count)
+			require.NotNil(t, err)
+			require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
+		})
+	}
+}
+
+func TestRollbackToLimit(t *testing.T) {
+	for _, u := range testURLs() {
+		t.Run(u.Scheme, func(t *testing.T) {
+			db := newTestDB(t, u)
+			drv, err := db.GetDriver()
+			require.NoError(t, err)
+
+			// drop, recreate, and migrate database
+			err = db.Drop()
+			require.NoError(t, err)
+			err = db.Create()
+			require.NoError(t, err)
+			err = db.Migrate()
+			require.NoError(t, err)
+
+			// verify migration
+			sqlDB, err := drv.Open()
+			require.NoError(t, err)
+			defer dbutil.MustClose(sqlDB)
+
+			count := 0
+			err = sqlDB.QueryRow(`select count(*) from schema_migrations
+				where version = '20151129054053'`).Scan(&count)
+			require.NoError(t, err)
+			require.Equal(t, 1, count)
+
+			err = sqlDB.QueryRow("select count(*) from categories").Scan(&count)
+			require.Nil(t, err)
+
+			// rollback
+			db.Limit = 2
+			err = db.Rollback()
+			require.NoError(t, err)
+
+			// verify rollback
+			err = sqlDB.QueryRow("select count(*) from schema_migrations").Scan(&count)
+			require.NoError(t, err)
+			require.Equal(t, 1, count)
+
+			err = sqlDB.QueryRow("select count(*) from posts").Scan(&count)
+			require.NotNil(t, err)
+			require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
+
+			err = sqlDB.QueryRow("select count(*) from categories").Scan(&count)
 			require.NotNil(t, err)
 			require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
 		})
@@ -390,7 +525,7 @@ func TestStatus(t *testing.T) {
 			// two pending
 			results, err := db.CheckMigrationsStatus(drv)
 			require.NoError(t, err)
-			require.Len(t, results, 2)
+			require.Len(t, results, 3)
 			require.False(t, results[0].Applied)
 			require.False(t, results[1].Applied)
 
@@ -398,12 +533,13 @@ func TestStatus(t *testing.T) {
 			err = db.Migrate()
 			require.NoError(t, err)
 
-			// two applied
+			// three applied
 			results, err = db.CheckMigrationsStatus(drv)
 			require.NoError(t, err)
-			require.Len(t, results, 2)
+			require.Len(t, results, 3)
 			require.True(t, results[0].Applied)
 			require.True(t, results[1].Applied)
+			require.True(t, results[2].Applied)
 
 			// rollback last migration
 			err = db.Rollback()
@@ -412,9 +548,10 @@ func TestStatus(t *testing.T) {
 			// one applied, one pending
 			results, err = db.CheckMigrationsStatus(drv)
 			require.NoError(t, err)
-			require.Len(t, results, 2)
+			require.Len(t, results, 3)
 			require.True(t, results[0].Applied)
-			require.False(t, results[1].Applied)
+			require.True(t, results[1].Applied)
+			require.False(t, results[2].Applied)
 		})
 	}
 }
