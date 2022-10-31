@@ -38,6 +38,7 @@ var (
 	ErrCantConnect           = errors.New("unable to connect to database")
 	ErrUnsupportedDriver     = errors.New("unsupported driver")
 	ErrNoMigrationName       = errors.New("please specify a name for the new migration")
+	ErrMigrationSubdirectory = errors.New("please specify a valid folder path for the new migration")
 	ErrMigrationAlreadyExist = errors.New("file already exists")
 	ErrMigrationDirNotFound  = errors.New("could not find migrations directory")
 	ErrMigrationNotFound     = errors.New("can't find migration file")
@@ -59,7 +60,7 @@ type DB struct {
 }
 
 // migrationFileRegexp pattern for valid migration files
-var migrationFileRegexp = regexp.MustCompile(`^\d.*\.sql$`)
+var migrationFileRegexp = regexp.MustCompile(`.*\d.*\.sql$`)
 
 // StatusResult represents an available migration status
 type StatusResult struct {
@@ -254,13 +255,23 @@ func ensureDir(dir string) error {
 const migrationTemplate = "-- migrate:up\n\n\n-- migrate:down\n\n"
 
 // NewMigration creates a new migration file
-func (db *DB) NewMigration(name string) error {
+func (db *DB) NewMigration(name string, subdirectory string) error {
 	// new migration name
 	timestamp := time.Now().UTC().Format("20060102150405")
 	if name == "" {
 		return ErrNoMigrationName
 	}
-	name = fmt.Sprintf("%s_%s.sql", timestamp, name)
+
+	subdirectoryPath := filepath.Join(db.MigrationsDir, subdirectory)
+	_, err := os.Stat(subdirectoryPath)
+	if os.IsNotExist(err) {
+		err := os.MkdirAll(subdirectoryPath, os.ModePerm)
+		if err != nil {
+			return ErrMigrationSubdirectory
+		}
+	}
+
+	name = filepath.Join(subdirectory, fmt.Sprintf("%s_%s.sql", timestamp, name))
 
 	// create migrations dir if missing
 	if err := ensureDir(db.MigrationsDir); err != nil {
@@ -415,23 +426,30 @@ func (db *DB) printVerbose(result sql.Result) {
 }
 
 func findMigrationFiles(dir string, re *regexp.Regexp) ([]string, error) {
-	files, err := os.ReadDir(dir)
+	var files []string
+	// Find files in directory recursively
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		// Removes base directory path from file name
+		fileName := path[len(dir)-1:]
+
+		files = append(files, fileName)
+		return nil
+	})
+
 	if err != nil {
 		return nil, fmt.Errorf("%w `%s`", ErrMigrationDirNotFound, dir)
 	}
 
 	matches := []string{}
-	for _, file := range files {
-		if file.IsDir() {
+	for _, fileName := range files {
+		if !re.MatchString(fileName) {
 			continue
 		}
 
-		name := file.Name()
-		if !re.MatchString(name) {
-			continue
-		}
-
-		matches = append(matches, name)
+		matches = append(matches, fileName)
 	}
 
 	sort.Strings(matches)
@@ -445,7 +463,7 @@ func findMigrationFile(dir string, ver string) (string, error) {
 	}
 
 	ver = regexp.QuoteMeta(ver)
-	re := regexp.MustCompile(fmt.Sprintf(`^%s.*\.sql$`, ver))
+	re := regexp.MustCompile(fmt.Sprintf(`.*%s.*\.sql$`, ver))
 
 	files, err := findMigrationFiles(dir, re)
 	if err != nil {

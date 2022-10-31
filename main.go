@@ -90,7 +90,8 @@ func NewApp() *cli.App {
 			Usage:   "Generate a new migration file",
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
 				name := c.Args().First()
-				return db.NewMigration(name)
+				subdirectory := c.Args().Get(1)
+				return db.NewMigration(name, subdirectory)
 			}),
 		},
 		{
