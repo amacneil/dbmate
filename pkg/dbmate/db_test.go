@@ -13,8 +13,8 @@ import (
 	_ "github.com/amacneil/dbmate/pkg/driver/postgres"
 	_ "github.com/amacneil/dbmate/pkg/driver/sqlite"
 
-	"github.com/kami-zh/go-capturer"
 	"github.com/stretchr/testify/require"
+	"github.com/zenizh/go-capturer"
 )
 
 var testdataDir string
