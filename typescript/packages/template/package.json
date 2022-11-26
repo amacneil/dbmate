@@ -1,0 +1,14 @@
+{
+  "name": "{{name}}",
+  "version": "{{version}}",
+  "description": "The {{jsOS}} {{jsArch}} binary for dbmate",
+  "repository": "https://github.com/amacneil/dbmate",
+  "license": "MIT",
+  "preferUnplugged": true,
+  "os": [
+    "{{jsOS}}"
+  ],
+  "cpu": [
+    "{{jsArch}}"
+  ]
+}

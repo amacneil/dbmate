@@ -52,6 +52,15 @@ For a comparison between dbmate and other popular database schema migration tool
 
 ## Installation
 
+**NPM**
+
+Install using [NPM](https://www.npmjs.com/):
+
+```sh
+$ npm install --save-dev dbmate
+$ npx dbmate --help
+```
+
 **macOS**
 
 Install using [Homebrew](https://brew.sh/):
@@ -62,7 +71,7 @@ $ brew install dbmate
 
 **Linux**
 
-Download the binary directly:
+Install the binary directly:
 
 ```sh
 $ sudo curl -fsSL -o /usr/local/bin/dbmate https://github.com/amacneil/dbmate/releases/latest/download/dbmate-linux-amd64
@@ -95,7 +104,7 @@ $ docker run --rm -it --network=host -v "$(pwd)/db:/db" ghcr.io/amacneil/dbmate 
 
 **Heroku**
 
-To use dbmate on Heroku, the easiest method is to store the linux binary in your git repository:
+To use dbmate on Heroku, either use the NPM method, or store the linux binary in your git repository:
 
 ```sh
 $ mkdir -p bin
@@ -104,12 +113,7 @@ $ chmod +x bin/dbmate
 $ git add bin/dbmate
 $ git commit -m "Add dbmate binary"
 $ git push heroku master
-```
-
-You can then run dbmate on heroku:
-
-```sh
-$ heroku run bin/dbmate up
+$ heroku run bin/dbmate --help
 ```
 
 ## Commands
