@@ -79,7 +79,7 @@ drop table users;
 
 	_, _, err = parseMigrationContents(migration)
 	require.NotNil(t, err)
-	require.Equal(t, "dbmate requires each migration to define an up bock with '-- migrate:up'", err.Error())
+	require.Equal(t, "dbmate requires each migration to define an up block with '-- migrate:up'", err.Error())
 
 	// It allows leading comments and whitespace preceding the migrate blocks
 	migration = `
@@ -128,5 +128,5 @@ ADD COLUMN status status_type DEFAULT 'active';
 
 	_, _, err = parseMigrationContents(migration)
 	require.NotNil(t, err)
-	require.Equal(t, "dbmate requires each migration to define an up bock with '-- migrate:up'", err.Error())
+	require.Equal(t, "dbmate requires each migration to define an up block with '-- migrate:up'", err.Error())
 }

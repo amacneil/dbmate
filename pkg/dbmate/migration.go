@@ -53,7 +53,7 @@ var (
 
 // Error codes
 var (
-	ErrParseMissingUp      = errors.New("dbmate requires each migration to define an up bock with '-- migrate:up'")
+	ErrParseMissingUp      = errors.New("dbmate requires each migration to define an up block with '-- migrate:up'")
 	ErrParseUnexpectedStmt = errors.New("dbmate does not support statements defined outside of the '-- migrate:up' or '-- migrate:down' blocks")
 )
 
