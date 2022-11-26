@@ -1,4 +1,4 @@
 // -*- jsonc -*-
 {
-  "recommendations": ["esbenp.prettier-vscode"]
+  "recommendations": ["esbenp.prettier-vscode", "golang.go"]
 }
