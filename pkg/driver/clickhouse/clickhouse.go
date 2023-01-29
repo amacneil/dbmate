@@ -143,7 +143,7 @@ func (drv *Driver) DropDatabase() error {
 func (drv *Driver) schemaDump(db *sql.DB, buf *bytes.Buffer, databaseName string) error {
 	buf.WriteString("\n--\n-- Database schema\n--\n\n")
 
-	buf.WriteString("CREATE DATABASE " + drv.quoteIdentifier(databaseName) + " IF NOT EXISTS;\n\n")
+	buf.WriteString("CREATE DATABASE IF NOT EXISTS" + drv.quoteIdentifier(databaseName) + ";\n\n")
 
 	tables, err := dbutil.QueryColumn(db, "show tables")
 	if err != nil {
