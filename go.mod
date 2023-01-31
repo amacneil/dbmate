@@ -4,12 +4,12 @@ go 1.19
 
 require (
 	github.com/ClickHouse/clickhouse-go v1.5.4
-	github.com/go-sql-driver/mysql v1.6.0
+	github.com/go-sql-driver/mysql v1.7.0
 	github.com/joho/godotenv v1.4.0
 	github.com/lib/pq v1.10.7
 	github.com/mattn/go-sqlite3 v1.14.16
 	github.com/stretchr/testify v1.8.1
-	github.com/urfave/cli/v2 v2.23.5
+	github.com/urfave/cli/v2 v2.24.2
 	github.com/zenizh/go-capturer v0.0.0-20211219060012-52ea6c8fed04
 )
 
