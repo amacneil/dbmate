@@ -464,7 +464,7 @@ func migrationVersion(filename string) string {
 }
 
 // Rollback rolls back the most recent migration
-func (db *DB) Rollback() error {
+func (db *DB) Rollback(number int) error {
 	drv, err := db.GetDriver()
 	if err != nil {
 		return err
@@ -483,55 +483,52 @@ func (db *DB) Rollback() error {
 	}
 	defer dbutil.MustClose(sqlDB)
 
-	applied, err := drv.SelectMigrations(sqlDB, 1)
+	applied, err := drv.SelectMigrations(sqlDB, number)
 	if err != nil {
 		return err
 	}
 
-	// grab most recent applied migration (applied has len=1)
-	latest := ""
-	for ver := range applied {
-		latest = ver
-	}
-	if latest == "" {
+	if len(applied) == 0 {
 		return ErrNoRollback
 	}
 
-	filename, err := findMigrationFile(db.MigrationsDir, latest)
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprintf(db.Log, "Rolling back: %s\n", filename)
-
-	_, down, err := parseMigration(filepath.Join(db.MigrationsDir, filename))
-	if err != nil {
-		return err
-	}
-
-	execMigration := func(tx dbutil.Transaction) error {
-		// rollback migration
-		result, err := tx.Exec(down.Contents)
+	for ver := range applied {
+		filename, err := findMigrationFile(db.MigrationsDir, ver)
 		if err != nil {
 			return err
-		} else if db.Verbose {
-			db.printVerbose(result)
 		}
 
-		// remove migration record
-		return drv.DeleteMigration(tx, latest)
-	}
+		fmt.Fprintf(db.Log, "Rolling back: %s\n", filename)
 
-	if down.Options.Transaction() {
-		// begin transaction
-		err = doTransaction(sqlDB, execMigration)
-	} else {
-		// run outside of transaction
-		err = execMigration(sqlDB)
-	}
+		_, down, err := parseMigration(filepath.Join(db.MigrationsDir, filename))
+		if err != nil {
+			return err
+		}
 
-	if err != nil {
-		return err
+		execMigration := func(tx dbutil.Transaction) error {
+			// rollback migration
+			result, err := tx.Exec(down.Contents)
+			if err != nil {
+				return err
+			} else if db.Verbose {
+				db.printVerbose(result)
+			}
+
+			// remove migration record
+			return drv.DeleteMigration(tx, ver)
+		}
+
+		if down.Options.Transaction() {
+			// begin transaction
+			err = doTransaction(sqlDB, execMigration)
+		} else {
+			// run outside of transaction
+			err = execMigration(sqlDB)
+		}
+
+		if err != nil {
+			return err
+		}
 	}
 
 	// automatically update schema file, silence errors
