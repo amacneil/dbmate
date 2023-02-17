@@ -189,6 +189,9 @@ func TestSQLiteDumpSchema(t *testing.T) {
 		"  ('abc1'),\n"+
 		"  ('abc2');\n")
 
+	// sqlite_* tables should not be present in the dump (.schema --nosys)
+	require.NotContains(t, string(schema), "sqlite_sequence")
+
 	// DumpSchema should return error if command fails
 	drv.databaseURL = dbutil.MustParseURL(".")
 	schema, err = drv.DumpSchema(db)
