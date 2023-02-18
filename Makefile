@@ -22,6 +22,8 @@ ifeq ($(GOOS),windows)
 	endif
 endif
 
+FLAGS += $(GO_ADDITIONAL_FLAGS)
+
 .PHONY: all
 all: fix build wait test
 

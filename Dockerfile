@@ -20,6 +20,7 @@ RUN curl -fsSL https://raw.githubusercontent.com/golangci/golangci-lint/master/i
 COPY go.* /src/
 RUN go mod download
 COPY . /src/
+ENV GO_ADDITIONAL_FLAGS="-buildvcs=false"
 RUN make build
 
 # release stage
