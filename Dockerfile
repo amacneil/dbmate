@@ -1,6 +1,7 @@
 # development image
 FROM golang:1.19 as dev
 WORKDIR /src
+RUN git config --global --add safe.directory /src
 
 # install database clients
 RUN apt-get update \
