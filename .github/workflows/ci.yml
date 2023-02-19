@@ -154,7 +154,7 @@ jobs:
             type=semver,pattern={{major}}
 
       - name: Publish Docker image
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
         with:
           context: .
