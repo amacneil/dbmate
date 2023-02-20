@@ -205,6 +205,7 @@ func TestClickHouseCreateMigrationsTable(t *testing.T) {
 
 		// use driver function to check the same as above
 		exists, err := drv.MigrationsTableExists(db)
+		require.NoError(t, err)
 		require.Equal(t, false, exists)
 
 		// create table
@@ -243,6 +244,7 @@ func TestClickHouseCreateMigrationsTable(t *testing.T) {
 
 		// use driver function to check the same as above
 		exists, err := drv.MigrationsTableExists(db)
+		require.NoError(t, err)
 		require.Equal(t, false, exists)
 
 		// create table
