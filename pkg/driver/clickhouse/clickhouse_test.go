@@ -203,6 +203,11 @@ func TestClickHouseCreateMigrationsTable(t *testing.T) {
 			"code: 60, message: Table dbmate_test.schema_migrations doesn't exist",
 		)
 
+		// use driver function to check the same as above
+		exists, err := drv.MigrationsTableExists(db)
+		require.NoError(t, err)
+		require.Equal(t, false, exists)
+
 		// create table
 		err = drv.CreateMigrationsTable(db)
 		require.NoError(t, err)
@@ -210,6 +215,11 @@ func TestClickHouseCreateMigrationsTable(t *testing.T) {
 		// migrations table should exist
 		err = db.QueryRow("select count(*) from schema_migrations").Scan(&count)
 		require.NoError(t, err)
+
+		// use driver function to check the same as above
+		exists, err = drv.MigrationsTableExists(db)
+		require.NoError(t, err)
+		require.Equal(t, true, exists)
 
 		// create table should be idempotent
 		err = drv.CreateMigrationsTable(db)
@@ -232,6 +242,11 @@ func TestClickHouseCreateMigrationsTable(t *testing.T) {
 			"code: 60, message: Table dbmate_test.testMigrations doesn't exist",
 		)
 
+		// use driver function to check the same as above
+		exists, err := drv.MigrationsTableExists(db)
+		require.NoError(t, err)
+		require.Equal(t, false, exists)
+
 		// create table
 		err = drv.CreateMigrationsTable(db)
 		require.NoError(t, err)
@@ -239,6 +254,11 @@ func TestClickHouseCreateMigrationsTable(t *testing.T) {
 		// migrations table should exist
 		err = db.QueryRow("select count(*) from \"testMigrations\"").Scan(&count)
 		require.NoError(t, err)
+
+		// use driver function to check the same as above
+		exists, err = drv.MigrationsTableExists(db)
+		require.NoError(t, err)
+		require.Equal(t, true, exists)
 
 		// create table should be idempotent
 		err = drv.CreateMigrationsTable(db)
