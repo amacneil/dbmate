@@ -233,7 +233,7 @@ func (drv *Driver) DatabaseExists() (bool, error) {
 // MigrationsTableExists checks if the schema_migrations table exists
 func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
 	exists := false
-	err := db.QueryRow("EXISTS TABLE $1", drv.quotedMigrationsTableName()).
+	err := db.QueryRow(fmt.Sprintf("EXISTS TABLE %s", drv.quotedMigrationsTableName())).
 		Scan(&exists)
 	if err == sql.ErrNoRows {
 		return false, nil
