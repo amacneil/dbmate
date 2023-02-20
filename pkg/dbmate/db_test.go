@@ -52,21 +52,21 @@ func TestNew(t *testing.T) {
 func TestGetDriver(t *testing.T) {
 	t.Run("missing URL", func(t *testing.T) {
 		db := dbmate.New(nil)
-		drv, err := db.GetDriver()
+		drv, err := db.Driver()
 		require.Nil(t, drv)
 		require.EqualError(t, err, "invalid url, have you set your --url flag or DATABASE_URL environment variable?")
 	})
 
 	t.Run("missing schema", func(t *testing.T) {
 		db := dbmate.New(dbutil.MustParseURL("//hi"))
-		drv, err := db.GetDriver()
+		drv, err := db.Driver()
 		require.Nil(t, drv)
 		require.EqualError(t, err, "invalid url, have you set your --url flag or DATABASE_URL environment variable?")
 	})
 
 	t.Run("invalid driver", func(t *testing.T) {
 		db := dbmate.New(dbutil.MustParseURL("foo://bar"))
-		drv, err := db.GetDriver()
+		drv, err := db.Driver()
 		require.EqualError(t, err, "unsupported driver: foo")
 		require.Nil(t, drv)
 	})
@@ -260,7 +260,7 @@ func TestMigrate(t *testing.T) {
 	for _, u := range testURLs() {
 		t.Run(u.Scheme, func(t *testing.T) {
 			db := newTestDB(t, u)
-			drv, err := db.GetDriver()
+			drv, err := db.Driver()
 			require.NoError(t, err)
 
 			// drop and recreate database
@@ -295,7 +295,7 @@ func TestUp(t *testing.T) {
 	for _, u := range testURLs() {
 		t.Run(u.Scheme, func(t *testing.T) {
 			db := newTestDB(t, u)
-			drv, err := db.GetDriver()
+			drv, err := db.Driver()
 			require.NoError(t, err)
 
 			// drop database
@@ -328,7 +328,7 @@ func TestRollback(t *testing.T) {
 	for _, u := range testURLs() {
 		t.Run(u.Scheme, func(t *testing.T) {
 			db := newTestDB(t, u)
-			drv, err := db.GetDriver()
+			drv, err := db.Driver()
 			require.NoError(t, err)
 
 			// drop, recreate, and migrate database
@@ -373,7 +373,7 @@ func TestStatus(t *testing.T) {
 	for _, u := range testURLs() {
 		t.Run(u.Scheme, func(t *testing.T) {
 			db := newTestDB(t, u)
-			drv, err := db.GetDriver()
+			drv, err := db.Driver()
 			require.NoError(t, err)
 
 			// drop, recreate, and migrate database
@@ -388,7 +388,7 @@ func TestStatus(t *testing.T) {
 			defer dbutil.MustClose(sqlDB)
 
 			// two pending
-			results, err := db.CheckMigrationsStatus(drv)
+			results, err := db.CheckMigrationsStatus()
 			require.NoError(t, err)
 			require.Len(t, results, 2)
 			require.False(t, results[0].Applied)
@@ -402,7 +402,7 @@ func TestStatus(t *testing.T) {
 			require.NoError(t, err)
 
 			// two applied
-			results, err = db.CheckMigrationsStatus(drv)
+			results, err = db.CheckMigrationsStatus()
 			require.NoError(t, err)
 			require.Len(t, results, 2)
 			require.True(t, results[0].Applied)
@@ -413,7 +413,7 @@ func TestStatus(t *testing.T) {
 			require.NoError(t, err)
 
 			// one applied, one pending
-			results, err = db.CheckMigrationsStatus(drv)
+			results, err = db.CheckMigrationsStatus()
 			require.NoError(t, err)
 			require.Len(t, results, 2)
 			require.True(t, results[0].Applied)

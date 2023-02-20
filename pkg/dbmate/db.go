@@ -15,21 +15,6 @@ import (
 	"github.com/amacneil/dbmate/pkg/dbutil"
 )
 
-// DefaultMigrationsDir specifies default directory to find migration files
-const DefaultMigrationsDir = "./db/migrations"
-
-// DefaultMigrationsTableName specifies default database tables to record migraitons in
-const DefaultMigrationsTableName = "schema_migrations"
-
-// DefaultSchemaFile specifies default location for schema.sql
-const DefaultSchemaFile = "./db/schema.sql"
-
-// DefaultWaitInterval specifies length of time between connection attempts
-const DefaultWaitInterval = time.Second
-
-// DefaultWaitTimeout specifies maximum time for connection attempts
-const DefaultWaitTimeout = 60 * time.Second
-
 // Error codes
 var (
 	ErrNoMigrationFiles      = errors.New("no migration files found")
@@ -44,22 +29,32 @@ var (
 	ErrCreateDirectory       = errors.New("unable to create directory")
 )
 
-// DB allows dbmate actions to be performed on a specified database
-type DB struct {
-	AutoDumpSchema      bool
-	DatabaseURL         *url.URL
-	MigrationsDir       string
-	MigrationsTableName string
-	SchemaFile          string
-	Verbose             bool
-	WaitBefore          bool
-	WaitInterval        time.Duration
-	WaitTimeout         time.Duration
-	Log                 io.Writer
-}
-
 // migrationFileRegexp pattern for valid migration files
 var migrationFileRegexp = regexp.MustCompile(`^\d.*\.sql$`)
+
+// DB allows dbmate actions to be performed on a specified database
+type DB struct {
+	// AutoDumpSchema generates schema.sql after each action
+	AutoDumpSchema bool
+	// DatabaseURL is the database connection string
+	DatabaseURL *url.URL
+	// Log is the interface to write stdout
+	Log io.Writer
+	// MigrationsDir specifies the directory to find migration files
+	MigrationsDir string
+	// MigrationsTableName specifies the database table to record migrations in
+	MigrationsTableName string
+	// SchemaFile specifies the location for schema.sql file
+	SchemaFile string
+	// Verbose prints the result of each statement execution
+	Verbose bool
+	// WaitBefore will wait for database to become available before running any actions
+	WaitBefore bool
+	// WaitInterval specifies length of time between connection attempts
+	WaitInterval time.Duration
+	// WaitTimeout specifies maximum time for connection attempts
+	WaitTimeout time.Duration
+}
 
 // StatusResult represents an available migration status
 type StatusResult struct {
@@ -72,18 +67,18 @@ func New(databaseURL *url.URL) *DB {
 	return &DB{
 		AutoDumpSchema:      true,
 		DatabaseURL:         databaseURL,
-		MigrationsDir:       DefaultMigrationsDir,
-		MigrationsTableName: DefaultMigrationsTableName,
-		SchemaFile:          DefaultSchemaFile,
+		MigrationsDir:       "./db/migrations",
+		MigrationsTableName: "schema_migrations",
+		SchemaFile:          "./db/schema.sql",
 		WaitBefore:          false,
-		WaitInterval:        DefaultWaitInterval,
-		WaitTimeout:         DefaultWaitTimeout,
+		WaitInterval:        time.Second,
+		WaitTimeout:         60 * time.Second,
 		Log:                 os.Stdout,
 	}
 }
 
-// GetDriver initializes the appropriate database driver
-func (db *DB) GetDriver() (Driver, error) {
+// Driver initializes the appropriate database driver
+func (db *DB) Driver() (Driver, error) {
 	if db.DatabaseURL == nil || db.DatabaseURL.Scheme == "" {
 		return nil, ErrInvalidURL
 	}
@@ -95,22 +90,18 @@ func (db *DB) GetDriver() (Driver, error) {
 
 	config := DriverConfig{
 		DatabaseURL:         db.DatabaseURL,
-		MigrationsTableName: db.MigrationsTableName,
 		Log:                 db.Log,
+		MigrationsTableName: db.MigrationsTableName,
+	}
+	drv := driverFunc(config)
+
+	if db.WaitBefore {
+		if err := db.wait(drv); err != nil {
+			return nil, err
+		}
 	}
 
-	return driverFunc(config), nil
-}
-
-// Wait blocks until the database server is available. It does not verify that
-// the specified database exists, only that the host is ready to accept connections.
-func (db *DB) Wait() error {
-	drv, err := db.GetDriver()
-	if err != nil {
-		return err
-	}
-
-	return db.wait(drv)
+	return drv, nil
 }
 
 func (db *DB) wait(drv Driver) error {
@@ -140,18 +131,23 @@ func (db *DB) wait(drv Driver) error {
 	return fmt.Errorf("%w: %s", ErrCantConnect, err)
 }
 
-// CreateAndMigrate creates the database (if necessary) and runs migrations
-func (db *DB) CreateAndMigrate() error {
-	drv, err := db.GetDriver()
+// Wait blocks until the database server is available. It does not verify that
+// the specified database exists, only that the host is ready to accept connections.
+func (db *DB) Wait() error {
+	drv, err := db.Driver()
 	if err != nil {
 		return err
 	}
 
-	if db.WaitBefore {
-		err := db.wait(drv)
-		if err != nil {
-			return err
-		}
+	// if db.WaitBefore is true, wait() will get called twice, no harm
+	return db.wait(drv)
+}
+
+// CreateAndMigrate creates the database (if necessary) and runs migrations
+func (db *DB) CreateAndMigrate() error {
+	drv, err := db.Driver()
+	if err != nil {
+		return err
 	}
 
 	// create database if it does not already exist
@@ -165,21 +161,14 @@ func (db *DB) CreateAndMigrate() error {
 	}
 
 	// migrate
-	return db.migrate(drv)
+	return db.Migrate()
 }
 
 // Create creates the current database
 func (db *DB) Create() error {
-	drv, err := db.GetDriver()
+	drv, err := db.Driver()
 	if err != nil {
 		return err
-	}
-
-	if db.WaitBefore {
-		err := db.wait(drv)
-		if err != nil {
-			return err
-		}
 	}
 
 	return drv.CreateDatabase()
@@ -187,16 +176,9 @@ func (db *DB) Create() error {
 
 // Drop drops the current database (if it exists)
 func (db *DB) Drop() error {
-	drv, err := db.GetDriver()
+	drv, err := db.Driver()
 	if err != nil {
 		return err
-	}
-
-	if db.WaitBefore {
-		err := db.wait(drv)
-		if err != nil {
-			return err
-		}
 	}
 
 	return drv.DropDatabase()
@@ -204,20 +186,9 @@ func (db *DB) Drop() error {
 
 // DumpSchema writes the current database schema to a file
 func (db *DB) DumpSchema() error {
-	drv, err := db.GetDriver()
+	drv, err := db.Driver()
 	if err != nil {
 		return err
-	}
-
-	return db.dumpSchema(drv)
-}
-
-func (db *DB) dumpSchema(drv Driver) error {
-	if db.WaitBefore {
-		err := db.wait(drv)
-		if err != nil {
-			return err
-		}
 	}
 
 	sqlDB, err := db.openDatabaseForMigration(drv)
@@ -319,15 +290,6 @@ func (db *DB) openDatabaseForMigration(drv Driver) (*sql.DB, error) {
 
 // Migrate migrates database to the latest version
 func (db *DB) Migrate() error {
-	drv, err := db.GetDriver()
-	if err != nil {
-		return err
-	}
-
-	return db.migrate(drv)
-}
-
-func (db *DB) migrate(drv Driver) error {
 	files, err := findMigrationFiles(db.MigrationsDir, migrationFileRegexp)
 	if err != nil {
 		return err
@@ -337,11 +299,9 @@ func (db *DB) migrate(drv Driver) error {
 		return ErrNoMigrationFiles
 	}
 
-	if db.WaitBefore {
-		err := db.wait(drv)
-		if err != nil {
-			return err
-		}
+	drv, err := db.Driver()
+	if err != nil {
+		return err
 	}
 
 	sqlDB, err := db.openDatabaseForMigration(drv)
@@ -397,7 +357,7 @@ func (db *DB) migrate(drv Driver) error {
 
 	// automatically update schema file, silence errors
 	if db.AutoDumpSchema {
-		_ = db.dumpSchema(drv)
+		_ = db.DumpSchema()
 	}
 
 	return nil
@@ -465,16 +425,9 @@ func migrationVersion(filename string) string {
 
 // Rollback rolls back the most recent migration
 func (db *DB) Rollback() error {
-	drv, err := db.GetDriver()
+	drv, err := db.Driver()
 	if err != nil {
 		return err
-	}
-
-	if db.WaitBefore {
-		err := db.wait(drv)
-		if err != nil {
-			return err
-		}
 	}
 
 	sqlDB, err := db.openDatabaseForMigration(drv)
@@ -536,7 +489,7 @@ func (db *DB) Rollback() error {
 
 	// automatically update schema file, silence errors
 	if db.AutoDumpSchema {
-		_ = db.dumpSchema(drv)
+		_ = db.DumpSchema()
 	}
 
 	return nil
@@ -544,12 +497,7 @@ func (db *DB) Rollback() error {
 
 // Status shows the status of all migrations
 func (db *DB) Status(quiet bool) (int, error) {
-	drv, err := db.GetDriver()
-	if err != nil {
-		return -1, err
-	}
-
-	results, err := db.CheckMigrationsStatus(drv)
+	results, err := db.CheckMigrationsStatus()
 	if err != nil {
 		return -1, err
 	}
@@ -580,7 +528,12 @@ func (db *DB) Status(quiet bool) (int, error) {
 }
 
 // CheckMigrationsStatus returns the status of all available mgirations
-func (db *DB) CheckMigrationsStatus(drv Driver) ([]StatusResult, error) {
+func (db *DB) CheckMigrationsStatus() ([]StatusResult, error) {
+	drv, err := db.Driver()
+	if err != nil {
+		return nil, err
+	}
+
 	files, err := findMigrationFiles(db.MigrationsDir, migrationFileRegexp)
 	if err != nil {
 		return nil, err
