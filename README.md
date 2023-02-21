@@ -1,13 +1,14 @@
 # Dbmate
 
-[![Version](https://img.shields.io/github/release/amacneil/dbmate.svg)](https://github.com/amacneil/dbmate/releases)
+[![Release](https://img.shields.io/github/release/amacneil/dbmate.svg)](https://github.com/amacneil/dbmate/releases)
 [![Go Report](https://goreportcard.com/badge/github.com/amacneil/dbmate)](https://goreportcard.com/report/github.com/amacneil/dbmate)
+[![Reference](https://img.shields.io/badge/go.dev-reference-blue?logo=go&logoColor=white)](https://pkg.go.dev/github.com/amacneil/dbmate/pkg/dbmate)
 
-Dbmate is a database migration tool, to keep your database schema in sync across multiple developers and your production servers.
+Dbmate is a database migration tool that will keep your database schema in sync across multiple developers and your production servers.
 
-It is a standalone command line tool, which can be used with Go, Node.js, Python, Ruby, PHP, or any other language or framework you are using to write database-backed applications. This is especially helpful if you are writing many services in different languages, and want to maintain some sanity with consistent development tools.
+It is a standalone command line tool that can be used with Go, Node.js, Python, Ruby, PHP, or any other language or framework you are using to write database-backed applications. This is especially helpful if you are writing multiple services in different languages, and want to maintain some sanity with consistent development tools.
 
-For a comparison between dbmate and other popular database schema migration tools, please see the [Alternatives](#alternatives) table.
+For a comparison between dbmate and other popular database schema migration tools, please see [Alternatives](#alternatives).
 
 ## Table of Contents
 
@@ -27,8 +28,13 @@ For a comparison between dbmate and other popular database schema migration tool
   - [Migration Options](#migration-options)
   - [Waiting For The Database](#waiting-for-the-database)
   - [Exporting Schema File](#exporting-schema-file)
-- [Internals](#internals)
-  - [schema_migrations table](#schema_migrations-table)
+- [Library](#library)
+  - [Use dbmate as a library](#use-dbmate-as-a-library)
+  - [Embedding migrations](#embedding-migrations)
+- [Concepts](#concepts)
+  - [Migration files](#migration-files)
+  - [Schema file](#schema-file)
+  - [Schema migrations table](#schema-migrations-table)
 - [Alternatives](#alternatives)
 - [Contributing](#contributing)
 
@@ -48,7 +54,7 @@ For a comparison between dbmate and other popular database schema migration tool
 
 **macOS**
 
-Install using Homebrew:
+Install using [Homebrew](https://brew.sh/):
 
 ```sh
 $ brew install dbmate
@@ -65,7 +71,7 @@ $ sudo chmod +x /usr/local/bin/dbmate
 
 **Windows**
 
-Download using [scoop](https://scoop.sh)
+Install using [Scoop](https://scoop.sh)
 
 ```pwsh
 scoop install dbmate
@@ -78,13 +84,13 @@ Docker images are published to both Docker Hub ([`amacneil/dbmate`](https://hub.
 Remember to set `--network=host` or see [this comment](https://github.com/amacneil/dbmate/issues/128#issuecomment-615924611) for more tips on using dbmate with docker networking):
 
 ```sh
-$ docker run --rm -it --network=host ghcr.io/amacneil/dbmate:1 --help
+$ docker run --rm -it --network=host ghcr.io/amacneil/dbmate --help
 ```
 
 If you wish to create or apply migrations, you will need to use Docker's [bind mount](https://docs.docker.com/storage/bind-mounts/) feature to make your local working directory (`pwd`) available inside the dbmate container:
 
 ```sh
-$ docker run --rm -it --network=host -v "$(pwd)/db:/db" ghcr.io/amacneil/dbmate:1 new create_users_table
+$ docker run --rm -it --network=host -v "$(pwd)/db:/db" ghcr.io/amacneil/dbmate new create_users_table
 ```
 
 **Heroku**
@@ -126,14 +132,14 @@ dbmate wait      # wait for the database server to become available
 
 The following options are available with all commands. You must use command line arguments in the order `dbmate [global options] command [command options]`. Most options can also be configured via environment variables (and loaded from your `.env` file, which is helpful to share configuration between team members).
 
-- `--url, -u "protocol://host:port/dbname"` - specify the database url directly. _(env: `$DATABASE_URL`)_
+- `--url, -u "protocol://host:port/dbname"` - specify the database url directly. _(env: `DATABASE_URL`)_
 - `--env, -e "DATABASE_URL"` - specify an environment variable to read the database connection URL from.
-- `--migrations-dir, -d "./db/migrations"` - where to keep the migration files. _(env: `$DBMATE_MIGRATIONS_DIR`)_
-- `--migrations-table "schema_migrations"` - database table to record migrations in. _(env: `$DBMATE_MIGRATIONS_TABLE`)_
-- `--schema-file, -s "./db/schema.sql"` - a path to keep the schema.sql file. _(env: `$DBMATE_SCHEMA_FILE`)_
-- `--no-dump-schema` - don't auto-update the schema.sql file on migrate/rollback _(env: `$DBMATE_NO_DUMP_SCHEMA`)_
-- `--wait` - wait for the db to become available before executing the subsequent command _(env: `$DBMATE_WAIT`)_
-- `--wait-timeout 60s` - timeout for --wait flag _(env: `$DBMATE_WAIT_TIMEOUT`)_
+- `--migrations-dir, -d "./db/migrations"` - where to keep the migration files. _(env: `DBMATE_MIGRATIONS_DIR`)_
+- `--migrations-table "schema_migrations"` - database table to record migrations in. _(env: `DBMATE_MIGRATIONS_TABLE`)_
+- `--schema-file, -s "./db/schema.sql"` - a path to keep the schema.sql file. _(env: `DBMATE_SCHEMA_FILE`)_
+- `--no-dump-schema` - don't auto-update the schema.sql file on migrate/rollback _(env: `DBMATE_NO_DUMP_SCHEMA`)_
+- `--wait` - wait for the db to become available before executing the subsequent command _(env: `DBMATE_WAIT`)_
+- `--wait-timeout 60s` - timeout for --wait flag _(env: `DBMATE_WAIT_TIMEOUT`)_
 
 ## Usage
 
@@ -386,11 +392,111 @@ On Ubuntu or Debian systems, you can fix this by installing `postgresql-client`,
 
 > Note: The `schema.sql` file will contain a complete schema for your database, even if some tables or columns were created outside of dbmate migrations.
 
-## Internals
+## Library
 
-### schema_migrations table
+### Use dbmate as a library
 
-By default, dbmate stores a record of each applied migration in a `schema_migrations` table. This table will be created for you automatically if it does not already exist. The table schema is very simple:
+Dbmate is designed to be used as a CLI with any language or framework, but it can also be used as a library in a Go application.
+
+Here is a simple example. Remember to import the driver you need!
+
+```go
+package main
+
+import (
+	"net/url"
+
+	"github.com/amacneil/dbmate/pkg/dbmate"
+	_ "github.com/amacneil/dbmate/pkg/driver/sqlite"
+)
+
+func main() {
+	u, _ := url.Parse("sqlite:foo.sqlite3")
+	db := dbmate.New(u)
+
+	err := db.CreateAndMigrate()
+	if err != nil {
+		panic(err)
+	}
+}
+```
+
+See the [reference documentation](https://pkg.go.dev/github.com/amacneil/dbmate/pkg/dbmate) for more options.
+
+### Embedding migrations
+
+Migrations can be embedded into your application binary using Go's [embed](https://pkg.go.dev/embed) functionality.
+
+Use `db.FS` to specify the filesystem used for reading migrations:
+
+```go
+package main
+
+import (
+	"embed"
+	"fmt"
+	"net/url"
+
+	"github.com/amacneil/dbmate/pkg/dbmate"
+	_ "github.com/amacneil/dbmate/pkg/driver/sqlite"
+)
+
+//go:embed db/migrations/*.sql
+var fs embed.FS
+
+func main() {
+	u, _ := url.Parse("sqlite:foo.sqlite3")
+	db := dbmate.New(u)
+	db.FS = fs
+
+	fmt.Println("Migrations:")
+	migrations, err := db.FindMigrations()
+	if err != nil {
+		panic(err)
+	}
+	for _, m := range migrations {
+		fmt.Println(m.Version, m.FilePath)
+	}
+
+	fmt.Println("\nApplying...")
+	err = db.CreateAndMigrate()
+	if err != nil {
+		panic(err)
+	}
+}
+```
+
+## Concepts
+
+### Migration files
+
+Migration files are very simple, and are stored in `./db/migrations` by default. You can create a new migration file named `[date]_create_users.sql` by running `dbmate new create_users`.
+Here is an example:
+
+```sql
+-- migrate:up
+create table users (
+  id integer,
+  name varchar(255),
+);
+
+-- migrate:down
+drop table if exists users;
+```
+
+Both up and down migrations are stored in the same file, for ease of editing. When you apply a migration dbmate only stores the version number, not the contents, so you should always rollback a migration before modifying its contents. For this reason, you can safely rename a migration file without affecting its applied status, as long as you keep the version number intact.
+
+### Schema file
+
+The schema file is written to `./db/schema.sql` by default. It is a complete dump of your database schema, including any applied migrations, and any other modifications you have made.
+
+This file should be checked in to source control, so that you can easily compare the diff of a migration. You can use the schema file to quickly restore your database without needing to run all migrations.
+
+### Schema migrations table
+
+Dbmate stores a record of each applied migration in table named `schema_migrations`. This table will be created for you automatically if it does not already exist.
+
+The table is very simple:
 
 ```sql
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -398,9 +504,7 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 )
 ```
 
-Dbmate records only the version number of applied migrations, so you can safely rename a migration file without affecting its applied status.
-
-You can customize the name of this table using the `--migrations-table` flag or `$DBMATE_MIGRATIONS_TABLE` environment variable. If you already have a table with this name (possibly from a previous migration tool), you should either manually update it to conform to this schema, or configure dbmate to use a different table name.
+You can customize the name of this table using the `--migrations-table` flag or `DBMATE_MIGRATIONS_TABLE` environment variable.
 
 ## Alternatives
 
