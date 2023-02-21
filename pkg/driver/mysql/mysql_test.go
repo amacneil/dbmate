@@ -149,36 +149,36 @@ func TestMySQLDumpArgs(t *testing.T) {
 	drv := testMySQLDriver(t)
 	drv.databaseURL = dbutil.MustParseURL("mysql://bob/mydb")
 
-	require.Equal(t,[]string {"--opt",
-	"--routines",
-	"--no-data",
-	"--skip-dump-date",
-	"--skip-add-drop-table",
-	"--host=bob",
-	"mydb"}, drv.mysqldumpArgs())
+	require.Equal(t, []string{"--opt",
+		"--routines",
+		"--no-data",
+		"--skip-dump-date",
+		"--skip-add-drop-table",
+		"--host=bob",
+		"mydb"}, drv.mysqldumpArgs())
 
 	drv.databaseURL = dbutil.MustParseURL("mysql://alice:pw@bob:5678/mydb")
-	require.Equal(t,[]string {"--opt",
-	"--routines",
-	"--no-data",
-	"--skip-dump-date",
-	"--skip-add-drop-table",
-	"--host=bob",
-	"--port=5678",
-	"--user=alice",
-	"--password=pw",
-	"mydb"}, drv.mysqldumpArgs())
+	require.Equal(t, []string{"--opt",
+		"--routines",
+		"--no-data",
+		"--skip-dump-date",
+		"--skip-add-drop-table",
+		"--host=bob",
+		"--port=5678",
+		"--user=alice",
+		"--password=pw",
+		"mydb"}, drv.mysqldumpArgs())
 
 	drv.databaseURL = dbutil.MustParseURL("mysql://alice:pw@bob:5678/mydb?socket=/var/run/mysqld/mysqld.sock")
-	require.Equal(t,[]string {"--opt",
-	"--routines",
-	"--no-data",
-	"--skip-dump-date",
-	"--skip-add-drop-table",
-	"--socket=/var/run/mysqld/mysqld.sock",
-	"--user=alice",
-	"--password=pw",
-	"mydb"}, drv.mysqldumpArgs())
+	require.Equal(t, []string{"--opt",
+		"--routines",
+		"--no-data",
+		"--skip-dump-date",
+		"--skip-add-drop-table",
+		"--socket=/var/run/mysqld/mysqld.sock",
+		"--user=alice",
+		"--password=pw",
+		"mydb"}, drv.mysqldumpArgs())
 }
 
 func TestMySQLDumpSchema(t *testing.T) {
