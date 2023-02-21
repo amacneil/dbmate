@@ -143,7 +143,7 @@ func (drv *Driver) DropDatabase() error {
 func (drv *Driver) schemaDump(db *sql.DB, buf *bytes.Buffer, databaseName string) error {
 	buf.WriteString("\n--\n-- Database schema\n--\n\n")
 
-	buf.WriteString("CREATE DATABASE " + drv.quoteIdentifier(databaseName) + " IF NOT EXISTS;\n\n")
+	buf.WriteString("CREATE DATABASE IF NOT EXISTS" + drv.quoteIdentifier(databaseName) + ";\n\n")
 
 	tables, err := dbutil.QueryColumn(db, "show tables")
 	if err != nil {
@@ -222,6 +222,18 @@ func (drv *Driver) DatabaseExists() (bool, error) {
 
 	exists := false
 	err = db.QueryRow("SELECT 1 FROM system.databases where name = ?", name).
+		Scan(&exists)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+
+	return exists, err
+}
+
+// MigrationsTableExists checks if the schema_migrations table exists
+func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
+	exists := false
+	err := db.QueryRow(fmt.Sprintf("EXISTS TABLE %s", drv.quotedMigrationsTableName())).
 		Scan(&exists)
 	if err == sql.ErrNoRows {
 		return false, nil

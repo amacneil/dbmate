@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: "🙋‍♀️ Question"
+    url: https://github.com/amacneil/dbmate/discussions
+    about: Search discussions or ask our community for help
+  - name: "🚀 Feature request"
+    url: https://github.com/amacneil/dbmate/discussions
+    about: Search existing feature requests or share a new idea

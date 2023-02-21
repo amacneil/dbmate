@@ -14,7 +14,7 @@ import (
 
 func testMySQLDriver(t *testing.T) *Driver {
 	u := dbutil.MustParseURL(os.Getenv("MYSQL_TEST_URL"))
-	drv, err := dbmate.New(u).GetDriver()
+	drv, err := dbmate.New(u).Driver()
 	require.NoError(t, err)
 
 	return drv.(*Driver)
@@ -40,7 +40,7 @@ func prepTestMySQLDB(t *testing.T) *sql.DB {
 
 func TestGetDriver(t *testing.T) {
 	db := dbmate.New(dbutil.MustParseURL("mysql://"))
-	drvInterface, err := db.GetDriver()
+	drvInterface, err := db.Driver()
 	require.NoError(t, err)
 
 	// driver should have URL and default migrations table set
@@ -217,6 +217,34 @@ func TestMySQLDumpSchema(t *testing.T) {
 	require.Nil(t, schema)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "Unknown database 'fakedb'")
+}
+
+func TestMySQLDumpSchemaContainsNoAutoIncrement(t *testing.T) {
+	drv := testMySQLDriver(t)
+
+	db := prepTestMySQLDB(t)
+	defer dbutil.MustClose(db)
+	err := drv.CreateMigrationsTable(db)
+	require.NoError(t, err)
+
+	// create table with AUTO_INCREMENT column
+	_, err = db.Exec(`create table foo_table (id int not null primary key auto_increment)`)
+	require.NoError(t, err)
+
+	// create a record
+	_, err = db.Exec(`insert into foo_table values ()`)
+	require.NoError(t, err)
+
+	// AUTO_INCREMENT should appear on the table definition
+	var tblName, tblCreate string
+	err = db.QueryRow(`show create table foo_table`).Scan(&tblName, &tblCreate)
+	require.NoError(t, err)
+	require.Contains(t, tblCreate, "AUTO_INCREMENT=")
+
+	// AUTO_INCREMENT should not appear in the dump
+	schema, err := drv.DumpSchema(db)
+	require.NoError(t, err)
+	require.NotContains(t, string(schema), "AUTO_INCREMENT=")
 }
 
 func TestMySQLDatabaseExists(t *testing.T) {

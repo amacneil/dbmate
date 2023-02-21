@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/amacneil/dbmate/pkg/dbmate"
@@ -196,7 +197,17 @@ func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
 	}
 
 	schema = append(schema, migrations...)
-	return dbutil.TrimLeadingSQLComments(schema)
+	schema, err = dbutil.TrimLeadingSQLComments(schema)
+	if err != nil {
+		return nil, err
+	}
+	return trimAutoincrementValues(schema), nil
+}
+
+// trimAutoincrementValues removes AUTO_INCREMENT values from MySQL schema dumps
+func trimAutoincrementValues(data []byte) []byte {
+	aiPattern := regexp.MustCompile(" AUTO_INCREMENT=[0-9]*")
+	return aiPattern.ReplaceAll(data, []byte(""))
 }
 
 // DatabaseExists determines whether the database exists
@@ -217,6 +228,19 @@ func (drv *Driver) DatabaseExists() (bool, error) {
 	}
 
 	return exists, err
+}
+
+// MigrationsTableExists checks if the schema_migrations table exists
+func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
+	match := ""
+	err := db.QueryRow(fmt.Sprintf("SHOW TABLES LIKE \"%s\"",
+		drv.migrationsTableName)).
+		Scan(&match)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+
+	return match != "", err
 }
 
 // CreateMigrationsTable creates the schema_migrations table

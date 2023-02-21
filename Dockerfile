@@ -1,6 +1,7 @@
 # development image
-FROM golang:1.17 as dev
+FROM golang:1.19 as dev
 WORKDIR /src
+RUN git config --global --add safe.directory /src
 
 # install database clients
 RUN apt-get update \
@@ -14,7 +15,7 @@ RUN apt-get update \
 
 # golangci-lint
 RUN curl -fsSL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
-	| sh -s -- -b /usr/local/bin v1.43.0
+	| sh -s -- -b /usr/local/bin v1.50.1
 
 # download modules
 COPY go.* /src/
@@ -26,6 +27,7 @@ RUN make build
 FROM alpine as release
 RUN apk add --no-cache \
 	mariadb-client \
+	mariadb-connector-c \
 	postgresql-client \
 	sqlite \
 	tzdata

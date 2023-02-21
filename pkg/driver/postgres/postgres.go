@@ -48,7 +48,7 @@ func connectionString(u *url.URL) string {
 	}
 
 	// default hostname
-	if hostname == "" {
+	if hostname == "" && query.Get("host") == "" {
 		switch runtime.GOOS {
 		case "linux":
 			query.Set("host", "/var/run/postgresql")
@@ -211,6 +211,26 @@ func (drv *Driver) DatabaseExists() (bool, error) {
 
 	exists := false
 	err = db.QueryRow("select true from pg_database where datname = $1", name).
+		Scan(&exists)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+
+	return exists, err
+}
+
+// MigrationsTableExists checks if the schema_migrations table exists
+func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
+	schema, migrationsTable, err := drv.quotedMigrationsTableNameParts(db)
+	if err != nil {
+		return false, err
+	}
+
+	exists := false
+	err = db.QueryRow("SELECT 1 FROM information_schema.tables "+
+		"WHERE  table_schema = $1 "+
+		"AND    table_name   = $2",
+		schema, migrationsTable).
 		Scan(&exists)
 	if err == sql.ErrNoRows {
 		return false, nil

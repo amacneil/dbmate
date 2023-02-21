@@ -11,10 +11,6 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/amacneil/dbmate/pkg/dbmate"
-	_ "github.com/amacneil/dbmate/pkg/driver/clickhouse"
-	_ "github.com/amacneil/dbmate/pkg/driver/mysql"
-	_ "github.com/amacneil/dbmate/pkg/driver/postgres"
-	_ "github.com/amacneil/dbmate/pkg/driver/sqlite"
 )
 
 func main() {
@@ -37,6 +33,7 @@ func NewApp() *cli.App {
 	app.Usage = "A lightweight, framework-independent database migration tool."
 	app.Version = dbmate.Version
 
+	defaultDB := dbmate.New(nil)
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
 			Name:    "url",
@@ -53,20 +50,20 @@ func NewApp() *cli.App {
 			Name:    "migrations-dir",
 			Aliases: []string{"d"},
 			EnvVars: []string{"DBMATE_MIGRATIONS_DIR"},
-			Value:   dbmate.DefaultMigrationsDir,
+			Value:   defaultDB.MigrationsDir,
 			Usage:   "specify the directory containing migration files",
 		},
 		&cli.StringFlag{
 			Name:    "migrations-table",
 			EnvVars: []string{"DBMATE_MIGRATIONS_TABLE"},
-			Value:   dbmate.DefaultMigrationsTableName,
+			Value:   defaultDB.MigrationsTableName,
 			Usage:   "specify the database table to record migrations in",
 		},
 		&cli.StringFlag{
 			Name:    "schema-file",
 			Aliases: []string{"s"},
 			EnvVars: []string{"DBMATE_SCHEMA_FILE"},
-			Value:   dbmate.DefaultSchemaFile,
+			Value:   defaultDB.SchemaFile,
 			Usage:   "specify the schema file location",
 		},
 		&cli.BoolFlag{
@@ -83,7 +80,7 @@ func NewApp() *cli.App {
 			Name:    "wait-timeout",
 			EnvVars: []string{"DBMATE_WAIT_TIMEOUT"},
 			Usage:   "timeout for --wait flag",
-			Value:   dbmate.DefaultWaitTimeout,
+			Value:   defaultDB.WaitTimeout,
 		},
 	}
 
@@ -235,9 +232,9 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 		db.MigrationsTableName = c.String("migrations-table")
 		db.SchemaFile = c.String("schema-file")
 		db.WaitBefore = c.Bool("wait")
-		overrideTimeout := c.Duration("wait-timeout")
-		if overrideTimeout != 0 {
-			db.WaitTimeout = overrideTimeout
+		waitTimeout := c.Duration("wait-timeout")
+		if waitTimeout != 0 {
+			db.WaitTimeout = waitTimeout
 		}
 
 		return f(db, c)

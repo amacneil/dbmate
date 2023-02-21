@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/amacneil/dbmate/pkg/dbmate"
@@ -13,8 +14,8 @@ import (
 	_ "github.com/amacneil/dbmate/pkg/driver/postgres"
 	_ "github.com/amacneil/dbmate/pkg/driver/sqlite"
 
-	"github.com/kami-zh/go-capturer"
 	"github.com/stretchr/testify/require"
+	"github.com/zenizh/go-capturer"
 )
 
 var testdataDir string
@@ -52,21 +53,21 @@ func TestNew(t *testing.T) {
 func TestGetDriver(t *testing.T) {
 	t.Run("missing URL", func(t *testing.T) {
 		db := dbmate.New(nil)
-		drv, err := db.GetDriver()
+		drv, err := db.Driver()
 		require.Nil(t, drv)
 		require.EqualError(t, err, "invalid url, have you set your --url flag or DATABASE_URL environment variable?")
 	})
 
 	t.Run("missing schema", func(t *testing.T) {
 		db := dbmate.New(dbutil.MustParseURL("//hi"))
-		drv, err := db.GetDriver()
+		drv, err := db.Driver()
 		require.Nil(t, drv)
 		require.EqualError(t, err, "invalid url, have you set your --url flag or DATABASE_URL environment variable?")
 	})
 
 	t.Run("invalid driver", func(t *testing.T) {
 		db := dbmate.New(dbutil.MustParseURL("foo://bar"))
-		drv, err := db.GetDriver()
+		drv, err := db.Driver()
 		require.EqualError(t, err, "unsupported driver: foo")
 		require.Nil(t, drv)
 	})
@@ -260,7 +261,7 @@ func TestMigrate(t *testing.T) {
 	for _, u := range testURLs() {
 		t.Run(u.Scheme, func(t *testing.T) {
 			db := newTestDB(t, u)
-			drv, err := db.GetDriver()
+			drv, err := db.Driver()
 			require.NoError(t, err)
 
 			// drop and recreate database
@@ -295,7 +296,7 @@ func TestUp(t *testing.T) {
 	for _, u := range testURLs() {
 		t.Run(u.Scheme, func(t *testing.T) {
 			db := newTestDB(t, u)
-			drv, err := db.GetDriver()
+			drv, err := db.Driver()
 			require.NoError(t, err)
 
 			// drop database
@@ -328,14 +329,21 @@ func TestRollback(t *testing.T) {
 	for _, u := range testURLs() {
 		t.Run(u.Scheme, func(t *testing.T) {
 			db := newTestDB(t, u)
-			drv, err := db.GetDriver()
+			drv, err := db.Driver()
 			require.NoError(t, err)
 
-			// drop, recreate, and migrate database
+			// drop and create database
 			err = db.Drop()
 			require.NoError(t, err)
 			err = db.Create()
 			require.NoError(t, err)
+
+			// rollback should return error
+			err = db.Rollback()
+			require.Error(t, err)
+			require.ErrorContains(t, err, "can't rollback: no migrations have been applied")
+
+			// migrate database
 			err = db.Migrate()
 			require.NoError(t, err)
 
@@ -369,11 +377,11 @@ func TestRollback(t *testing.T) {
 	}
 }
 
-func TestStatus(t *testing.T) {
+func TestFindMigrations(t *testing.T) {
 	for _, u := range testURLs() {
 		t.Run(u.Scheme, func(t *testing.T) {
 			db := newTestDB(t, u)
-			drv, err := db.GetDriver()
+			drv, err := db.Driver()
 			require.NoError(t, err)
 
 			// drop, recreate, and migrate database
@@ -388,18 +396,21 @@ func TestStatus(t *testing.T) {
 			defer dbutil.MustClose(sqlDB)
 
 			// two pending
-			results, err := db.CheckMigrationsStatus(drv)
+			results, err := db.FindMigrations()
 			require.NoError(t, err)
 			require.Len(t, results, 2)
 			require.False(t, results[0].Applied)
 			require.False(t, results[1].Applied)
+			migrationsTableExists, err := drv.MigrationsTableExists(sqlDB)
+			require.NoError(t, err)
+			require.False(t, migrationsTableExists)
 
 			// run migrations
 			err = db.Migrate()
 			require.NoError(t, err)
 
 			// two applied
-			results, err = db.CheckMigrationsStatus(drv)
+			results, err = db.FindMigrations()
 			require.NoError(t, err)
 			require.Len(t, results, 2)
 			require.True(t, results[0].Applied)
@@ -410,11 +421,65 @@ func TestStatus(t *testing.T) {
 			require.NoError(t, err)
 
 			// one applied, one pending
-			results, err = db.CheckMigrationsStatus(drv)
+			results, err = db.FindMigrations()
 			require.NoError(t, err)
 			require.Len(t, results, 2)
 			require.True(t, results[0].Applied)
 			require.False(t, results[1].Applied)
 		})
 	}
+}
+
+func TestFindMigrationsFS(t *testing.T) {
+	mapFS := fstest.MapFS{
+		"db/migrations/20151129054053_test_migration.sql": {},
+		"db/migrations/001_test_migration.sql": {
+			Data: []byte(`-- migrate:up
+create table users (id serial, name text);
+-- migrate:down
+drop table users;
+`),
+		},
+		"db/migrations/002_test_migration.sql":                {},
+		"db/migrations/003_not_sql.txt":                       {},
+		"db/migrations/missing_version.sql":                   {},
+		"db/not_migrations/20151129054053_test_migration.sql": {},
+	}
+
+	u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
+	db := newTestDB(t, u)
+	db.FS = mapFS
+
+	// drop and recreate database
+	err := db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
+
+	actual, err := db.FindMigrations()
+	require.NoError(t, err)
+
+	// test migrations are correct and in order
+	require.Equal(t, "001_test_migration.sql", actual[0].FileName)
+	require.Equal(t, "db/migrations/001_test_migration.sql", actual[0].FilePath)
+	require.Equal(t, "001", actual[0].Version)
+	require.Equal(t, false, actual[0].Applied)
+
+	require.Equal(t, "002_test_migration.sql", actual[1].FileName)
+	require.Equal(t, "db/migrations/002_test_migration.sql", actual[1].FilePath)
+	require.Equal(t, "002", actual[1].Version)
+	require.Equal(t, false, actual[1].Applied)
+
+	require.Equal(t, "20151129054053_test_migration.sql", actual[2].FileName)
+	require.Equal(t, "db/migrations/20151129054053_test_migration.sql", actual[2].FilePath)
+	require.Equal(t, "20151129054053", actual[2].Version)
+	require.Equal(t, false, actual[2].Applied)
+
+	// test parsing first migration
+	parsed, err := actual[0].Parse()
+	require.Nil(t, err)
+	require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);\n", parsed.Up)
+	require.True(t, parsed.UpOptions.Transaction())
+	require.Equal(t, "-- migrate:down\ndrop table users;\n", parsed.Down)
+	require.True(t, parsed.DownOptions.Transaction())
 }

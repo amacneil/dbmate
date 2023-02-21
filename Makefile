@@ -4,6 +4,10 @@ export CGO_ENABLED = 1
 # strip binaries
 FLAGS := -tags sqlite_omit_load_extension,sqlite_json -ldflags '-s'
 
+# default output file
+OUTPUT ?= dbmate
+
+# platform-specific settings
 GOOS := $(shell go env GOOS)
 ifeq ($(GOOS),linux)
 	# statically link binaries to support alpine linux
@@ -12,8 +16,11 @@ endif
 ifeq ($(GOOS),darwin)
 	export SDKROOT ?= $(shell xcrun --sdk macosx --show-sdk-path)
 endif
-
-OUTPUT ?= dbmate
+ifeq ($(GOOS),windows)
+	ifneq ($(suffix $(OUTPUT)),.exe)
+		OUTPUT := $(addsuffix .exe,$(OUTPUT))
+	endif
+endif
 
 .PHONY: all
 all: fix build wait test
