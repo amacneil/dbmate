@@ -132,17 +132,21 @@ func (drv *Driver) mysqldumpArgs() []string {
 	args := []string{"--opt", "--routines", "--no-data",
 		"--skip-dump-date", "--skip-add-drop-table"}
 
-	if hostname := drv.databaseURL.Hostname(); hostname != "" {
-		args = append(args, "--host="+hostname)
+	socket := drv.databaseURL.Query().Get("socket")
+	if socket != "" {
+		args = append(args, "--socket="+socket)
+	} else {
+		if hostname := drv.databaseURL.Hostname(); hostname != "" {
+			args = append(args, "--host="+hostname)
+		}
+		if port := drv.databaseURL.Port(); port != "" {
+			args = append(args, "--port="+port)
+		}
 	}
-	if port := drv.databaseURL.Port(); port != "" {
-		args = append(args, "--port="+port)
-	}
+
 	if username := drv.databaseURL.User.Username(); username != "" {
 		args = append(args, "--user="+username)
 	}
-	// mysql recommends against using environment variables to supply password
-	// https://dev.mysql.com/doc/refman/5.7/en/password-security-user.html
 	if password, set := drv.databaseURL.User.Password(); set {
 		args = append(args, "--password="+password)
 	}
