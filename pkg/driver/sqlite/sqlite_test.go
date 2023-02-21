@@ -180,22 +180,29 @@ func TestSQLiteDumpSchema(t *testing.T) {
 	err = drv.InsertMigration(db, "abc2")
 	require.NoError(t, err)
 
+	// create a table that will trigger `sqlite_sequence` system table
+	_, err = db.Exec("CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT)")
+	require.NoError(t, err)
+
 	// DumpSchema should return schema
 	schema, err := drv.DumpSchema(db)
 	require.NoError(t, err)
+	require.Contains(t, string(schema), "CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT)")
 	require.Contains(t, string(schema), "CREATE TABLE IF NOT EXISTS \"test_migrations\"")
 	require.Contains(t, string(schema), ");\n-- Dbmate schema migrations\n"+
 		"INSERT INTO \"test_migrations\" (version) VALUES\n"+
 		"  ('abc1'),\n"+
 		"  ('abc2');\n")
 
+	// sqlite_* tables should not be present in the dump (.schema --nosys)
+	require.NotContains(t, string(schema), "sqlite_")
+
 	// DumpSchema should return error if command fails
 	drv.databaseURL = dbutil.MustParseURL(".")
 	schema, err = drv.DumpSchema(db)
 	require.Nil(t, schema)
 	require.Error(t, err)
-	require.EqualError(t, err, "Error: unable to open database \"/.\": "+
-		"unable to open database file")
+	require.EqualError(t, err, "Error: unable to open database \"/.\": unable to open database file")
 }
 
 func TestSQLiteDatabaseExists(t *testing.T) {
