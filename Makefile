@@ -44,7 +44,7 @@ test:
 
 .PHONY: lint
 lint:
-	golangci-lint run
+	golangci-lint run --timeout 2m
 
 .PHONY: fix
 fix:
