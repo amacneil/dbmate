@@ -1,6 +1,6 @@
 module github.com/amacneil/dbmate
 
-go 1.19
+go 1.20
 
 require (
 	github.com/ClickHouse/clickhouse-go v1.5.4

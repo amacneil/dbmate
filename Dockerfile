@@ -1,5 +1,5 @@
 # development image
-FROM golang:1.19 as dev
+FROM golang:1.20 as dev
 WORKDIR /src
 RUN git config --global --add safe.directory /src
 
@@ -15,7 +15,7 @@ RUN apt-get update \
 
 # golangci-lint
 RUN curl -fsSL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
-	| sh -s -- -b /usr/local/bin v1.50.1
+	| sh -s -- -b /usr/local/bin v1.51.2
 
 # download modules
 COPY go.* /src/
