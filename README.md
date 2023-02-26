@@ -249,12 +249,6 @@ DATABASE_URL="sqlite:/tmp/database.sqlite3"
 DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name"
 ```
 
-or
-
-```sh
-DATABASE_URL="clickhouse://127.0.0.1:9000?username=username&password=password&database=database_name"
-```
-
 [See other supported connection options](https://github.com/ClickHouse/clickhouse-go#dsn).
 
 ### Creating Migrations

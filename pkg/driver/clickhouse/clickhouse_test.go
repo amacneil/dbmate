@@ -51,21 +51,35 @@ func TestGetDriver(t *testing.T) {
 }
 
 func TestConnectionString(t *testing.T) {
-	t.Run("simple", func(t *testing.T) {
-		u, err := url.Parse("clickhouse://user:pass@host/db")
-		require.NoError(t, err)
+	cases := []struct {
+		input    string
+		expected string
+	}{
+		// defaults
+		{"clickhouse://myhost", "clickhouse://myhost:9000"},
+		// custom port
+		{"clickhouse://myhost:1234/mydb", "clickhouse://myhost:1234/mydb"},
+		// database parameter
+		{"clickhouse://myhost?database=mydb", "clickhouse://myhost:9000/mydb"},
+		// username & password
+		{"clickhouse://abc:123@myhost/mydb", "clickhouse://abc:123@myhost:9000/mydb"},
+		{"clickhouse://abc:@myhost/mydb", "clickhouse://abc@myhost:9000/mydb"},
+		// username & password parameter
+		{"clickhouse://myhost/mydb?username=abc&password=123", "clickhouse://abc:123@myhost:9000/mydb"},
+		{"clickhouse://aaa:111@myhost/mydb?username=bbb&password=222", "clickhouse://bbb:222@myhost:9000/mydb"},
+		// custom parameters
+		{"clickhouse://myhost/mydb?dial_timeout=200ms", "clickhouse://myhost:9000/mydb?dial_timeout=200ms"},
+	}
 
-		s := connectionString(u)
-		require.Equal(t, "tcp://host:9000?database=db&password=pass&username=user", s)
-	})
+	for _, c := range cases {
+		t.Run(c.input, func(t *testing.T) {
+			u, err := url.Parse(c.input)
+			require.NoError(t, err)
 
-	t.Run("canonical", func(t *testing.T) {
-		u, err := url.Parse("clickhouse://host:9000?database=db&password=pass&username=user")
-		require.NoError(t, err)
-
-		s := connectionString(u)
-		require.Equal(t, "tcp://host:9000?database=db&password=pass&username=user", s)
-	})
+			actual := connectionString(u)
+			require.Equal(t, c.expected, actual)
+		})
+	}
 }
 
 func TestClickHouseCreateDropDatabase(t *testing.T) {
@@ -140,9 +154,7 @@ func TestClickHouseDumpSchema(t *testing.T) {
 		"    ('abc2');\n")
 
 	// DumpSchema should return error if command fails
-	values := drv.databaseURL.Query()
-	values.Set("database", "fakedb")
-	drv.databaseURL.RawQuery = values.Encode()
+	drv.databaseURL.Path = "/fakedb"
 	db, err = sql.Open("clickhouse", drv.databaseURL.String())
 	require.NoError(t, err)
 

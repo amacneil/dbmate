@@ -13,7 +13,7 @@ import (
 	"github.com/amacneil/dbmate/pkg/dbmate"
 	"github.com/amacneil/dbmate/pkg/dbutil"
 
-	"github.com/ClickHouse/clickhouse-go"
+	"github.com/ClickHouse/clickhouse-go/v2"
 )
 
 func init() {
@@ -37,9 +37,9 @@ func NewDriver(config dbmate.DriverConfig) dbmate.Driver {
 }
 
 func connectionString(initialURL *url.URL) string {
-	u := *initialURL
+	// clone url
+	u := dbutil.MustParseURL(initialURL.String())
 
-	u.Scheme = "tcp"
 	host := u.Host
 	if u.Port() == "" {
 		host = fmt.Sprintf("%s:9000", host)
@@ -47,22 +47,31 @@ func connectionString(initialURL *url.URL) string {
 	u.Host = host
 
 	query := u.Query()
-	if query.Get("username") == "" && u.User.Username() != "" {
-		query.Set("username", u.User.Username())
-	}
-	password, passwordSet := u.User.Password()
-	if query.Get("password") == "" && passwordSet {
-		query.Set("password", password)
-	}
-	u.User = nil
+	username := u.User.Username()
+	password, _ := u.User.Password()
 
-	if query.Get("database") == "" {
-		path := strings.Trim(u.Path, "/")
-		if path != "" {
-			query.Set("database", path)
-			u.Path = ""
+	if query.Get("username") != "" {
+		username = query.Get("username")
+		query.Del("username")
+	}
+	if query.Get("password") != "" {
+		password = query.Get("password")
+		query.Del("password")
+	}
+
+	if username != "" {
+		if password == "" {
+			u.User = url.User(username)
+		} else {
+			u.User = url.UserPassword(username, password)
 		}
 	}
+
+	if query.Get("database") != "" {
+		u.Path = fmt.Sprintf("/%s", query.Get("database"))
+		query.Del("database")
+	}
+
 	u.RawQuery = query.Encode()
 
 	return u.String()
@@ -81,15 +90,13 @@ func (drv *Driver) openClickHouseDB() (*sql.DB, error) {
 	}
 
 	// connect to clickhouse database
-	values := clickhouseURL.Query()
-	values.Set("database", "default")
-	clickhouseURL.RawQuery = values.Encode()
+	clickhouseURL.Path = "/default"
 
 	return sql.Open("clickhouse", clickhouseURL.String())
 }
 
 func (drv *Driver) databaseName() string {
-	name := dbutil.MustParseURL(connectionString(drv.databaseURL)).Query().Get("database")
+	name := strings.TrimLeft(dbutil.MustParseURL(connectionString(drv.databaseURL)).Path, "/")
 	if name == "" {
 		name = "default"
 	}
