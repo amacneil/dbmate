@@ -478,7 +478,9 @@ create table users (
 drop table if exists users;
 ```
 
-Both up and down migrations are stored in the same file, for ease of editing. When you apply a migration dbmate only stores the version number, not the contents, so you should always rollback a migration before modifying its contents. For this reason, you can safely rename a migration file without affecting its applied status, as long as you keep the version number intact.
+Both up and down migrations are stored in the same file, for ease of editing. Both up and down directives are required, even if you choose not to implement the down migration.
+
+When you apply a migration dbmate only stores the version number, not the contents, so you should always rollback a migration before modifying its contents. For this reason, you can safely rename a migration file without affecting its applied status, as long as you keep the version number intact.
 
 ### Schema file
 

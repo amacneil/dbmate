@@ -60,7 +60,9 @@ var (
 // Error codes
 var (
 	ErrParseMissingUp      = errors.New("dbmate requires each migration to define an up block with '-- migrate:up'")
-	ErrParseUnexpectedStmt = errors.New("dbmate does not support statements defined outside of the '-- migrate:up' or '-- migrate:down' blocks")
+	ErrParseMissingDown    = errors.New("dbmate requires each migration to define a down block with '-- migrate:down'")
+	ErrParseWrongOrder     = errors.New("dbmate requires '-- migrate:up' to appear before '-- migrate:down'")
+	ErrParseUnexpectedStmt = errors.New("dbmate does not support statements preceding the '-- migrate:up' block")
 )
 
 // parseMigrationContents parses the string contents of a migration.
@@ -69,34 +71,30 @@ var (
 // requires that at least an up block was defined and will otherwise
 // return an error.
 func parseMigrationContents(contents string) (*ParsedMigration, error) {
-	upDirectiveStart, upDirectiveEnd, hasDefinedUpBlock := getMatchPositions(contents, upRegExp)
-	downDirectiveStart, downDirectiveEnd, hasDefinedDownBlock := getMatchPositions(contents, downRegExp)
+	upDirectiveStart, hasDefinedUpBlock := getMatchPosition(contents, upRegExp)
+	downDirectiveStart, hasDefinedDownBlock := getMatchPosition(contents, downRegExp)
 
 	if !hasDefinedUpBlock {
 		return nil, ErrParseMissingUp
-	} else if statementsPrecedeMigrateBlocks(contents, upDirectiveStart, downDirectiveStart) {
+	}
+	if !hasDefinedDownBlock {
+		return nil, ErrParseMissingDown
+	}
+	if upDirectiveStart > downDirectiveStart {
+		return nil, ErrParseWrongOrder
+	}
+	if statementsPrecedeMigrateBlocks(contents, upDirectiveStart) {
 		return nil, ErrParseUnexpectedStmt
 	}
 
-	upEnd := len(contents)
-	downEnd := len(contents)
-
-	if hasDefinedDownBlock && upDirectiveStart < downDirectiveStart {
-		upEnd = downDirectiveStart
-	} else if hasDefinedDownBlock && upDirectiveStart > downDirectiveStart {
-		downEnd = upDirectiveStart
-	} else {
-		downEnd = -1
-	}
-
-	upDirective := substring(contents, upDirectiveStart, upDirectiveEnd)
-	downDirective := substring(contents, downDirectiveStart, downDirectiveEnd)
+	upBlock := substring(contents, upDirectiveStart, downDirectiveStart)
+	downBlock := substring(contents, downDirectiveStart, len(contents))
 
 	parsed := ParsedMigration{
-		Up:          substring(contents, upDirectiveStart, upEnd),
-		UpOptions:   parseMigrationOptions(upDirective),
-		Down:        substring(contents, downDirectiveStart, downEnd),
-		DownOptions: parseMigrationOptions(downDirective),
+		Up:          upBlock,
+		UpOptions:   parseMigrationOptions(upBlock),
+		Down:        downBlock,
+		DownOptions: parseMigrationOptions(downBlock),
 	}
 	return &parsed, nil
 }
@@ -110,6 +108,9 @@ func parseMigrationContents(contents string) (*ParsedMigration, error) {
 //	// migrationOptions{"transaction": "false"}
 func parseMigrationOptions(contents string) ParsedMigrationOptions {
 	options := make(migrationOptions)
+
+	// remove everything after first newline
+	contents = strings.SplitN(contents, "\n", 2)[0]
 
 	// strip away the -- migrate:[up|down] part
 	contents = blockDirectiveRegExp.ReplaceAllString(contents, "")
@@ -156,14 +157,8 @@ func parseMigrationOptions(contents string) ParsedMigrationOptions {
 // -- migrate:up
 // create table users (id serial, status status_type);
 // `, 54, -1)
-func statementsPrecedeMigrateBlocks(contents string, upDirectiveStart, downDirectiveStart int) bool {
-	until := upDirectiveStart
-
-	if downDirectiveStart > -1 {
-		until = min(upDirectiveStart, downDirectiveStart)
-	}
-
-	lines := strings.Split(contents[0:until], "\n")
+func statementsPrecedeMigrateBlocks(contents string, upDirectiveStart int) bool {
+	lines := strings.Split(contents[0:upDirectiveStart], "\n")
 
 	for _, line := range lines {
 		if isEmptyLine(line) || isCommentLine(line) {
@@ -186,12 +181,12 @@ func isCommentLine(s string) bool {
 	return commentLineRegExp.MatchString(s)
 }
 
-func getMatchPositions(s string, re *regexp.Regexp) (int, int, bool) {
+func getMatchPosition(s string, re *regexp.Regexp) (int, bool) {
 	match := re.FindStringIndex(s)
 	if match == nil {
-		return -1, -1, false
+		return -1, false
 	}
-	return match[0], match[1], true
+	return match[0], true
 }
 
 func substring(s string, begin, end int) string {
@@ -199,11 +194,4 @@ func substring(s string, begin, end int) string {
 		return ""
 	}
 	return s[begin:end]
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

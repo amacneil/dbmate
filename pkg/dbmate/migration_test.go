@@ -35,23 +35,24 @@ drop table users;
 }
 
 func TestParseMigrationContents(t *testing.T) {
-	// It supports the typical use case.
-	migration := `-- migrate:up
+	t.Run("support the typical use case", func(t *testing.T) {
+		migration := `-- migrate:up
 create table users (id serial, name text);
 -- migrate:down
 drop table users;`
 
-	parsed, err := parseMigrationContents(migration)
-	require.Nil(t, err)
+		parsed, err := parseMigrationContents(migration)
+		require.Nil(t, err)
 
-	require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);\n", parsed.Up)
-	require.Equal(t, true, parsed.UpOptions.Transaction())
+		require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);\n", parsed.Up)
+		require.Equal(t, true, parsed.UpOptions.Transaction())
 
-	require.Equal(t, "-- migrate:down\ndrop table users;", parsed.Down)
-	require.Equal(t, true, parsed.DownOptions.Transaction())
+		require.Equal(t, "-- migrate:down\ndrop table users;", parsed.Down)
+		require.Equal(t, true, parsed.DownOptions.Transaction())
+	})
 
-	// It does not require space between the '--' and 'migrate'
-	migration = `
+	t.Run("do not require space between '--' and 'migrate'", func(t *testing.T) {
+		migration := `
 --migrate:up
 create table users (id serial, name text);
 
@@ -59,58 +60,76 @@ create table users (id serial, name text);
 drop table users;
 `
 
-	parsed, err = parseMigrationContents(migration)
-	require.Nil(t, err)
+		parsed, err := parseMigrationContents(migration)
+		require.Nil(t, err)
 
-	require.Equal(t, "--migrate:up\ncreate table users (id serial, name text);\n\n", parsed.Up)
-	require.Equal(t, true, parsed.UpOptions.Transaction())
+		require.Equal(t, "--migrate:up\ncreate table users (id serial, name text);\n\n", parsed.Up)
+		require.Equal(t, true, parsed.UpOptions.Transaction())
 
-	require.Equal(t, "--migrate:down\ndrop table users;\n", parsed.Down)
-	require.Equal(t, true, parsed.DownOptions.Transaction())
+		require.Equal(t, "--migrate:down\ndrop table users;\n", parsed.Down)
+		require.Equal(t, true, parsed.DownOptions.Transaction())
+	})
 
-	// It is acceptable for down to be defined before up
-	migration = `-- migrate:down
+	t.Run("require up before down", func(t *testing.T) {
+		migration := `-- migrate:down
 drop table users;
 -- migrate:up
 create table users (id serial, name text);
 `
 
-	parsed, err = parseMigrationContents(migration)
-	require.Nil(t, err)
+		_, err := parseMigrationContents(migration)
+		require.Error(t, err, "dbmate requires '-- migrate:up' to appear before '-- migrate:down'")
+	})
 
-	require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);\n", parsed.Up)
-	require.Equal(t, true, parsed.UpOptions.Transaction())
-
-	require.Equal(t, "-- migrate:down\ndrop table users;\n", parsed.Down)
-	require.Equal(t, true, parsed.DownOptions.Transaction())
-
-	// It supports turning transactions off for a given migration block,
-	// e.g., the below would not work in Postgres inside a transaction.
-	// It also supports omitting the down block.
-	migration = `-- migrate:up transaction:false
+	t.Run("support disabling transactions", func(t *testing.T) {
+		// e.g., the below would not work in Postgres inside a transaction.
+		// It also supports omitting the down block.
+		migration := `-- migrate:up transaction:false
+ALTER TYPE colors ADD VALUE 'orange' AFTER 'red';
+-- migrate:down transaction:false
 ALTER TYPE colors ADD VALUE 'orange' AFTER 'red';
 `
 
-	parsed, err = parseMigrationContents(migration)
-	require.Nil(t, err)
+		parsed, err := parseMigrationContents(migration)
+		require.Nil(t, err)
 
-	require.Equal(t, "-- migrate:up transaction:false\nALTER TYPE colors ADD VALUE 'orange' AFTER 'red';\n", parsed.Up)
-	require.Equal(t, false, parsed.UpOptions.Transaction())
+		require.Equal(t, "-- migrate:up transaction:false\nALTER TYPE colors ADD VALUE 'orange' AFTER 'red';\n", parsed.Up)
+		require.Equal(t, false, parsed.UpOptions.Transaction())
 
-	require.Equal(t, "", parsed.Down)
-	require.Equal(t, true, parsed.DownOptions.Transaction())
+		require.Equal(t, "-- migrate:down transaction:false\nALTER TYPE colors ADD VALUE 'orange' AFTER 'red';\n", parsed.Down)
+		require.Equal(t, false, parsed.DownOptions.Transaction())
+	})
 
-	// It does *not* support omitting the up block.
-	migration = `-- migrate:down
+	t.Run("require migrate blocks", func(t *testing.T) {
+		migration := `
+ALTER TABLE users
+ADD COLUMN status status_type DEFAULT 'active';
+`
+
+		_, err := parseMigrationContents(migration)
+		require.Error(t, err, "dbmate requires each migration to define an up block with '-- migrate:up'")
+	})
+
+	t.Run("require an up block", func(t *testing.T) {
+		migration := `-- migrate:down
 drop table users;
 `
 
-	_, err = parseMigrationContents(migration)
-	require.NotNil(t, err)
-	require.Equal(t, "dbmate requires each migration to define an up block with '-- migrate:up'", err.Error())
+		_, err := parseMigrationContents(migration)
+		require.Error(t, err, "dbmate requires each migration to define an up block with '-- migrate:up'")
+	})
 
-	// It allows leading comments and whitespace preceding the migrate blocks
-	migration = `
+	t.Run("require a down block", func(t *testing.T) {
+		migration := `-- migrate:up
+create table users (id serial, name text);
+`
+
+		_, err := parseMigrationContents(migration)
+		require.Error(t, err, "dbmate requires each migration to define a down block with '-- migrate:down'")
+	})
+
+	t.Run("allow leading comments and whitespace preceding the migrate blocks", func(t *testing.T) {
+		migration := `
 -- This migration creates the users table.
 -- It'll drop it in the event of a rollback.
 
@@ -121,17 +140,18 @@ create table users (id serial, name text);
 drop table users;
 `
 
-	parsed, err = parseMigrationContents(migration)
-	require.Nil(t, err)
+		parsed, err := parseMigrationContents(migration)
+		require.Nil(t, err)
 
-	require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);\n\n", parsed.Up)
-	require.Equal(t, true, parsed.UpOptions.Transaction())
+		require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);\n\n", parsed.Up)
+		require.Equal(t, true, parsed.UpOptions.Transaction())
 
-	require.Equal(t, "-- migrate:down\ndrop table users;\n", parsed.Down)
-	require.Equal(t, true, parsed.DownOptions.Transaction())
+		require.Equal(t, "-- migrate:down\ndrop table users;\n", parsed.Down)
+		require.Equal(t, true, parsed.DownOptions.Transaction())
+	})
 
-	// It does *not* allow arbitrary statements preceding the migrate blocks
-	migration = `
+	t.Run("do not allow arbitrary statements preceding the migrate blocks", func(t *testing.T) {
+		migration := `
 -- create status_type
 CREATE TYPE status_type AS ENUM ('active', 'inactive');
 
@@ -144,17 +164,7 @@ ALTER TABLE users
 DROP COLUMN status;
 `
 
-	_, err = parseMigrationContents(migration)
-	require.NotNil(t, err)
-	require.Equal(t, "dbmate does not support statements defined outside of the '-- migrate:up' or '-- migrate:down' blocks", err.Error())
-
-	// It requires an at least an up block
-	migration = `
-ALTER TABLE users
-ADD COLUMN status status_type DEFAULT 'active';
-`
-
-	_, err = parseMigrationContents(migration)
-	require.NotNil(t, err)
-	require.Equal(t, "dbmate requires each migration to define an up block with '-- migrate:up'", err.Error())
+		_, err := parseMigrationContents(migration)
+		require.Error(t, err, "dbmate does not support statements preceding the '-- migrate:up' block")
+	})
 }
