@@ -1,0 +1,22 @@
+{
+  "name": "dbmate",
+  "version": "",
+  "description": "A lightweight, framework-agnostic database migration tool",
+  "repository": "https://github.com/amacneil/dbmate",
+  "homepage": "https://github.com/amacneil/dbmate#readme",
+  "author": "Adrian Macneil",
+  "license": "MIT",
+  "keywords": [
+    "clickhouse",
+    "database",
+    "migration",
+    "mysql",
+    "postgres",
+    "schema",
+    "sqlite"
+  ],
+  "bin": {
+    "dbmate": "bin/dbmate.js"
+  },
+  "optionalDependencies": {}
+}

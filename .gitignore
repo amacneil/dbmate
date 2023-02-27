@@ -1,8 +1,10 @@
 .DS_Store
 .env
+*.log
 /.cache
 /db
 /dbmate
 /dist
 /testdata/db/schema.sql
 /vendor
+node_modules
