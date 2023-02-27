@@ -319,9 +319,6 @@ func (drv *Driver) DeleteMigration(db dbutil.Transaction, version string) error 
 // Ping verifies a connection to the database server. It does not verify whether the
 // specified database exists.
 func (drv *Driver) Ping() error {
-	// attempt connection to primary database, not "clickhouse" database
-	// to support servers with no "clickhouse" database
-	// (see https://github.com/amacneil/dbmate/issues/78)
 	db, err := drv.Open()
 	if err != nil {
 		return err
