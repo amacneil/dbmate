@@ -7,7 +7,7 @@ const { fileURLToPath } = require("url");
 const { dirname } = require("path");
 
 const packageName = `@dbmate/${platform}-${arch}`;
-const binName = arch === "win32" ? "dbmate.exe" : "dbmate";
+const binName = platform === "win32" ? "dbmate.exe" : "dbmate";
 let binPath = `${packageName}/bin/${binName}`;
 
 try {
