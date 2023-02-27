@@ -10,7 +10,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/urfave/cli/v2"
 
-	"github.com/amacneil/dbmate/pkg/dbmate"
+	"github.com/amacneil/dbmate/v2/pkg/dbmate"
 )
 
 func main() {

@@ -2,7 +2,7 @@
 
 [![Release](https://img.shields.io/github/release/amacneil/dbmate.svg)](https://github.com/amacneil/dbmate/releases)
 [![Go Report](https://goreportcard.com/badge/github.com/amacneil/dbmate)](https://goreportcard.com/report/github.com/amacneil/dbmate)
-[![Reference](https://img.shields.io/badge/go.dev-reference-blue?logo=go&logoColor=white)](https://pkg.go.dev/github.com/amacneil/dbmate/pkg/dbmate)
+[![Reference](https://img.shields.io/badge/go.dev-reference-blue?logo=go&logoColor=white)](https://pkg.go.dev/github.com/amacneil/dbmate/v2/pkg/dbmate)
 
 Dbmate is a database migration tool that will keep your database schema in sync across multiple developers and your production servers.
 
@@ -400,8 +400,8 @@ package main
 import (
 	"net/url"
 
-	"github.com/amacneil/dbmate/pkg/dbmate"
-	_ "github.com/amacneil/dbmate/pkg/driver/sqlite"
+	"github.com/amacneil/dbmate/v2/pkg/dbmate"
+	_ "github.com/amacneil/dbmate/v2/pkg/driver/sqlite"
 )
 
 func main() {
@@ -415,7 +415,7 @@ func main() {
 }
 ```
 
-See the [reference documentation](https://pkg.go.dev/github.com/amacneil/dbmate/pkg/dbmate) for more options.
+See the [reference documentation](https://pkg.go.dev/github.com/amacneil/dbmate/v2/pkg/dbmate) for more options.
 
 ### Embedding migrations
 
@@ -431,8 +431,8 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/amacneil/dbmate/pkg/dbmate"
-	_ "github.com/amacneil/dbmate/pkg/driver/sqlite"
+	"github.com/amacneil/dbmate/v2/pkg/dbmate"
+	_ "github.com/amacneil/dbmate/v2/pkg/driver/sqlite"
 )
 
 //go:embed db/migrations/*.sql

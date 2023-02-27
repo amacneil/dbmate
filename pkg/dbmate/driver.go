@@ -5,7 +5,7 @@ import (
 	"io"
 	"net/url"
 
-	"github.com/amacneil/dbmate/pkg/dbutil"
+	"github.com/amacneil/dbmate/v2/pkg/dbutil"
 )
 
 // Driver provides top level database functions
