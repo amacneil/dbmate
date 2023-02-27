@@ -373,6 +373,19 @@ func TestRollback(t *testing.T) {
 			err = sqlDB.QueryRow("select count(*) from posts").Scan(&count)
 			require.NotNil(t, err)
 			require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
+
+			// rollback second time
+			err = db.Rollback()
+			require.NoError(t, err)
+
+			// verify second rollback
+			err = sqlDB.QueryRow("select count(*) from schema_migrations").Scan(&count)
+			require.NoError(t, err)
+			require.Equal(t, 0, count)
+
+			err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
+			require.NotNil(t, err)
+			require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
 		})
 	}
 }

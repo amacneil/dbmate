@@ -457,9 +457,9 @@ func (db *DB) Rollback() error {
 		return err
 	}
 
-	for _, migration := range migrations {
+	for i, migration := range migrations {
 		if migration.Applied {
-			latest = &migration
+			latest = &migrations[i]
 		}
 	}
 
