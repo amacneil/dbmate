@@ -39,7 +39,7 @@ type DB struct {
 	AutoDumpSchema bool
 	// DatabaseURL is the database connection string
 	DatabaseURL *url.URL
-	// FS allows overriding the filesystem
+	// FS specifies the filesystem, or nil for OS filesystem
 	FS fs.FS
 	// Log is the interface to write stdout
 	Log io.Writer
@@ -70,7 +70,7 @@ func New(databaseURL *url.URL) *DB {
 	return &DB{
 		AutoDumpSchema:      true,
 		DatabaseURL:         databaseURL,
-		FS:                  os.DirFS("."),
+		FS:                  nil,
 		Log:                 os.Stdout,
 		MigrationsDir:       "./db/migrations",
 		MigrationsTableName: "schema_migrations",
@@ -372,6 +372,19 @@ func (db *DB) printVerbose(result sql.Result) {
 	}
 }
 
+func (db *DB) readMigrationsDir() ([]fs.DirEntry, error) {
+	path := filepath.Clean(db.MigrationsDir)
+
+	// We use nil instead of os.DirFS() because DirFS cannot support both relative and absolute
+	// directory paths - it must be anchored at either "." or "/", which we do not know in advance.
+	// See: https://github.com/amacneil/dbmate/issues/403
+	if db.FS == nil {
+		return os.ReadDir(path)
+	}
+
+	return fs.ReadDir(db.FS, path)
+}
+
 // FindMigrations lists all available migrations
 func (db *DB) FindMigrations() ([]Migration, error) {
 	drv, err := db.Driver()
@@ -400,7 +413,7 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 	}
 
 	// find filesystem migrations
-	files, err := fs.ReadDir(db.FS, filepath.Clean(db.MigrationsDir))
+	files, err := db.readMigrationsDir()
 	if err != nil {
 		return nil, fmt.Errorf("%w `%s`", ErrMigrationDirNotFound, db.MigrationsDir)
 	}

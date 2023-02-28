@@ -3,6 +3,7 @@ package dbmate
 import (
 	"errors"
 	"io/fs"
+	"os"
 	"regexp"
 	"strings"
 )
@@ -16,14 +17,24 @@ type Migration struct {
 	Version  string
 }
 
+func (m *Migration) readFile() (string, error) {
+	if m.FS == nil {
+		bytes, err := os.ReadFile(m.FilePath)
+		return string(bytes), err
+	}
+
+	bytes, err := fs.ReadFile(m.FS, m.FilePath)
+	return string(bytes), err
+}
+
 // Parse a migration
 func (m *Migration) Parse() (*ParsedMigration, error) {
-	bytes, err := fs.ReadFile(m.FS, m.FilePath)
+	contents, err := m.readFile()
 	if err != nil {
 		return nil, err
 	}
 
-	return parseMigrationContents(string(bytes))
+	return parseMigrationContents(contents)
 }
 
 // ParsedMigration contains the migration contents and options
