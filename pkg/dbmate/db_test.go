@@ -346,37 +346,58 @@ func TestRollback(t *testing.T) {
 			require.NoError(t, err)
 			defer dbutil.MustClose(sqlDB)
 
-			count := 0
-			err = sqlDB.QueryRow(`select count(*) from schema_migrations
-				where version = '20151129054053'`).Scan(&count)
+			var applied []string
+			rows, err := sqlDB.Query("select version from schema_migrations order by version asc")
 			require.NoError(t, err)
-			require.Equal(t, 1, count)
+			defer rows.Close()
+			for rows.Next() {
+				var version string
+				require.NoError(t, rows.Scan(&version))
+				applied = append(applied, version)
+			}
+			require.NoError(t, rows.Err())
+			require.Equal(t, []string{"20151129054053", "20200227231541"}, applied)
 
+			// users and posts tables have been created
+			var count int
+			err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
+			require.Nil(t, err)
 			err = sqlDB.QueryRow("select count(*) from posts").Scan(&count)
 			require.Nil(t, err)
 
-			// rollback
+			// rollback second migration
 			err = db.Rollback()
 			require.NoError(t, err)
 
-			// verify rollback
+			// one migration remaining
 			err = sqlDB.QueryRow("select count(*) from schema_migrations").Scan(&count)
 			require.NoError(t, err)
 			require.Equal(t, 1, count)
 
+			// posts table was deleted
 			err = sqlDB.QueryRow("select count(*) from posts").Scan(&count)
 			require.NotNil(t, err)
 			require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
 
-			// rollback second time
+			// users table still exists
+			err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
+			require.Nil(t, err)
+
+			// rollback first migration
 			err = db.Rollback()
 			require.NoError(t, err)
 
-			// verify second rollback
+			// no migrations remaining
 			err = sqlDB.QueryRow("select count(*) from schema_migrations").Scan(&count)
 			require.NoError(t, err)
 			require.Equal(t, 0, count)
 
+			// posts table was deleted
+			err = sqlDB.QueryRow("select count(*) from posts").Scan(&count)
+			require.NotNil(t, err)
+			require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
+
+			// users table was deleted
 			err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
 			require.NotNil(t, err)
 			require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
