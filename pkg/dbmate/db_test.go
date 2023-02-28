@@ -18,19 +18,19 @@ import (
 	"github.com/zenizh/go-capturer"
 )
 
-var testdataDir string
+var rootDir string
 
 func newTestDB(t *testing.T, u *url.URL) *dbmate.DB {
 	var err error
 
-	// only chdir once, because testdata is relative to current directory
-	if testdataDir == "" {
-		testdataDir, err = filepath.Abs("../../testdata")
-		require.NoError(t, err)
-
-		err = os.Chdir(testdataDir)
+	// find root directory relative to current directory
+	if rootDir == "" {
+		rootDir, err = filepath.Abs("../..")
 		require.NoError(t, err)
 	}
+
+	err = os.Chdir(rootDir + "/testdata")
+	require.NoError(t, err)
 
 	db := dbmate.New(u)
 	db.AutoDumpSchema = false
@@ -104,10 +104,7 @@ func TestDumpSchema(t *testing.T) {
 	// create custom schema file directory
 	dir, err := os.MkdirTemp("", "dbmate")
 	require.NoError(t, err)
-	defer func() {
-		err := os.RemoveAll(dir)
-		require.NoError(t, err)
-	}()
+	defer os.RemoveAll(dir)
 
 	// create schema.sql in subdirectory to test creating directory
 	db.SchemaFile = filepath.Join(dir, "/schema/schema.sql")
@@ -142,10 +139,7 @@ func TestAutoDumpSchema(t *testing.T) {
 	// create custom schema file directory
 	dir, err := os.MkdirTemp("", "dbmate")
 	require.NoError(t, err)
-	defer func() {
-		err := os.RemoveAll(dir)
-		require.NoError(t, err)
-	}()
+	defer os.RemoveAll(dir)
 
 	// create schema.sql in subdirectory to test creating directory
 	db.SchemaFile = filepath.Join(dir, "/schema/schema.sql")
@@ -428,6 +422,45 @@ func TestFindMigrations(t *testing.T) {
 			require.False(t, results[1].Applied)
 		})
 	}
+}
+
+func TestFindMigrationsAbsolute(t *testing.T) {
+	t.Run("relative path", func(t *testing.T) {
+		u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
+		db := newTestDB(t, u)
+		db.MigrationsDir = "db/migrations"
+
+		migrations, err := db.FindMigrations()
+		require.NoError(t, err)
+
+		require.Equal(t, "db/migrations/20151129054053_test_migration.sql", migrations[0].FilePath)
+	})
+
+	t.Run("absolute path", func(t *testing.T) {
+		dir, err := os.MkdirTemp("", "dbmate")
+		require.NoError(t, err)
+		defer os.RemoveAll(dir)
+		require.True(t, filepath.IsAbs(dir))
+
+		file, err := os.Create(filepath.Join(dir, "1234_example.sql"))
+		require.NoError(t, err)
+		defer file.Close()
+
+		u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
+		db := newTestDB(t, u)
+		db.MigrationsDir = dir
+		require.Nil(t, db.FS)
+
+		migrations, err := db.FindMigrations()
+		require.NoError(t, err)
+		require.Len(t, migrations, 1)
+		require.Equal(t, dir+"/1234_example.sql", migrations[0].FilePath)
+		require.True(t, filepath.IsAbs(migrations[0].FilePath))
+		require.Nil(t, migrations[0].FS)
+		require.Equal(t, "1234_example.sql", migrations[0].FileName)
+		require.Equal(t, "1234", migrations[0].Version)
+		require.False(t, migrations[0].Applied)
+	})
 }
 
 func TestFindMigrationsFS(t *testing.T) {
