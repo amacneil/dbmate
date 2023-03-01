@@ -48,6 +48,13 @@ jobs:
             env: {}
           - os: windows
             image: windows-latest
+            arch: 386
+            setup: choco install mingw --x86 --force
+            env:
+              CC: i686-w64-mingw32-gcc
+              CXX: i686-w64-mingw32-g++
+          - os: windows
+            image: windows-latest
             arch: amd64
             env: {}
 
