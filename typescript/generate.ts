@@ -22,6 +22,7 @@ const OS_MAP: Record<string, string> = {
 
 // map GOARCH to NPM
 const ARCH_MAP: Record<string, string> = {
+  386: "ia32",
   amd64: "x64",
   arm: "arm",
   arm64: "arm64",

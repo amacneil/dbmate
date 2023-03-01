@@ -14,15 +14,15 @@ jobs:
         include:
           - os: linux
             image: ubuntu-latest
-            arch: amd64
-            env: {}
+            arch: 386
+            setup: sudo apt-get update && sudo apt-get install -qq gcc-i686-linux-gnu
+            env:
+              CC: i686-linux-gnu-gcc
+              CXX: i686-linux-gnu-g++
           - os: linux
             image: ubuntu-latest
-            arch: arm64
-            setup: sudo apt-get update && sudo apt-get install -qq gcc-aarch64-linux-gnu
-            env:
-              CC: aarch64-linux-gnu-gcc
-              CXX: aarch64-linux-gnu-g++
+            arch: amd64
+            env: {}
           - os: linux
             image: ubuntu-latest
             arch: arm
@@ -31,6 +31,13 @@ jobs:
               CC: arm-linux-gnueabihf-gcc
               CXX: arm-linux-gnueabihf-g++
               GOARM: 7
+          - os: linux
+            image: ubuntu-latest
+            arch: arm64
+            setup: sudo apt-get update && sudo apt-get install -qq gcc-aarch64-linux-gnu
+            env:
+              CC: aarch64-linux-gnu-gcc
+              CXX: aarch64-linux-gnu-g++
           - os: macos
             image: macos-latest
             arch: amd64
