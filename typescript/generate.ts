@@ -2,6 +2,7 @@ import { readFile, writeFile, copyFile, chmod, mkdir } from "fs/promises";
 import { parse as parseYaml } from "yaml";
 import rimraf from "rimraf";
 import Handlebars from "handlebars";
+import { exec } from "@actions/exec";
 
 type MatrixItem = {
   os: string;
@@ -113,6 +114,10 @@ async function main() {
   // copy readme and license
   await copyFile("../LICENSE", "packages/dbmate/LICENSE");
   await copyFile("../README.md", "packages/dbmate/README.md");
+
+  await exec("npm", ["run", "build"], {
+    cwd: "packages/dbmate",
+  });
 }
 
 main().catch((e) => {

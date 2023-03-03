@@ -1,0 +1,14 @@
+{
+  "extends": "@foxglove/tsconfig/base",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020"],
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true
+  },
+  "include": ["./src/**/*"],
+  "exclude": ["node_modules", "./src/**.test.*"]
+}

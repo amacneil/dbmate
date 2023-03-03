@@ -15,8 +15,13 @@
     "schema",
     "sqlite"
   ],
+  "files": ["LICENSE", "README", "dist"],
   "bin": {
-    "dbmate": "bin/dbmate.js"
+    "dbmate": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc"
   },
   "optionalDependencies": {}
 }
