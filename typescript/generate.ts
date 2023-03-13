@@ -1,7 +1,19 @@
-import { readFile, writeFile, cp, chmod, mkdir } from "fs/promises";
-import { parse as parseYaml } from "yaml";
 import { exec } from "@actions/exec";
+import { readFile, writeFile, cp, chmod, mkdir } from "fs/promises";
 import Handlebars from "handlebars";
+import { parse as parseYaml } from "yaml";
+
+type CiYaml = {
+  jobs: {
+    build: {
+      strategy: {
+        matrix: {
+          include: MatrixItem[];
+        };
+      };
+    };
+  };
+};
 
 type MatrixItem = {
   os: string;
@@ -33,19 +45,19 @@ async function getVersion(): Promise<string> {
   const versionFile = await readFile("../pkg/dbmate/version.go", "utf8");
   const matches = versionFile.match(/Version = "([^"]+)"/);
 
-  if (!matches || !matches[1]) {
-    throw new Error("Unable to detect version from version.go");
+  if (matches?.[1]) {
+    return matches[1];
   }
 
-  return matches[1];
+  throw new Error("Unable to detect version from version.go");
 }
 
 // fetch github actions build matrix
 async function getBuildMatrix() {
   const contents = await readFile("../.github/workflows/ci.yml", "utf8");
-  const ci = parseYaml(contents);
+  const ci = parseYaml(contents) as CiYaml;
 
-  return ci.jobs.build.strategy.matrix.include as MatrixItem[];
+  return ci.jobs.build.strategy.matrix.include;
 }
 
 // copy and update template into new package
@@ -65,9 +77,9 @@ async function main() {
 
   // parse main package.json
   const version = await getVersion();
-  const mainPackageJson: PackageJson = JSON.parse(
+  const mainPackageJson = JSON.parse(
     await readFile("packages/dbmate/package.json", "utf8")
-  );
+  ) as PackageJson;
   mainPackageJson.version = version;
 
   // generate os/arch packages
@@ -120,7 +132,9 @@ async function main() {
   }
 
   // copy main package
-  await cp("packages/dbmate", "dist/dbmate", { recursive: true });
+  await cp("packages/dbmate", "dist/dbmate", {
+    recursive: true,
+  });
 
   // write package.json
   await writeFile(

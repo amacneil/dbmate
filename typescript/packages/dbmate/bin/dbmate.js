@@ -1,10 +1,7 @@
 #!/usr/bin/env node
 
-const { arch, platform } = require("process");
-const { realpathSync } = require("fs");
 const { spawnSync } = require("child_process");
-const { fileURLToPath } = require("url");
-const { dirname } = require("path");
+const { arch, platform } = require("process");
 
 const packageName = `@dbmate/${platform}-${arch}`;
 const binName = platform === "win32" ? "dbmate.exe" : "dbmate";
