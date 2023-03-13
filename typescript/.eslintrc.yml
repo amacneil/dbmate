@@ -1,0 +1,15 @@
+extends:
+  - plugin:@foxglove/base
+
+env:
+  node: true
+
+ignorePatterns:
+  - dist
+
+overrides:
+  - files: ["*.ts"]
+    extends:
+      - plugin:@foxglove/typescript
+    parserOptions:
+      project: tsconfig.eslint.json

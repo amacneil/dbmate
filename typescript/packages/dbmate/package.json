@@ -15,13 +15,14 @@
     "schema",
     "sqlite"
   ],
-  "files": ["LICENSE", "README", "dist"],
-  "bin": {
-    "dbmate": "./dist/cli.js"
-  },
+  "type": "module",
+  "bin": "./dist/cli.js",
   "main": "./dist/index.js",
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "build": "tsc"
+    "build": "tsc --build"
   },
   "optionalDependencies": {}
 }

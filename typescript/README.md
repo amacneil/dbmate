@@ -8,8 +8,14 @@ This directory contains scripts to generate and publish the dbmate npm package.
 npm run generate
 ```
 
-## Pack the package to a tarball
+For local development, you can avoid copying the dbmate binaries if you don't have them available:
 
 ```
-npm pack ./packages/dbmate
+npm run generate -- --skip-bin
+```
+
+## Publish the packages (CI only)
+
+```
+npm run publish
 ```

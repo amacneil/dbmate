@@ -1,24 +1,24 @@
 import { execSync } from "node:child_process";
 
-import { getBinaryPath } from "./resolve";
+import { resolveBinary } from "./resolveBinary.js";
 
 type Args = {
   // Location of the migration files. Defaults to $(cwd)/db/migrations.
   migrationsDir?: string;
 };
 
-class DbMate {
+export class Dbmate {
   private binaryPath: string;
   private dbUrl: string;
   private args: Args | undefined;
 
   constructor(dbUrl: string, args?: Args) {
-    this.binaryPath = getBinaryPath();
+    this.binaryPath = resolveBinary();
     this.dbUrl = dbUrl;
     this.args = args;
   }
 
-  async up() {
+  async up(): Promise<void> {
     const cmd = `${this.binaryPath} --env DB_URL ${this.buildCliArgs()} up`;
     execSync(cmd, {
       env: {
@@ -27,7 +27,7 @@ class DbMate {
     });
   }
 
-  async down() {
+  async down(): Promise<void> {
     const cmd = `${this.binaryPath} --env DB_URL ${this.buildCliArgs()} down`;
     execSync(cmd, {
       env: {
@@ -36,7 +36,7 @@ class DbMate {
     });
   }
 
-  async drop() {
+  async drop(): Promise<void> {
     const cmd = `${this.binaryPath} --env DB_URL ${this.buildCliArgs()} drop`;
     execSync(cmd, {
       env: {
@@ -55,5 +55,3 @@ class DbMate {
     return cliArgs.join(" ");
   }
 }
-
-export default DbMate;

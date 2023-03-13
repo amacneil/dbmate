@@ -1,8 +1,19 @@
-import { readFile, writeFile, copyFile, chmod, mkdir } from "fs/promises";
-import { parse as parseYaml } from "yaml";
-import rimraf from "rimraf";
-import Handlebars from "handlebars";
 import { exec } from "@actions/exec";
+import Handlebars from "handlebars";
+import { readFile, writeFile, cp, chmod, mkdir } from "node:fs/promises";
+import { parse as parseYaml } from "yaml";
+
+type CiYaml = {
+  jobs: {
+    build: {
+      strategy: {
+        matrix: {
+          include: MatrixItem[];
+        };
+      };
+    };
+  };
+};
 
 type MatrixItem = {
   os: string;
@@ -34,19 +45,19 @@ async function getVersion(): Promise<string> {
   const versionFile = await readFile("../pkg/dbmate/version.go", "utf8");
   const matches = versionFile.match(/Version = "([^"]+)"/);
 
-  if (!matches || !matches[1]) {
-    throw new Error("Unable to detect version from version.go");
+  if (matches?.[1]) {
+    return matches[1];
   }
 
-  return matches[1];
+  throw new Error("Unable to detect version from version.go");
 }
 
 // fetch github actions build matrix
 async function getBuildMatrix() {
   const contents = await readFile("../.github/workflows/ci.yml", "utf8");
-  const ci = parseYaml(contents);
+  const ci = parseYaml(contents) as CiYaml;
 
-  return ci.jobs.build.strategy.matrix.include as MatrixItem[];
+  return ci.jobs.build.strategy.matrix.include;
 }
 
 // copy and update template into new package
@@ -61,14 +72,22 @@ async function copyTemplate(
 }
 
 async function main() {
-  // parse root package.json template
-  const version = await getVersion();
-  const rootPackage: PackageJson = JSON.parse(
-    await readFile("packages/dbmate/package.template.json", "utf8")
-  );
-  rootPackage.version = version;
+  // clean output directories
+  await exec("npm", ["run", "clean"]);
 
-  // generate npm packages
+  // build main package
+  await exec("npm", ["run", "build"], {
+    cwd: "packages/dbmate",
+  });
+
+  // parse main package.json
+  const version = await getVersion();
+  const mainPackageJson = JSON.parse(
+    await readFile("packages/dbmate/package.json", "utf8")
+  ) as PackageJson;
+  mainPackageJson.version = version;
+
+  // generate os/arch packages
   const buildMatrix = await getBuildMatrix();
   for (const build of buildMatrix) {
     const jsOS = OS_MAP[build.os];
@@ -82,42 +101,55 @@ async function main() {
     }
 
     const name = `@dbmate/${jsOS}-${jsArch}`;
-    const targetDir = `packages/@dbmate/${jsOS}-${jsArch}`;
+    const targetDir = `dist/@dbmate/${jsOS}-${jsArch}`;
     const binext = jsOS === "win32" ? ".exe" : "";
     const templateVars = { jsOS, jsArch, name, version };
 
     // generate package directory
     console.log(`Generate ${name}`);
-    await rimraf(targetDir);
     await mkdir(`${targetDir}/bin`, { recursive: true });
     await copyTemplate("package.json", targetDir, templateVars);
     await copyTemplate("README.md", targetDir, templateVars);
 
     // copy binary from github actions artifact
-    const binfile = `${targetDir}/bin/dbmate${binext}`;
-    await copyFile(
-      `../dist/dbmate-${build.os}-${build.arch}/dbmate-${build.os}-${build.arch}${binext}`,
-      binfile
-    );
-    await chmod(binfile, 0o755);
+    const targetBin = `${targetDir}/bin/dbmate${binext}`;
+    try {
+      if (process.argv[2] === "--skip-bin") {
+        // dummy file for testing
+        await writeFile(targetBin, "");
+      } else {
+        // copy os/arch binary (typically built via CI)
+        await cp(
+          `../dist/dbmate-${build.os}-${build.arch}/dbmate-${build.os}-${build.arch}${binext}`,
+          targetBin
+        );
+      }
+      await chmod(targetBin, 0o755);
+    } catch (e) {
+      console.error(e);
+      throw new Error(
+        "Run `npm run generate -- --skip-bin` to test generate without binaries"
+      );
+    }
 
-    // record dependency in root package
-    rootPackage.optionalDependencies[name] = version;
+    // record dependency in main package.json
+    mainPackageJson.optionalDependencies[name] = version;
   }
 
-  // write root package.json
+  // copy main package
+  await cp("packages/dbmate", "dist/dbmate", {
+    recursive: true,
+  });
+
+  // write package.json
   await writeFile(
-    "packages/dbmate/package.json",
-    JSON.stringify(rootPackage, undefined, 2)
+    "dist/dbmate/package.json",
+    JSON.stringify(mainPackageJson, undefined, 2)
   );
 
   // copy readme and license
-  await copyFile("../LICENSE", "packages/dbmate/LICENSE");
-  await copyFile("../README.md", "packages/dbmate/README.md");
-
-  await exec("npm", ["run", "build"], {
-    cwd: "packages/dbmate",
-  });
+  await cp("../LICENSE", "dist/dbmate/LICENSE");
+  await cp("../README.md", "dist/dbmate/README.md");
 }
 
 main().catch((e) => {

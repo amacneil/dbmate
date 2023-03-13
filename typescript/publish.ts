@@ -1,12 +1,14 @@
-import { readdir } from "fs/promises";
 import { exec } from "@actions/exec";
+import { readdir } from "node:fs/promises";
 
 async function main() {
-  const args = ["publish", "--access", "public"];
-  await exec("npm", args.concat([`./packages/dbmate`]));
+  const packages = [`./dist/dbmate`];
+  (await readdir("dist/@dbmate")).forEach((pkg) =>
+    packages.push(`./dist/@dbmate/${pkg}`)
+  );
 
-  for (const pkg of await readdir("packages/@dbmate")) {
-    await exec("npm", args.concat([`./packages/@dbmate/${pkg}`]));
+  for (const pkg of packages) {
+    await exec("npm", ["publish", "--access", "public", pkg]);
   }
 }
 
