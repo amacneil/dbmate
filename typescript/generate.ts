@@ -1,6 +1,6 @@
 import { exec } from "@actions/exec";
-import { readFile, writeFile, cp, chmod, mkdir } from "fs/promises";
 import Handlebars from "handlebars";
+import { readFile, writeFile, cp, chmod, mkdir } from "node:fs/promises";
 import { parse as parseYaml } from "yaml";
 
 type CiYaml = {
@@ -74,6 +74,11 @@ async function copyTemplate(
 async function main() {
   // clean output directories
   await exec("npm", ["run", "clean"]);
+
+  // build main package
+  await exec("npm", ["run", "build"], {
+    cwd: "packages/dbmate",
+  });
 
   // parse main package.json
   const version = await getVersion();

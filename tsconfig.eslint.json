@@ -1,0 +1,5 @@
+// -*- jsonc -*-
+// This file is used by vscode-eslint due to different working directory
+{
+  "extends": "./typescript/tsconfig.eslint.json"
+}

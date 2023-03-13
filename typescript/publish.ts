@@ -1,5 +1,5 @@
 import { exec } from "@actions/exec";
-import { readdir } from "fs/promises";
+import { readdir } from "node:fs/promises";
 
 async function main() {
   const packages = [`./dist/dbmate`];
