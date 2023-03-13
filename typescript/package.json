@@ -2,7 +2,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "clean": "rimraf packages/dbmate/package.json packages/dbmate/LICENSE packages/dbmate/README.md packages/@dbmate",
+    "clean": "rimraf dist",
     "generate": "node --loader ts-node/esm generate.ts",
     "publish": "node --loader ts-node/esm publish.ts"
   },
