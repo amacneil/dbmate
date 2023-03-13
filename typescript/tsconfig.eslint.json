@@ -1,0 +1,6 @@
+// -*- jsonc -*-
+// This tsconfig is used for eslint
+{
+  "extends": "./tsconfig.json",
+  "include": ["**/*"]
+}
