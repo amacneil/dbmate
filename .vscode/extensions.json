@@ -1,4 +1,8 @@
 // -*- jsonc -*-
 {
-  "recommendations": ["esbenp.prettier-vscode", "golang.go"]
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "golang.go"
+  ]
 }
