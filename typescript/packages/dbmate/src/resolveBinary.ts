@@ -1,4 +1,3 @@
-import { createRequire } from "node:module";
 import { arch, platform } from "node:process";
 
 /**
@@ -9,7 +8,7 @@ export function resolveBinary(): string {
   const path = `@dbmate/${platform}-${arch}/bin/dbmate${ext}`;
 
   try {
-    return createRequire(import.meta.url).resolve(path);
+    return require.resolve(path);
   } catch (err) {
     if (
       err != undefined &&

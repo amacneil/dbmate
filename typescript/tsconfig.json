@@ -3,6 +3,7 @@
   "include": ["*.ts"],
   "compilerOptions": {
     "rootDir": ".",
-    "outDir": "dist"
+    "outDir": "./dist",
+    "module": "commonjs"
   }
 }
