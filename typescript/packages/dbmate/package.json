@@ -15,7 +15,6 @@
     "schema",
     "sqlite"
   ],
-  "type": "module",
   "bin": "./dist/cli.js",
   "main": "./dist/index.js",
   "files": [
