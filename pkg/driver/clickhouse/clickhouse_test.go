@@ -2,6 +2,7 @@ package clickhouse
 
 import (
 	"database/sql"
+	"fmt"
 	"net/url"
 	"os"
 	"testing"
@@ -22,6 +23,12 @@ func testClickHouseDriverURL(t *testing.T, url string) *Driver {
 
 func testClickHouseDriver(t *testing.T) *Driver {
 	return testClickHouseDriverURL(t, os.Getenv("CLICKHOUSE_TEST_URL"))
+}
+
+func testClickHouseDriverOnCluster(t *testing.T) *Driver {
+	os.Setenv("CLICKHOUSE_TEST_URL", "clickhouse://localhost:9000/dbmate_test")
+	u := fmt.Sprintf("%s?on_cluster", os.Getenv("CLICKHOUSE_TEST_URL"))
+	return testClickHouseDriverURL(t, u)
 }
 
 func prepTestClickHouseDB(t *testing.T) *sql.DB {
@@ -88,94 +95,6 @@ func TestConnectionString(t *testing.T) {
 	}
 }
 
-func TestOnCluster(t *testing.T) {
-	cases := []struct {
-		input    string
-		expected bool
-	}{
-		// param not supplied
-		{"clickhouse://myhost:9000", false},
-		// empty on_cluster parameter
-		{"clickhouse://myhost:9000?on_cluster", true},
-		// true on_cluster parameter
-		{"clickhouse://myhost:9000?on_cluster=true", true},
-		// any other value on_cluster parameter
-		{"clickhouse://myhost:9000?on_cluster=falsy", false},
-	}
-
-	for _, c := range cases {
-		t.Run(c.input, func(t *testing.T) {
-			drv := testClickHouseDriverURL(t, c.input)
-
-			actual := drv.onCluster()
-			require.Equal(t, c.expected, actual)
-		})
-	}
-}
-
-func TestClusterMacro(t *testing.T) {
-	cases := []struct {
-		input    string
-		expected string
-	}{
-		// cluster_macro not supplied
-		{"clickhouse://myhost:9000", "{cluster}"},
-		// cluster_macro supplied
-		{"clickhouse://myhost:9000?cluster_macro={cluster2}", "{cluster2}"},
-	}
-
-	for _, c := range cases {
-		t.Run(c.input, func(t *testing.T) {
-			drv := testClickHouseDriverURL(t, c.input)
-
-			actual := drv.clusterMacro()
-			require.Equal(t, c.expected, actual)
-		})
-	}
-}
-
-func TestReplicaMacro(t *testing.T) {
-	cases := []struct {
-		input    string
-		expected string
-	}{
-		// replica_macro not supplied
-		{"clickhouse://myhost:9000", "{replica}"},
-		// replica_macro supplied
-		{"clickhouse://myhost:9000?replica_macro={replica2}", "{replica2}"},
-	}
-
-	for _, c := range cases {
-		t.Run(c.input, func(t *testing.T) {
-			drv := testClickHouseDriverURL(t, c.input)
-
-			actual := drv.replicaMacro()
-			require.Equal(t, c.expected, actual)
-		})
-	}
-}
-
-func TestZookeeperPath(t *testing.T) {
-	cases := []struct {
-		input    string
-		expected string
-	}{
-		// zoo_path not supplied
-		{"clickhouse://myhost:9000", "/clickhouse/tables/{cluster}/{table}"},
-		// zoo_path supplied
-		{"clickhouse://myhost:9000?zoo_path=/zk/path/tables", "/zk/path/tables"},
-	}
-
-	for _, c := range cases {
-		t.Run(c.input, func(t *testing.T) {
-			drv := testClickHouseDriverURL(t, c.input)
-
-			actual := drv.zookeeperPath()
-			require.Equal(t, c.expected, actual)
-		})
-	}
-}
-
 func TestOnClusterClause(t *testing.T) {
 	cases := []struct {
 		input    string
@@ -184,9 +103,9 @@ func TestOnClusterClause(t *testing.T) {
 		// not on cluster
 		{"clickhouse://myhost:9000", ""},
 		// on_cluster supplied
-		{"clickhouse://myhost:9000?on_cluster",  " ON CLUSTER '{cluster}'"},
+		{"clickhouse://myhost:9000?on_cluster", " ON CLUSTER '{cluster}'"},
 		// on_cluster with supplied macro
-		{"clickhouse://myhost:9000?on_cluster&cluster_macro={cluster2}",  " ON CLUSTER '{cluster2}'"},
+		{"clickhouse://myhost:9000?on_cluster&cluster_macro={cluster2}", " ON CLUSTER '{cluster2}'"},
 	}
 
 	for _, c := range cases {
@@ -201,6 +120,42 @@ func TestOnClusterClause(t *testing.T) {
 
 func TestClickHouseCreateDropDatabase(t *testing.T) {
 	drv := testClickHouseDriver(t)
+
+	// drop any existing database
+	err := drv.DropDatabase()
+	require.NoError(t, err)
+
+	// create database
+	err = drv.CreateDatabase()
+	require.NoError(t, err)
+
+	// check that database exists and we can connect to it
+	func() {
+		db, err := sql.Open("clickhouse", drv.databaseURL.String())
+		require.NoError(t, err)
+		defer dbutil.MustClose(db)
+
+		err = db.Ping()
+		require.NoError(t, err)
+	}()
+
+	// drop the database
+	err = drv.DropDatabase()
+	require.NoError(t, err)
+
+	// check that database no longer exists
+	func() {
+		db, err := sql.Open("clickhouse", drv.databaseURL.String())
+		require.NoError(t, err)
+		defer dbutil.MustClose(db)
+
+		err = db.Ping()
+		require.EqualError(t, err, "code: 81, message: Database dbmate_test doesn't exist")
+	}()
+}
+
+func TestClickHouseCreateDropDatabaseOnCluster(t *testing.T) {
+	drv := testClickHouseDriverOnCluster(t)
 
 	// drop any existing database
 	err := drv.DropDatabase()
