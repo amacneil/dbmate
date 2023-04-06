@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	OnClusterQueryParam = "on_cluster"
-	ZooPathQueryParam = "zoo_path"
+	OnClusterQueryParam    = "on_cluster"
+	ZooPathQueryParam      = "zoo_path"
 	ClusterMacroQueryParam = "cluster_macro"
 	ReplicaMacroQueryParam = "replica_macro"
 )
@@ -104,12 +104,11 @@ func (drv *Driver) openClickHouseDB() (*sql.DB, error) {
 
 func (drv *Driver) onCluster() bool {
 	v := dbutil.MustParseURL(connectionString(drv.databaseURL)).Query()
-	hasOnCluster :=  v.Has(OnClusterQueryParam)
-	onClusterValue :=  v.Get(OnClusterQueryParam)
+	hasOnCluster := v.Has(OnClusterQueryParam)
+	onClusterValue := v.Get(OnClusterQueryParam)
 	onCluster := hasOnCluster && (onClusterValue == "" || onClusterValue == "true")
 	return onCluster
 }
-
 
 func (drv *Driver) clusterMacro() string {
 	v := dbutil.MustParseURL(connectionString(drv.databaseURL)).Query()
@@ -120,7 +119,6 @@ func (drv *Driver) clusterMacro() string {
 	return clusterMacro
 }
 
-
 func (drv *Driver) replicaMacro() string {
 	v := dbutil.MustParseURL(connectionString(drv.databaseURL)).Query()
 	replicaMacro := v.Get(ReplicaMacroQueryParam)
@@ -129,7 +127,6 @@ func (drv *Driver) replicaMacro() string {
 	}
 	return replicaMacro
 }
-
 
 func (drv *Driver) zookeeperPath() string {
 	v := dbutil.MustParseURL(connectionString(drv.databaseURL)).Query()

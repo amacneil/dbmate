@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func testClickHouseDriverUrl(t *testing.T, url string) *Driver {
+func testClickHouseDriverURL(t *testing.T, url string) *Driver {
 	u := dbutil.MustParseURL(url)
 	drv, err := dbmate.New(u).Driver()
 	require.NoError(t, err)
@@ -21,7 +21,7 @@ func testClickHouseDriverUrl(t *testing.T, url string) *Driver {
 }
 
 func testClickHouseDriver(t *testing.T) *Driver {
-	return testClickHouseDriverUrl(t, os.Getenv("CLICKHOUSE_TEST_URL"))
+	return testClickHouseDriverURL(t, os.Getenv("CLICKHOUSE_TEST_URL"))
 }
 
 func prepTestClickHouseDB(t *testing.T) *sql.DB {
@@ -105,7 +105,7 @@ func TestOnCluster(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.input, func(t *testing.T) {
-			drv := testClickHouseDriverUrl(t, c.input)
+			drv := testClickHouseDriverURL(t, c.input)
 
 			actual := drv.onCluster()
 			require.Equal(t, c.expected, actual)
@@ -126,7 +126,7 @@ func TestClusterMacro(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.input, func(t *testing.T) {
-			drv := testClickHouseDriverUrl(t, c.input)
+			drv := testClickHouseDriverURL(t, c.input)
 
 			actual := drv.clusterMacro()
 			require.Equal(t, c.expected, actual)
@@ -147,7 +147,7 @@ func TestReplicaMacro(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.input, func(t *testing.T) {
-			drv := testClickHouseDriverUrl(t, c.input)
+			drv := testClickHouseDriverURL(t, c.input)
 
 			actual := drv.replicaMacro()
 			require.Equal(t, c.expected, actual)
@@ -168,7 +168,7 @@ func TestZookeeperPath(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.input, func(t *testing.T) {
-			drv := testClickHouseDriverUrl(t, c.input)
+			drv := testClickHouseDriverURL(t, c.input)
 
 			actual := drv.zookeeperPath()
 			require.Equal(t, c.expected, actual)
