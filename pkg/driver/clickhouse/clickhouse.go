@@ -16,6 +16,13 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2"
 )
 
+const (
+	OnClusterQueryParam = "on_cluster"
+	ZooPathQueryParam = "zoo_path"
+	ClusterMacroQueryParam = "cluster_macro"
+	ReplicaMacroQueryParam = "replica_macro"
+)
+
 func init() {
 	dbmate.RegisterDriver(NewDriver, "clickhouse")
 }
@@ -93,6 +100,45 @@ func (drv *Driver) openClickHouseDB() (*sql.DB, error) {
 	clickhouseURL.Path = "/default"
 
 	return sql.Open("clickhouse", clickhouseURL.String())
+}
+
+func (drv *Driver) onCluster() bool {
+	v := dbutil.MustParseURL(connectionString(drv.databaseURL)).Query()
+	hasOnCluster :=  v.Has(OnClusterQueryParam)
+	onClusterValue :=  v.Get(OnClusterQueryParam)
+	onCluster := hasOnCluster && (onClusterValue == "" || onClusterValue == "true")
+	return onCluster
+}
+
+
+func (drv *Driver) clusterMacro() string {
+	v := dbutil.MustParseURL(connectionString(drv.databaseURL)).Query()
+	clusterMacro := v.Get(ClusterMacroQueryParam)
+	if clusterMacro == "" {
+		clusterMacro = "{cluster}"
+	}
+	return clusterMacro
+}
+
+
+func (drv *Driver) replicaMacro() string {
+	v := dbutil.MustParseURL(connectionString(drv.databaseURL)).Query()
+	replicaMacro := v.Get(ReplicaMacroQueryParam)
+	if replicaMacro == "" {
+		replicaMacro = "{replica}"
+	}
+	return replicaMacro
+}
+
+
+func (drv *Driver) zookeeperPath() string {
+	v := dbutil.MustParseURL(connectionString(drv.databaseURL)).Query()
+	clusterMacro := drv.clusterMacro()
+	zookeeperPath := v.Get(ZooPathQueryParam)
+	if zookeeperPath == "" {
+		zookeeperPath = fmt.Sprintf("/clickhouse/tables/%s/{table}", clusterMacro)
+	}
+	return zookeeperPath
 }
 
 func (drv *Driver) databaseName() string {
