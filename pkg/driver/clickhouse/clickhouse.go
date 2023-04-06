@@ -138,6 +138,14 @@ func (drv *Driver) zookeeperPath() string {
 	return zookeeperPath
 }
 
+func (drv *Driver) onClusterClause() string{
+	clusterClause := ""
+	if drv.onCluster() {
+		clusterClause = fmt.Sprintf(" ON CLUSTER '%s'", drv.clusterMacro())
+	}
+	return clusterClause
+}
+
 func (drv *Driver) databaseName() string {
 	name := strings.TrimLeft(dbutil.MustParseURL(connectionString(drv.databaseURL)).Path, "/")
 	if name == "" {
@@ -169,7 +177,9 @@ func (drv *Driver) CreateDatabase() error {
 	}
 	defer dbutil.MustClose(db)
 
-	_, err = db.Exec("create database " + drv.quoteIdentifier(name))
+	q := fmt.Sprintf("CREATE DATABASE %s%s", drv.quoteIdentifier(name), drv.onClusterClause())
+
+	_, err = db.Exec(q)
 
 	return err
 }
@@ -185,7 +195,9 @@ func (drv *Driver) DropDatabase() error {
 	}
 	defer dbutil.MustClose(db)
 
-	_, err = db.Exec("drop database if exists " + drv.quoteIdentifier(name))
+	q := fmt.Sprintf("DROP DATABASE IF EXISTS %s%s", drv.quoteIdentifier(name), drv.onClusterClause())
+
+	_, err = db.Exec(q)
 
 	return err
 }

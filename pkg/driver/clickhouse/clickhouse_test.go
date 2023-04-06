@@ -176,6 +176,29 @@ func TestZookeeperPath(t *testing.T) {
 	}
 }
 
+func TestOnClusterClause(t *testing.T) {
+	cases := []struct {
+		input    string
+		expected string
+	}{
+		// not on cluster
+		{"clickhouse://myhost:9000", ""},
+		// on_cluster supplied
+		{"clickhouse://myhost:9000?on_cluster",  " ON CLUSTER '{cluster}'"},
+		// on_cluster with supplied macro
+		{"clickhouse://myhost:9000?on_cluster&cluster_macro={cluster2}",  " ON CLUSTER '{cluster2}'"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.input, func(t *testing.T) {
+			drv := testClickHouseDriverURL(t, c.input)
+
+			actual := drv.onClusterClause()
+			require.Equal(t, c.expected, actual)
+		})
+	}
+}
+
 func TestClickHouseCreateDropDatabase(t *testing.T) {
 	drv := testClickHouseDriver(t)
 
