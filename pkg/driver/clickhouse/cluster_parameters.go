@@ -27,9 +27,9 @@ func ClusterParametersFromURL(u *url.URL) *ClusterParameters {
 
 	r := &ClusterParameters{
 		OnCluster: onCluster,
-		ZooPath: clusterMacro,
-		ClusterMacro: replicaMacro,
-		ReplicaMacro: zookeeperPath,
+		ZooPath: zookeeperPath,
+		ClusterMacro: clusterMacro,
+		ReplicaMacro: replicaMacro,
 	}
 
 	v := u.Query()
