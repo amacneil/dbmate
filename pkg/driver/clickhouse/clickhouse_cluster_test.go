@@ -2,12 +2,20 @@ package clickhouse
 
 import (
 	"database/sql"
+	"fmt"
+	"os"
 	"testing"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
 
 	"github.com/stretchr/testify/require"
 )
+
+func testClickHouseDriverOnCluster(t *testing.T) *Driver {
+	u := fmt.Sprintf("%s?on_cluster", os.Getenv("CLICKHOUSE_CLUSTER_01_TEST_URL"))
+	return testClickHouseDriverURL(t, u)
+}
+
 
 func TestOnClusterClause(t *testing.T) {
 	cases := []struct {

@@ -2,7 +2,6 @@ package clickhouse
 
 import (
 	"database/sql"
-	"fmt"
 	"net/url"
 	"os"
 	"testing"
@@ -25,11 +24,6 @@ func testClickHouseDriver(t *testing.T) *Driver {
 	return testClickHouseDriverURL(t, os.Getenv("CLICKHOUSE_TEST_URL"))
 }
 
-func testClickHouseDriverOnCluster(t *testing.T) *Driver {
-	os.Setenv("CLICKHOUSE_TEST_URL", "clickhouse://localhost:9000/dbmate_test")
-	u := fmt.Sprintf("%s?on_cluster", os.Getenv("CLICKHOUSE_TEST_URL"))
-	return testClickHouseDriverURL(t, u)
-}
 
 func prepTestClickHouseDB(t *testing.T) *sql.DB {
 	drv := testClickHouseDriver(t)

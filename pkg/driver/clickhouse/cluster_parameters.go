@@ -32,11 +32,13 @@ func ClusterParametersFromURL(u *url.URL) *ClusterParameters {
 		ReplicaMacro: replicaMacro,
 	}
 
-	v := u.Query()
-	v.Del(OnClusterQueryParam)
-	v.Del(ClusterMacroQueryParam)
-	v.Del(ReplicaMacroQueryParam)
-	v.Del(ZooPathQueryParam)
+	q := u.Query()
+	q.Del(OnClusterQueryParam)
+	q.Del(ClusterMacroQueryParam)
+	q.Del(ReplicaMacroQueryParam)
+	q.Del(ZooPathQueryParam)
+
+	u.RawQuery = q.Encode()
 
 	return r
 }
