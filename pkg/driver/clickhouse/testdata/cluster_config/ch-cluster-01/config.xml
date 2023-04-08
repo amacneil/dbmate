@@ -10,8 +10,8 @@
         <level>trace</level>
         <log>/var/log/clickhouse-server/clickhouse-server.log</log>
         <errorlog>/var/log/clickhouse-server/clickhouse-server.err.log</errorlog>
-        <size>1000M</size>
-        <count>10</count>
+        <size>100M</size>
+        <count>2</count>
     </logger>
 
     <http_port>8123</http_port>
