@@ -11,11 +11,28 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func testClickHouseDriverOnCluster(t *testing.T) *Driver {
+func testClickHouseDriverCluster01(t *testing.T) *Driver {
 	u := fmt.Sprintf("%s?on_cluster", os.Getenv("CLICKHOUSE_CLUSTER_01_TEST_URL"))
 	return testClickHouseDriverURL(t, u)
 }
 
+func testClickHouseDriverCluster02(t *testing.T) *Driver {
+	u := fmt.Sprintf("%s?on_cluster", os.Getenv("CLICKHOUSE_CLUSTER_01_TEST_URL"))
+	return testClickHouseDriverURL(t, u)
+}
+
+func assertDatabaseExists(t *testing.T, drv *Driver, shouldExist bool){
+	db, err := sql.Open("clickhouse", drv.databaseURL.String())
+		require.NoError(t, err)
+		defer dbutil.MustClose(db)
+
+		err = db.Ping()
+		if shouldExist{
+			require.NoError(t, err)
+		} else {
+			require.EqualError(t, err, "code: 81, message: Database dbmate_test doesn't exist")
+		}
+}
 
 func TestOnClusterClause(t *testing.T) {
 	cases := []struct {
@@ -41,37 +58,28 @@ func TestOnClusterClause(t *testing.T) {
 }
 
 func TestClickHouseCreateDropDatabaseOnCluster(t *testing.T) {
-	drv := testClickHouseDriverOnCluster(t)
+	drv01 := testClickHouseDriverCluster01(t)
+	drv02 := testClickHouseDriverCluster02(t)
 
 	// drop any existing database
-	err := drv.DropDatabase()
+	err := drv01.DropDatabase()
 	require.NoError(t, err)
 
 	// create database
-	err = drv.CreateDatabase()
+	err = drv01.CreateDatabase()
 	require.NoError(t, err)
 
 	// check that database exists and we can connect to it
-	func() {
-		db, err := sql.Open("clickhouse", drv.databaseURL.String())
-		require.NoError(t, err)
-		defer dbutil.MustClose(db)
-
-		err = db.Ping()
-		require.NoError(t, err)
-	}()
+	assertDatabaseExists(t, drv01, true)
+	// check that database exists on the other clickhouse node and we can connect to it
+	assertDatabaseExists(t, drv02, true)
 
 	// drop the database
-	err = drv.DropDatabase()
+	err = drv01.DropDatabase()
 	require.NoError(t, err)
 
 	// check that database no longer exists
-	func() {
-		db, err := sql.Open("clickhouse", drv.databaseURL.String())
-		require.NoError(t, err)
-		defer dbutil.MustClose(db)
-
-		err = db.Ping()
-		require.EqualError(t, err, "code: 81, message: Database dbmate_test doesn't exist")
-	}()
+	assertDatabaseExists(t, drv01, false)
+	// check that database no longer exists on the other clickhouse node
+	assertDatabaseExists(t, drv02, false)
 }
