@@ -52,7 +52,7 @@ services:
     depends_on:
       - zookeeper
     volumes:
-      - ./pkg/driver/clickhouse/cluster_config/ch-cluster-01/config.xml:/etc/clickhouse-server/config.xml
+      - ./pkg/driver/clickhouse/testdata/cluster_config/ch-cluster-01/config.xml:/etc/clickhouse-server/config.xml
 
   clickhouse-cluster-02:
     image: clickhouse/clickhouse-server:22.8
@@ -62,4 +62,4 @@ services:
     depends_on:
       - zookeeper
     volumes:
-      - ./pkg/driver/clickhouse/cluster_config/ch-cluster-02/config.xml:/etc/clickhouse-server/config.xml
+      - ./pkg/driver/clickhouse/testdata/cluster_config/ch-cluster-02/config.xml:/etc/clickhouse-server/config.xml
