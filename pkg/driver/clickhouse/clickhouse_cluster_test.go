@@ -83,3 +83,48 @@ func TestClickHouseCreateDropDatabaseOnCluster(t *testing.T) {
 	// check that database no longer exists on the other clickhouse node
 	assertDatabaseExists(t, drv02, false)
 }
+
+func TestClickHouseDumpSchemaOnCluster(t *testing.T) {
+	drv := testClickHouseDriverCluster01(t)
+	drv.migrationsTableName = "test_migrations"
+
+	// prepare database
+	db := prepTestClickHouseDB(t, drv)
+	defer dbutil.MustClose(db)
+	err := drv.CreateMigrationsTable(db)
+	require.NoError(t, err)
+
+	// insert migration
+	tx, err := db.Begin()
+	require.NoError(t, err)
+	err = drv.InsertMigration(tx, "abc1")
+	require.NoError(t, err)
+	err = tx.Commit()
+	require.NoError(t, err)
+	tx, err = db.Begin()
+	require.NoError(t, err)
+	err = drv.InsertMigration(tx, "abc2")
+	require.NoError(t, err)
+	err = tx.Commit()
+	require.NoError(t, err)
+
+	// DumpSchema should return schema
+	schema, err := drv.DumpSchema(db)
+	require.NoError(t, err)
+	require.Contains(t, string(schema), "CREATE TABLE "+drv.databaseName()+".test_migrations")
+	require.Contains(t, string(schema), "--\n"+
+		"-- Dbmate schema migrations\n"+
+		"--\n\n"+
+		"INSERT INTO test_migrations (version) VALUES\n"+
+		"    ('abc1'),\n"+
+		"    ('abc2');\n")
+
+	// DumpSchema should return error if command fails
+	drv.databaseURL.Path = "/fakedb"
+	db, err = sql.Open("clickhouse", drv.databaseURL.String())
+	require.NoError(t, err)
+
+	schema, err = drv.DumpSchema(db)
+	require.Nil(t, schema)
+	require.EqualError(t, err, "code: 81, message: Database fakedb doesn't exist")
+}
