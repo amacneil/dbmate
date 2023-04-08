@@ -164,7 +164,7 @@ func (drv *Driver) DropDatabase() error {
 
 func (drv *Driver) schemaDump(db *sql.DB, buf *bytes.Buffer, databaseName string) error {
 	buf.WriteString("\n--\n-- Database schema\n--\n\n")
-	buf.WriteString("CREATE DATABASE IF NOT EXISTS " + drv.quoteIdentifier(databaseName) + ";\n\n")
+	buf.WriteString(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s%s;\n\n", drv.quoteIdentifier(databaseName), drv.onClusterClause()))
 
 	tables, err := dbutil.QueryColumn(db, "show tables")
 	if err != nil {
@@ -265,15 +265,21 @@ func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
 
 // CreateMigrationsTable creates the schema migrations table
 func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
+
+	engineClause := "ReplacingMergeTree(ts)"
+	if drv.clusterParameters.OnCluster{
+		engineClause = fmt.Sprintf("ReplicatedReplacingMergeTree(%s, %s, ts)", drv.clusterParameters.ZooPath, drv.clusterParameters.ReplicaMacro)
+	}
+
 	_, err := db.Exec(fmt.Sprintf(`
-		create table if not exists %s (
+		create table if not exists %s%s (
 			version String,
 			ts DateTime default now(),
 			applied UInt8 default 1
-		) engine = ReplacingMergeTree(ts)
+		) engine = %s
 		primary key version
 		order by version
-	`, drv.quotedMigrationsTableName()))
+	`, drv.quotedMigrationsTableName(), drv.onClusterClause(), engineClause))
 
 	return err
 }
