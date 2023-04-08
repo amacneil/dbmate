@@ -34,10 +34,9 @@ func NewDriver(config dbmate.DriverConfig) dbmate.Driver {
 		migrationsTableName: config.MigrationsTableName,
 		databaseURL:         config.DatabaseURL,
 		log:                 config.Log,
-		clusterParameters:   ClusterParametersFromURL(config.DatabaseURL),
+		clusterParameters:   ExtractClusterParametersFromURL(config.DatabaseURL),
 	}
 }
-
 
 func connectionString(initialURL *url.URL) string {
 	// clone url
@@ -98,7 +97,7 @@ func (drv *Driver) openClickHouseDB() (*sql.DB, error) {
 	return sql.Open("clickhouse", clickhouseURL.String())
 }
 
-func (drv *Driver) onClusterClause() string{
+func (drv *Driver) onClusterClause() string {
 	clusterClause := ""
 	if drv.clusterParameters.OnCluster {
 		clusterClause = fmt.Sprintf(" ON CLUSTER '%s'", drv.clusterParameters.ClusterMacro)
@@ -267,7 +266,7 @@ func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
 func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 
 	engineClause := "ReplacingMergeTree(ts)"
-	if drv.clusterParameters.OnCluster{
+	if drv.clusterParameters.OnCluster {
 		engineClause = fmt.Sprintf("ReplicatedReplacingMergeTree(%s, %s, ts)", drv.clusterParameters.ZooPath, drv.clusterParameters.ReplicaMacro)
 	}
 

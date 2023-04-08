@@ -13,21 +13,21 @@ const (
 )
 
 type ClusterParameters struct {
-	OnCluster bool
-	ZooPath string
+	OnCluster    bool
+	ZooPath      string
 	ClusterMacro string
 	ReplicaMacro string
 }
 
-func ClusterParametersFromURL(u *url.URL) *ClusterParameters {
+func ExtractClusterParametersFromURL(u *url.URL) *ClusterParameters {
 	onCluster := extractOnCluster(u)
 	clusterMacro := extractClusterMacro(u)
 	replicaMacro := extractReplicaMacro(u)
 	zookeeperPath := extractZookeeperPath(u)
 
 	r := &ClusterParameters{
-		OnCluster: onCluster,
-		ZooPath: zookeeperPath,
+		OnCluster:    onCluster,
+		ZooPath:      zookeeperPath,
 		ClusterMacro: clusterMacro,
 		ReplicaMacro: replicaMacro,
 	}
