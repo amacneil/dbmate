@@ -17,7 +17,7 @@ func testClickHouseDriverCluster01(t *testing.T) *Driver {
 }
 
 func testClickHouseDriverCluster02(t *testing.T) *Driver {
-	u := fmt.Sprintf("%s?on_cluster", os.Getenv("CLICKHOUSE_CLUSTER_01_TEST_URL"))
+	u := fmt.Sprintf("%s?on_cluster", os.Getenv("CLICKHOUSE_CLUSTER_02_TEST_URL"))
 	return testClickHouseDriverURL(t, u)
 }
 
