@@ -93,7 +93,6 @@ func TestClickHouseCreateDropDatabase(t *testing.T) {
 	}()
 }
 
-
 func TestClickHouseDumpSchema(t *testing.T) {
 	drv := testClickHouseDriver(t)
 	drv.migrationsTableName = "test_migrations"

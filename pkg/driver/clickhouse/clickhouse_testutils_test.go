@@ -24,7 +24,6 @@ func testClickHouseDriver(t *testing.T) *Driver {
 }
 
 func prepTestClickHouseDB(t *testing.T, drv *Driver) *sql.DB {
-
 	// drop any existing database
 	err := drv.DropDatabase()
 	require.NoError(t, err)

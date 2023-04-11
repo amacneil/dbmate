@@ -161,7 +161,7 @@ func (drv *Driver) DropDatabase() error {
 	return err
 }
 
-func (drv *Driver)schemaDump(db *sql.DB, buf *bytes.Buffer, databaseName string) error {
+func (drv *Driver) schemaDump(db *sql.DB, buf *bytes.Buffer, databaseName string) error {
 	buf.WriteString("\n--\n-- Database schema\n--\n\n")
 	buf.WriteString(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s%s;\n\n", drv.quoteIdentifier(databaseName), drv.onClusterClause()))
 
@@ -264,7 +264,6 @@ func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
 
 // CreateMigrationsTable creates the schema migrations table
 func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
-
 	engineClause := "ReplacingMergeTree(ts)"
 	if drv.clusterParameters.OnCluster {
 		engineClause = fmt.Sprintf("ReplicatedReplacingMergeTree('%s', '%s', ts)", drv.clusterParameters.ZooPath, drv.clusterParameters.ReplicaMacro)

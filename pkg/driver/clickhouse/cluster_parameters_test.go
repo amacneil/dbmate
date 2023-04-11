@@ -1,13 +1,12 @@
 package clickhouse
 
 import (
-
 	"testing"
 
-	"github.com/amacneil/dbmate/v2/pkg/dbutil"
 	"github.com/stretchr/testify/require"
-)
 
+	"github.com/amacneil/dbmate/v2/pkg/dbutil"
+)
 
 func TestOnCluster(t *testing.T) {
 	cases := []struct {
@@ -33,7 +32,6 @@ func TestOnCluster(t *testing.T) {
 		})
 	}
 }
-
 
 func TestClusterMacro(t *testing.T) {
 	cases := []struct {

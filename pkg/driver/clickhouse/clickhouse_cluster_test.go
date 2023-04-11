@@ -22,21 +22,21 @@ func testClickHouseDriverCluster02(t *testing.T) *Driver {
 	return testClickHouseDriverURL(t, u)
 }
 
-func assertDatabaseExists(t *testing.T, drv *Driver, shouldExist bool){
+func assertDatabaseExists(t *testing.T, drv *Driver, shouldExist bool) {
 	db, err := sql.Open("clickhouse", drv.databaseURL.String())
-		require.NoError(t, err)
-		defer dbutil.MustClose(db)
+	require.NoError(t, err)
+	defer dbutil.MustClose(db)
 
-		err = db.Ping()
-		if shouldExist{
-			require.NoError(t, err)
-		} else {
-			require.EqualError(t, err, "code: 81, message: Database dbmate_test doesn't exist")
-		}
+	err = db.Ping()
+	if shouldExist {
+		require.NoError(t, err)
+	} else {
+		require.EqualError(t, err, "code: 81, message: Database dbmate_test doesn't exist")
+	}
 }
 
 // To make sure data insertion is synced on both nodes
-func waitForNodesToSync(){
+func waitForNodesToSync() {
 	time.Sleep(25 * time.Millisecond)
 }
 
