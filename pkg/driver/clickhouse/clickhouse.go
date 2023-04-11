@@ -271,14 +271,14 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 	}
 
 	_, err := db.Exec(fmt.Sprintf(`
-		create table if not exists %s (
+		create table if not exists %s%s (
 			version String,
 			ts DateTime default now(),
 			applied UInt8 default 1
 		) engine = %s
 		primary key version
 		order by version
-	`, drv.quotedMigrationsTableName(), engineClause))
+	`, drv.quotedMigrationsTableName(), drv.onClusterClause(), engineClause))
 
 	return err
 }

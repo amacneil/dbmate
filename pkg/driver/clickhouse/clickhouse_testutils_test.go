@@ -23,7 +23,6 @@ func testClickHouseDriver(t *testing.T) *Driver {
 	return testClickHouseDriverURL(t, os.Getenv("CLICKHOUSE_TEST_URL"))
 }
 
-
 func prepTestClickHouseDB(t *testing.T, drv *Driver) *sql.DB {
 
 	// drop any existing database
