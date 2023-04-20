@@ -43,6 +43,8 @@ type DB struct {
 	FS fs.FS
 	// Log is the interface to write stdout
 	Log io.Writer
+	// Migration specifies a specific migration to look at
+	Migration string
 	// MigrationsDir specifies the directory to find migration files
 	MigrationsDir string
 	// MigrationsTableName specifies the database table to record migrations in
@@ -72,6 +74,7 @@ func New(databaseURL *url.URL) *DB {
 		DatabaseURL:         databaseURL,
 		FS:                  nil,
 		Log:                 os.Stdout,
+		Migration:           "",
 		MigrationsDir:       "./db/migrations",
 		MigrationsTableName: "schema_migrations",
 		SchemaFile:          "./db/schema.sql",
@@ -418,6 +421,7 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 		return nil, fmt.Errorf("%w `%s`", ErrMigrationDirNotFound, db.MigrationsDir)
 	}
 
+	found := false
 	migrations := []Migration{}
 	for _, file := range files {
 		if file.IsDir() {
@@ -436,11 +440,23 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 			FS:       db.FS,
 			Version:  matches[1],
 		}
+
+		if db.Migration != "" {
+			if db.Migration != migration.Version && db.Migration != migration.FileName {
+				continue
+			}
+			found = true
+		}
+
 		if ok := appliedMigrations[migration.Version]; ok {
 			migration.Applied = true
 		}
 
 		migrations = append(migrations, migration)
+	}
+
+	if !found && db.Migration != "" {
+		return nil, fmt.Errorf("%w `%s`", ErrMigrationNotFound, db.Migration)
 	}
 
 	sort.Slice(migrations, func(i, j int) bool {
