@@ -11,6 +11,7 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
+	"github.com/amacneil/dbmate/v2/pkg/dbutil"
 	_ "github.com/amacneil/dbmate/v2/pkg/driver/clickhouse"
 	_ "github.com/amacneil/dbmate/v2/pkg/driver/mysql"
 	_ "github.com/amacneil/dbmate/v2/pkg/driver/postgres"
@@ -36,7 +37,7 @@ func NewApp() *cli.App {
 	app.Usage = "A lightweight, framework-independent database migration tool."
 	app.Version = dbmate.Version
 
-	defaultDB := dbmate.New(nil)
+	defaultDB := dbmate.New(nil, nil)
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
 			Name:    "url",
@@ -225,11 +226,11 @@ func loadDotEnv() {
 // action wraps a cli.ActionFunc with dbmate initialization logic
 func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 	return func(c *cli.Context) error {
-		u, err := getDatabaseURL(c)
+		u, dsn, err := getDatabaseConfig(c)
 		if err != nil {
 			return err
 		}
-		db := dbmate.New(u)
+		db := dbmate.New(u, dsn)
 		db.AutoDumpSchema = !c.Bool("no-dump-schema")
 		db.MigrationsDir = c.String("migrations-dir")
 		db.MigrationsTableName = c.String("migrations-table")
@@ -245,7 +246,7 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 }
 
 // getDatabaseURL returns the current database url from cli flag or environment variable
-func getDatabaseURL(c *cli.Context) (u *url.URL, err error) {
+func getDatabaseConfig(c *cli.Context) (*url.URL, *dbutil.DSN, error) {
 	// check --url flag first
 	value := c.String("url")
 	if value == "" {
@@ -254,7 +255,16 @@ func getDatabaseURL(c *cli.Context) (u *url.URL, err error) {
 		value = os.Getenv(env)
 	}
 
-	return url.Parse(value)
+	if value == "" {
+		if dsn := os.Getenv("DATABASE_DSN"); dsn != "" {
+			driver := os.Getenv("DBMATE_DRIVER")
+			dsn, err := dbmate.NewDSN(driver, dsn)
+			return nil, &dsn, err
+		}
+	}
+
+	u, err := url.Parse(value)
+	return u, nil, err
 }
 
 // redactLogString attempts to redact passwords from errors

@@ -166,3 +166,79 @@ func MustUnescapePath(s string) string {
 
 	return path
 }
+
+type DSN struct {
+	connectionString string
+	driver           string
+}
+
+var ErrDriverUnset = errors.New("driver not set")
+
+func NewDSN(driver string, input string) (DSN, error) {
+	// We support some manipulation of the DSN.
+	// We Don't actually parse the DSN because would bring in a dependency
+	// This means there will be edge cases
+	// However, the DSN manipulation we do is very limited
+	dsn := DSN{
+		connectionString: input,
+	}
+	if driver == "" {
+		driver = dsn.DeleteKey("driver")
+		if driver == "" {
+			return DSN{}, ErrDriverUnset
+		}
+	}
+	dsn.driver = driver
+	return dsn, nil
+}
+
+func (dsn *DSN) Driver() string {
+	return dsn.driver
+}
+
+func (dsn *DSN) ConnectionString() string {
+	return dsn.connectionString
+}
+
+// This function will not work properly if the key value is quoting a space
+func (dsn *DSN) GetKey(key string) string {
+	items := strings.Split(dsn.connectionString, " ")
+	for _, item := range items {
+		if strings.HasPrefix(item, key+"=") {
+			keySplit := strings.Split(item, "=")
+			if len(keySplit) == 2 {
+				return keySplit[1]
+			}
+		}
+	}
+	return ""
+}
+
+// return the original value
+// This will not work properly if the key value is quoting a space
+func (dsn *DSN) DeleteKey(key string) string {
+	return dsn.SetKey(key, "")
+}
+
+// Return the original value
+// This function will not work properly if the key value is quoting a space
+func (dsn *DSN) SetKey(key string, newValue string) (original string) {
+	// delete key (and its value) from the DSN
+	items := strings.Split(dsn.connectionString, " ")
+	newItems := make([]string, 0, len(items))
+	for _, item := range items {
+		if strings.HasPrefix(item, key+"=") {
+			kv := strings.Split(item, "=")
+			if len(kv) == 2 {
+				original = kv[1]
+			}
+		} else {
+			newItems = append(newItems, item)
+		}
+	}
+	if newValue != "" {
+		newItems = append(newItems, newValue)
+	}
+	dsn.connectionString = strings.Join(newItems, " ")
+	return
+}

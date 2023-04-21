@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
@@ -30,6 +31,14 @@ var (
 	ErrCreateDirectory       = errors.New("unable to create directory")
 )
 
+func NewDSN(driver string, input string) (dbutil.DSN, error) {
+	dsn, err := dbutil.NewDSN(driver, input)
+	if errors.Is(err, dbutil.ErrDriverUnset) {
+		return dsn, fmt.Errorf("%w: %s expected DBMATE_DRIVER to be set or driver= in DSN", err.Error(), ErrUnsupportedDriver)
+	}
+	return dsn, err
+}
+
 // migrationFileRegexp pattern for valid migration files
 var migrationFileRegexp = regexp.MustCompile(`^(\d+).*\.sql$`)
 
@@ -39,6 +48,8 @@ type DB struct {
 	AutoDumpSchema bool
 	// DatabaseURL is the database connection string
 	DatabaseURL *url.URL
+	// DatabaseDSN is the database connection dsn
+	DatabaseDSN *dbutil.DSN
 	// FS specifies the filesystem, or nil for OS filesystem
 	FS fs.FS
 	// Log is the interface to write stdout
@@ -66,10 +77,11 @@ type StatusResult struct {
 }
 
 // New initializes a new dbmate database
-func New(databaseURL *url.URL) *DB {
+func New(databaseURL *url.URL, dsn *dbutil.DSN) *DB {
 	return &DB{
 		AutoDumpSchema:      true,
 		DatabaseURL:         databaseURL,
+		DatabaseDSN:         dsn,
 		FS:                  nil,
 		Log:                 os.Stdout,
 		MigrationsDir:       "./db/migrations",
@@ -84,17 +96,25 @@ func New(databaseURL *url.URL) *DB {
 
 // Driver initializes the appropriate database driver
 func (db *DB) Driver() (Driver, error) {
+	var scheme string
 	if db.DatabaseURL == nil || db.DatabaseURL.Scheme == "" {
-		return nil, ErrInvalidURL
+		if db.DatabaseDSN != nil {
+			scheme = strings.ToLower(db.DatabaseDSN.Driver())
+		} else {
+			return nil, ErrInvalidURL
+		}
+	} else {
+		scheme = db.DatabaseURL.Scheme
 	}
 
-	driverFunc := drivers[db.DatabaseURL.Scheme]
+	driverFunc := drivers[scheme]
 	if driverFunc == nil {
-		return nil, fmt.Errorf("%w: %s", ErrUnsupportedDriver, db.DatabaseURL.Scheme)
+		return nil, fmt.Errorf("%w: %s", ErrUnsupportedDriver, scheme)
 	}
 
 	config := DriverConfig{
 		DatabaseURL:         db.DatabaseURL,
+		DatabaseDSN:         db.DatabaseDSN,
 		Log:                 db.Log,
 		MigrationsTableName: db.MigrationsTableName,
 	}

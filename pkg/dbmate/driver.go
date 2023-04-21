@@ -26,6 +26,7 @@ type Driver interface {
 // DriverConfig holds configuration passed to driver constructors
 type DriverConfig struct {
 	DatabaseURL         *url.URL
+	DatabaseDSN         *dbutil.DSN
 	Log                 io.Writer
 	MigrationsTableName string
 }

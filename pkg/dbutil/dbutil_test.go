@@ -56,3 +56,42 @@ func TestQueryValue(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "7", val)
 }
+
+func TestDSNDriverRequired(t *testing.T) {
+	driver := "postgres"
+	connStr := "user=User dbname=DBName"
+	_, err := dbutil.NewDSN(driver, connStr)
+	require.NoError(t, err)
+	_, err = dbutil.NewDSN("", connStr)
+	require.Error(t, err)
+	_, err = dbutil.NewDSN("", connStr+" driver=postgres")
+	require.NoError(t, err)
+}
+
+func TestDSNGetKey(t *testing.T) {
+	driver := "postgres"
+	connStr := "user=User dbname=DBName"
+	dsn, err := dbutil.NewDSN(driver, connStr)
+	require.NoError(t, err)
+	require.Equal(t, connStr, dsn.ConnectionString())
+
+	userValue := dsn.GetKey("user")
+	require.Equal(t, "User", userValue)
+	dbnameValue := dsn.GetKey("dbname")
+	require.Equal(t, "DBName", dbnameValue)
+}
+
+func TestDSNDeleteKey(t *testing.T) {
+	driver := "postgres"
+	connStr := "user=User dbname=DBName"
+	dsn, err := dbutil.NewDSN(driver, connStr)
+	require.NoError(t, err)
+	require.Equal(t, connStr, dsn.ConnectionString())
+
+	userValue := dsn.DeleteKey("user")
+	require.Equal(t, "User", userValue)
+	require.Equal(t, "dbname=DBName", dsn.ConnectionString())
+	dbnameValue := dsn.DeleteKey("dbname")
+	require.Equal(t, "DBName", dbnameValue)
+	require.Equal(t, "", dsn.ConnectionString())
+}

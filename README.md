@@ -196,6 +196,8 @@ $ dbmate -u "postgres://postgres@127.0.0.1:5432/myapp_test?sslmode=disable" up
 
 The only advantage of using `dbmate -e TEST_DATABASE_URL` over `dbmate -u $TEST_DATABASE_URL` is that the former takes advantage of dbmate's automatic `.env` file loading.
 
+Some drivers (currently just Postgres) support specifying a DSN string instead of a url by using `DATABASE_DSN` instead of `DATABBASE_URL`. When using `DATABASE_DSN` you can specify the driver with `DBMATE_DRIVER`.
+
 #### PostgreSQL
 
 When connecting to Postgres, you may need to add the `sslmode=disable` option to your connection string, as dbmate by default requires a TLS connection (some other frameworks/languages allow unencrypted connections by default).
