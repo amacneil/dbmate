@@ -49,11 +49,11 @@ func NewApp() *cli.App {
 			Value:   "DATABASE_URL",
 			Usage:   "specify an environment variable containing the database URL",
 		},
-		&cli.StringFlag{
+		&cli.StringSliceFlag{
 			Name:    "migrations-dir",
 			Aliases: []string{"d"},
 			EnvVars: []string{"DBMATE_MIGRATIONS_DIR"},
-			Value:   defaultDB.MigrationsDir,
+			Value:   cli.NewStringSlice(defaultDB.MigrationsDir[0]),
 			Usage:   "specify the directory containing migration files",
 		},
 		&cli.StringFlag{
@@ -231,7 +231,7 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 		}
 		db := dbmate.New(u)
 		db.AutoDumpSchema = !c.Bool("no-dump-schema")
-		db.MigrationsDir = c.String("migrations-dir")
+		db.MigrationsDir = c.StringSlice("migrations-dir")
 		db.MigrationsTableName = c.String("migrations-table")
 		db.SchemaFile = c.String("schema-file")
 		db.WaitBefore = c.Bool("wait")

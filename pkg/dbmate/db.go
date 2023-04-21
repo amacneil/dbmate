@@ -43,8 +43,8 @@ type DB struct {
 	FS fs.FS
 	// Log is the interface to write stdout
 	Log io.Writer
-	// MigrationsDir specifies the directory to find migration files
-	MigrationsDir string
+	// MigrationsDir specifies the directory or directories to find migration files
+	MigrationsDir []string
 	// MigrationsTableName specifies the database table to record migrations in
 	MigrationsTableName string
 	// SchemaFile specifies the location for schema.sql file
@@ -72,7 +72,7 @@ func New(databaseURL *url.URL) *DB {
 		DatabaseURL:         databaseURL,
 		FS:                  nil,
 		Log:                 os.Stdout,
-		MigrationsDir:       "./db/migrations",
+		MigrationsDir:       []string{"./db/migrations"},
 		MigrationsTableName: "schema_migrations",
 		SchemaFile:          "./db/schema.sql",
 		Verbose:             false,
@@ -239,12 +239,12 @@ func (db *DB) NewMigration(name string) error {
 	name = fmt.Sprintf("%s_%s.sql", timestamp, name)
 
 	// create migrations dir if missing
-	if err := ensureDir(db.MigrationsDir); err != nil {
+	if err := ensureDir(db.MigrationsDir[0]); err != nil {
 		return err
 	}
 
 	// check file does not already exist
-	path := filepath.Join(db.MigrationsDir, name)
+	path := filepath.Join(db.MigrationsDir[0], name)
 	fmt.Fprintf(db.Log, "Creating migration: %s\n", path)
 
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
@@ -372,8 +372,8 @@ func (db *DB) printVerbose(result sql.Result) {
 	}
 }
 
-func (db *DB) readMigrationsDir() ([]fs.DirEntry, error) {
-	path := filepath.Clean(db.MigrationsDir)
+func (db *DB) readMigrationsDir(dir string) ([]fs.DirEntry, error) {
+	path := filepath.Clean(dir)
 
 	// We use nil instead of os.DirFS() because DirFS cannot support both relative and absolute
 	// directory paths - it must be anchored at either "." or "/", which we do not know in advance.
@@ -412,35 +412,37 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 		}
 	}
 
-	// find filesystem migrations
-	files, err := db.readMigrationsDir()
-	if err != nil {
-		return nil, fmt.Errorf("%w `%s`", ErrMigrationDirNotFound, db.MigrationsDir)
-	}
-
 	migrations := []Migration{}
-	for _, file := range files {
-		if file.IsDir() {
-			continue
+	for _, dir := range db.MigrationsDir {
+		// find filesystem migrations
+		files, err := db.readMigrationsDir(dir)
+		if err != nil {
+			return nil, fmt.Errorf("%w `%s`", ErrMigrationDirNotFound, dir)
 		}
 
-		matches := migrationFileRegexp.FindStringSubmatch(file.Name())
-		if len(matches) < 2 {
-			continue
-		}
+		for _, file := range files {
+			if file.IsDir() {
+				continue
+			}
 
-		migration := Migration{
-			Applied:  false,
-			FileName: matches[0],
-			FilePath: filepath.Join(db.MigrationsDir, matches[0]),
-			FS:       db.FS,
-			Version:  matches[1],
-		}
-		if ok := appliedMigrations[migration.Version]; ok {
-			migration.Applied = true
-		}
+			matches := migrationFileRegexp.FindStringSubmatch(file.Name())
+			if len(matches) < 2 {
+				continue
+			}
 
-		migrations = append(migrations, migration)
+			migration := Migration{
+				Applied:  false,
+				FileName: matches[0],
+				FilePath: filepath.Join(dir, matches[0]),
+				FS:       db.FS,
+				Version:  matches[1],
+			}
+			if ok := appliedMigrations[migration.Version]; ok {
+				migration.Applied = true
+			}
+
+			migrations = append(migrations, migration)
+		}
 	}
 
 	sort.Slice(migrations, func(i, j int) bool {

@@ -42,7 +42,7 @@ func TestNew(t *testing.T) {
 	db := dbmate.New(dbutil.MustParseURL("foo:test"))
 	require.True(t, db.AutoDumpSchema)
 	require.Equal(t, "foo:test", db.DatabaseURL.String())
-	require.Equal(t, "./db/migrations", db.MigrationsDir)
+	require.Equal(t, []string{"./db/migrations"}, db.MigrationsDir)
 	require.Equal(t, "schema_migrations", db.MigrationsTableName)
 	require.Equal(t, "./db/schema.sql", db.SchemaFile)
 	require.False(t, db.WaitBefore)
@@ -462,7 +462,7 @@ func TestFindMigrationsAbsolute(t *testing.T) {
 	t.Run("relative path", func(t *testing.T) {
 		u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
 		db := newTestDB(t, u)
-		db.MigrationsDir = "db/migrations"
+		db.MigrationsDir = []string{"db/migrations"}
 
 		migrations, err := db.FindMigrations()
 		require.NoError(t, err)
@@ -482,7 +482,7 @@ func TestFindMigrationsAbsolute(t *testing.T) {
 
 		u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
 		db := newTestDB(t, u)
-		db.MigrationsDir = dir
+		db.MigrationsDir = []string{dir}
 		require.Nil(t, db.FS)
 
 		migrations, err := db.FindMigrations()
@@ -549,4 +549,37 @@ drop table users;
 	require.True(t, parsed.UpOptions.Transaction())
 	require.Equal(t, "-- migrate:down\ndrop table users;\n", parsed.Down)
 	require.True(t, parsed.DownOptions.Transaction())
+}
+
+func TestFindMigrationsFSMultipleDirs(t *testing.T) {
+	mapFS := fstest.MapFS{
+		"db/migrations_a/001_test_migration_a.sql": {},
+		"db/migrations_a/005_test_migration_a.sql": {},
+		"db/migrations_b/003_test_migration_b.sql": {},
+		"db/migrations_b/004_test_migration_b.sql": {},
+		"db/migrations_c/002_test_migration_c.sql": {},
+		"db/migrations_c/006_test_migration_c.sql": {},
+	}
+
+	u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
+	db := newTestDB(t, u)
+	db.FS = mapFS
+	db.MigrationsDir = []string{"./db/migrations_a", "./db/migrations_b", "./db/migrations_c"}
+
+	// drop and recreate database
+	err := db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
+
+	actual, err := db.FindMigrations()
+	require.NoError(t, err)
+
+	// test migrations are correct and in order
+	require.Equal(t, "db/migrations_a/001_test_migration_a.sql", actual[0].FilePath)
+	require.Equal(t, "db/migrations_c/002_test_migration_c.sql", actual[1].FilePath)
+	require.Equal(t, "db/migrations_b/003_test_migration_b.sql", actual[2].FilePath)
+	require.Equal(t, "db/migrations_b/004_test_migration_b.sql", actual[3].FilePath)
+	require.Equal(t, "db/migrations_a/005_test_migration_a.sql", actual[4].FilePath)
+	require.Equal(t, "db/migrations_c/006_test_migration_c.sql", actual[5].FilePath)
 }
