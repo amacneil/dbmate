@@ -22,19 +22,19 @@ func TestGetDatabaseUrl(t *testing.T) {
 	ctx := cli.NewContext(app, flagset, nil)
 
 	// no flags defaults to DATABASE_URL
-	u, err := getDatabaseURL(ctx)
+	u, _, err := getDatabaseConfig(ctx)
 	require.NoError(t, err)
 	require.Equal(t, "foo://example.org/one", u.String())
 
 	// --env overwrites DATABASE_URL
 	require.NoError(t, ctx.Set("env", "CUSTOM_URL"))
-	u, err = getDatabaseURL(ctx)
+	u, _, err = getDatabaseConfig(ctx)
 	require.NoError(t, err)
 	require.Equal(t, "foo://example.org/two", u.String())
 
 	// --url takes precedence over preceding two options
 	require.NoError(t, ctx.Set("url", "foo://example.org/three"))
-	u, err = getDatabaseURL(ctx)
+	u, _, err = getDatabaseConfig(ctx)
 	require.NoError(t, err)
 	require.Equal(t, "foo://example.org/three", u.String())
 }

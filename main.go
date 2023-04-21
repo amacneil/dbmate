@@ -37,7 +37,7 @@ func NewApp() *cli.App {
 	app.Usage = "A lightweight, framework-independent database migration tool."
 	app.Version = dbmate.Version
 
-	defaultDB := dbmate.New(nil, nil)
+	defaultDB := dbmate.New(nil)
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
 			Name:    "url",
@@ -230,7 +230,7 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 		if err != nil {
 			return err
 		}
-		db := dbmate.New(u, dsn)
+		db := dbmate.NewWithDSN(u, dsn)
 		db.AutoDumpSchema = !c.Bool("no-dump-schema")
 		db.MigrationsDir = c.String("migrations-dir")
 		db.MigrationsTableName = c.String("migrations-table")

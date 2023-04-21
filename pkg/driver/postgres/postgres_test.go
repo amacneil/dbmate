@@ -14,7 +14,7 @@ import (
 )
 
 func testPostgresDriver(t *testing.T) *Driver {
-	u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
+	u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"), ni)
 	drv, err := dbmate.New(u).Driver()
 	require.NoError(t, err)
 
@@ -94,6 +94,7 @@ func TestConnectionString(t *testing.T) {
 }
 
 func TestConnectionArgsForDump(t *testing.T) {
+	drv := testPostgresDriver(t)
 	cases := []struct {
 		input    string
 		expected []string
@@ -109,9 +110,10 @@ func TestConnectionArgsForDump(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.input, func(t *testing.T) {
 			u, err := url.Parse(c.input)
+			drv.databaseURL = u
 			require.NoError(t, err)
 
-			actual := connectionArgsForDump(u)
+			actual := drv.connectionArgsForDump()
 			require.Equal(t, c.expected, actual)
 		})
 	}

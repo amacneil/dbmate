@@ -77,7 +77,12 @@ type StatusResult struct {
 }
 
 // New initializes a new dbmate database
-func New(databaseURL *url.URL, dsn *dbutil.DSN) *DB {
+func New(databaseURL *url.URL) *DB {
+	return NewWithDSN(databaseURL, nil)
+}
+
+// NewWithDSN initializes a new dbmate database with either a url or a dsn
+func NewWithDSN(databaseURL *url.URL, dsn *dbutil.DSN) *DB {
 	return &DB{
 		AutoDumpSchema:      true,
 		DatabaseURL:         databaseURL,
