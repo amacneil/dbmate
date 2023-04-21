@@ -34,7 +34,7 @@ var (
 func NewDSN(driver string, input string) (dbutil.DSN, error) {
 	dsn, err := dbutil.NewDSN(driver, input)
 	if errors.Is(err, dbutil.ErrDriverUnset) {
-		return dsn, fmt.Errorf("%w: %s expected DBMATE_DRIVER to be set or driver= in DSN", err.Error(), ErrUnsupportedDriver)
+		return dsn, fmt.Errorf("%s: expected DBMATE_DRIVER to be set or driver= in DSN: %w", err.Error(), ErrUnsupportedDriver)
 	}
 	return dsn, err
 }
