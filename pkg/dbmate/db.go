@@ -43,8 +43,8 @@ type DB struct {
 	FS fs.FS
 	// Log is the interface to write stdout
 	Log io.Writer
-	// Migration specifies a specific migration to look at
-	Migration string
+	// Migration specifies one or more specific migrations to look at
+	Migrations []string
 	// MigrationsDir specifies the directory or directories to find migration files
 	MigrationsDir []string
 	// MigrationsTableName specifies the database table to record migrations in
@@ -74,7 +74,7 @@ func New(databaseURL *url.URL) *DB {
 		DatabaseURL:         databaseURL,
 		FS:                  nil,
 		Log:                 os.Stdout,
-		Migration:           "",
+		Migrations:          []string{},
 		MigrationsDir:       []string{"./db/migrations"},
 		MigrationsTableName: "schema_migrations",
 		SchemaFile:          "./db/schema.sql",
@@ -415,7 +415,7 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 		}
 	}
 
-	found := false
+	givenMigrations := db.Migrations
 	migrations := []Migration{}
 	for _, dir := range db.MigrationsDir {
 		// find filesystem migrations
@@ -442,11 +442,18 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 				Version:  matches[1],
 			}
 
-			if db.Migration != "" {
-				if db.Migration != migration.Version && db.Migration != migration.FileName {
+			if len(db.Migrations) > 0 {
+				found := false
+				for i, given := range givenMigrations {
+					if given == migration.Version || given == migration.FileName {
+						givenMigrations = append(givenMigrations[:i], givenMigrations[i+1:]...)
+						found = true
+						break
+					}
+				}
+				if !found {
 					continue
 				}
-				found = true
 			}
 
 			if ok := appliedMigrations[migration.Version]; ok {
@@ -457,8 +464,8 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 		}
 	}
 
-	if !found && db.Migration != "" {
-		return nil, fmt.Errorf("%w `%s`", ErrMigrationNotFound, db.Migration)
+	if len(givenMigrations) > 0 {
+		return nil, fmt.Errorf("%w `%v`", ErrMigrationNotFound, givenMigrations)
 	}
 
 	sort.Slice(migrations, func(i, j int) bool {
