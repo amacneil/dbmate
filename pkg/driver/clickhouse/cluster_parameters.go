@@ -19,6 +19,17 @@ type ClusterParameters struct {
 	ReplicaMacro string
 }
 
+func ClearClusterParametersFromUrl(u *url.URL) *url.URL{
+	q := u.Query()
+	q.Del(OnClusterQueryParam)
+	q.Del(ClusterMacroQueryParam)
+	q.Del(ReplicaMacroQueryParam)
+	q.Del(ZooPathQueryParam)
+	u.RawQuery = q.Encode()
+
+	return u
+}
+
 func ExtractClusterParametersFromURL(u *url.URL) *ClusterParameters {
 	onCluster := extractOnCluster(u)
 	clusterMacro := extractClusterMacro(u)
@@ -31,14 +42,6 @@ func ExtractClusterParametersFromURL(u *url.URL) *ClusterParameters {
 		ClusterMacro: clusterMacro,
 		ReplicaMacro: replicaMacro,
 	}
-
-	q := u.Query()
-	q.Del(OnClusterQueryParam)
-	q.Del(ClusterMacroQueryParam)
-	q.Del(ReplicaMacroQueryParam)
-	q.Del(ZooPathQueryParam)
-
-	u.RawQuery = q.Encode()
 
 	return r
 }
