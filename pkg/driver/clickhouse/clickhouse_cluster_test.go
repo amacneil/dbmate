@@ -42,7 +42,7 @@ func waitForNodesToSync() {
 }
 
 // Makes sure driver creatinon is atomic
-func TestDriverCreationSanity(t *testing.T){
+func TestDriverCreationSanity(t *testing.T) {
 	url := fmt.Sprintf("%s?on_cluster", os.Getenv("CLICKHOUSE_CLUSTER_01_TEST_URL"))
 	u := dbutil.MustParseURL(url)
 	dbm := dbmate.New(u)

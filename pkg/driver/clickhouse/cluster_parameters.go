@@ -19,7 +19,7 @@ type ClusterParameters struct {
 	ReplicaMacro string
 }
 
-func ClearClusterParametersFromUrl(u *url.URL) *url.URL{
+func ClearClusterParametersFromURL(u *url.URL) *url.URL {
 	q := u.Query()
 	q.Del(OnClusterQueryParam)
 	q.Del(ClusterMacroQueryParam)
