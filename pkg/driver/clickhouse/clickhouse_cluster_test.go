@@ -38,11 +38,11 @@ func assertDatabaseExists(t *testing.T, drv *Driver, shouldExist bool) {
 
 // To make sure data insertion is synced on both nodes
 func waitForNodesToSync() {
-	time.Sleep(25 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 }
 
 // Makes sure driver creatinon is atomic
-func TestDriverCreationSanity(t *testing.T) {
+func TestDriverCreationSanity(t *testing.T){
 	url := fmt.Sprintf("%s?on_cluster", os.Getenv("CLICKHOUSE_CLUSTER_01_TEST_URL"))
 	u := dbutil.MustParseURL(url)
 	dbm := dbmate.New(u)
