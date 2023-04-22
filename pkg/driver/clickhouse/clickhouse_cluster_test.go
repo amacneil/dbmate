@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
@@ -34,11 +33,6 @@ func assertDatabaseExists(t *testing.T, drv *Driver, shouldExist bool) {
 	} else {
 		require.EqualError(t, err, "code: 81, message: Database dbmate_test doesn't exist")
 	}
-}
-
-// To make sure data insertion is synced on both nodes
-func waitForNodesToSync() {
-	time.Sleep(50 * time.Millisecond)
 }
 
 // Makes sure driver creatinon is atomic
@@ -242,8 +236,6 @@ func TestClickHouseSelectMigrationsOnCluster(t *testing.T) {
 	err = tx.Commit()
 	require.NoError(t, err)
 
-	waitForNodesToSync()
-
 	migrations01, err := drv01.SelectMigrations(db01, -1)
 	require.NoError(t, err)
 	require.Equal(t, true, migrations01["abc1"])
@@ -305,8 +297,6 @@ func TestClickHouseInsertMigrationOnCluster(t *testing.T) {
 	err = tx.Commit()
 	require.NoError(t, err)
 
-	waitForNodesToSync()
-
 	err = db01.QueryRow("select count(*) from test_migrations where version = 'abc1'").Scan(&count01)
 	require.NoError(t, err)
 	require.Equal(t, 1, count01)
@@ -348,8 +338,6 @@ func TestClickHouseDeleteMigrationOnCluster(t *testing.T) {
 	require.NoError(t, err)
 	err = tx.Commit()
 	require.NoError(t, err)
-
-	waitForNodesToSync()
 
 	count01 := 0
 	err = db01.QueryRow("select count(*) from test_migrations final where applied").Scan(&count01)
