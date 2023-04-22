@@ -132,6 +132,7 @@ func TestClickHouseDumpSchemaOnCluster(t *testing.T) {
 	schema, err := drv.DumpSchema(db)
 	require.NoError(t, err)
 	require.Contains(t, string(schema), "CREATE TABLE "+drv.databaseName()+".test_migrations")
+	require.Contains(t, string(schema), "ENGINE = ReplicatedReplacingMergeTree")
 	require.Contains(t, string(schema), "--\n"+
 		"-- Dbmate schema migrations\n"+
 		"--\n\n"+
