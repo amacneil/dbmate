@@ -76,6 +76,8 @@ func connectionString(initialURL *url.URL) string {
 
 	u.RawQuery = query.Encode()
 
+	u = ClearClusterParametersFromUrl(u)
+
 	return u.String()
 }
 

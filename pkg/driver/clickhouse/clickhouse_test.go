@@ -42,8 +42,6 @@ func TestConnectionString(t *testing.T) {
 		{"clickhouse://aaa:111@myhost/mydb?username=bbb&password=222", "clickhouse://bbb:222@myhost:9000/mydb"},
 		// custom parameters
 		{"clickhouse://myhost/mydb?dial_timeout=200ms", "clickhouse://myhost:9000/mydb?dial_timeout=200ms"},
-		// on_cluster parameter
-		{"clickhouse://myhost/mydb?on_cluster=true", "clickhouse://myhost:9000/mydb?on_cluster=true"},
 	}
 
 	for _, c := range cases {

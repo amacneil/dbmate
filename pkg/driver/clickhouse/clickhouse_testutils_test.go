@@ -33,7 +33,7 @@ func prepTestClickHouseDB(t *testing.T, drv *Driver) *sql.DB {
 	require.NoError(t, err)
 
 	// connect database
-	db, err := sql.Open("clickhouse", drv.databaseURL.String())
+	db, err := drv.Open()
 	require.NoError(t, err)
 
 	return db
