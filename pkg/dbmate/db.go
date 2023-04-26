@@ -26,7 +26,7 @@ var (
 	ErrNoMigrationName       = errors.New("please specify a name for the new migration")
 	ErrMigrationAlreadyExist = errors.New("file already exists")
 	ErrMigrationDirNotFound  = errors.New("could not find migrations directory")
-	ErrMigrationNotFound     = errors.New("can't find migration file")
+	ErrMigrationNotFound     = errors.New("can't find migrations for")
 	ErrCreateDirectory       = errors.New("unable to create directory")
 )
 
@@ -415,8 +415,7 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 		}
 	}
 
-	givenMigrations := db.Migrations
-	migrations := []Migration{}
+	foundMigrations := []Migration{}
 	for _, dir := range db.MigrationsDir {
 		// find filesystem migrations
 		files, err := db.readMigrationsDir(dir)
@@ -442,37 +441,19 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 				Version:  matches[1],
 			}
 
-			if len(db.Migrations) > 0 {
-				found := false
-				for i, given := range givenMigrations {
-					if given == migration.Version || given == migration.FileName {
-						givenMigrations = append(givenMigrations[:i], givenMigrations[i+1:]...)
-						found = true
-						break
-					}
-				}
-				if !found {
-					continue
-				}
-			}
-
 			if ok := appliedMigrations[migration.Version]; ok {
 				migration.Applied = true
 			}
 
-			migrations = append(migrations, migration)
+			foundMigrations = append(foundMigrations, migration)
 		}
 	}
 
-	if len(givenMigrations) > 0 {
-		return nil, fmt.Errorf("%w `%v`", ErrMigrationNotFound, givenMigrations)
-	}
-
-	sort.Slice(migrations, func(i, j int) bool {
-		return migrations[i].FileName < migrations[j].FileName
+	sort.Slice(foundMigrations, func(i, j int) bool {
+		return foundMigrations[i].FileName < foundMigrations[j].FileName
 	})
 
-	return migrations, nil
+	return filterMigrations(db.Migrations, foundMigrations)
 }
 
 // Rollback rolls back the most recent migration

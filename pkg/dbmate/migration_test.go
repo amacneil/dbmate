@@ -168,3 +168,73 @@ DROP COLUMN status;
 		require.Error(t, err, "dbmate does not support statements preceding the '-- migrate:up' block")
 	})
 }
+
+func TestMigrationRange(t *testing.T) {
+	abc := Migration{
+		Version:  "abc",
+		FileName: "abc.sql",
+	}
+	xyz := Migration{
+		Version:  "xyz",
+		FileName: "xyz.sql",
+	}
+	two := Migration{
+		Version:  "234",
+		FileName: "234.sql",
+	}
+	one := Migration{
+		Version:  "123",
+		FileName: "123.sql",
+	}
+	migrations := []Migration{abc, xyz, one, two}
+	t.Run("when no ranges given passes through", func(t *testing.T) {
+		ms, err := filterMigrations([]string{}, migrations)
+		require.NoError(t, err)
+		require.Equal(t, ms, migrations)
+	})
+
+	t.Run("when filters don't match", func(t *testing.T) {
+		_, err := filterMigrations([]string{"nobody"}, migrations)
+		require.Error(t, err)
+	})
+
+	t.Run("select single migrations by version", func(t *testing.T) {
+		ms, err := filterMigrations([]string{"xyz", "234"}, migrations)
+		require.NoError(t, err)
+		require.Equal(t, ms, []Migration{xyz, two})
+	})
+
+	t.Run("select single migrations by filename", func(t *testing.T) {
+		ms, err := filterMigrations([]string{"xyz.sql", "234.sql"}, migrations)
+		require.NoError(t, err)
+		require.Equal(t, []Migration{xyz, two}, ms)
+	})
+
+	t.Run("select single migrations by index position", func(t *testing.T) {
+		ms, err := filterMigrations([]string{"+2", "-1"}, migrations)
+		require.NoError(t, err)
+		require.Equal(t, []Migration{migrations[1], migrations[len(migrations)-2]}, ms)
+	})
+	t.Run("filter range", func(t *testing.T) {
+		ms, err := filterMigrations([]string{"abc...123"}, migrations)
+		require.NoError(t, err)
+		require.Equal(t, []Migration{abc, xyz, one}, ms)
+	})
+
+	t.Run("filter range given backwards", func(t *testing.T) {
+		_, err := filterMigrations([]string{"123...abc"}, migrations)
+		require.Error(t, err)
+	})
+
+	t.Run("filter range no end", func(t *testing.T) {
+		ms, err := filterMigrations([]string{"123..."}, migrations)
+		require.NoError(t, err)
+		require.Equal(t, []Migration{one, two}, ms)
+	})
+
+	t.Run("filter range no begin", func(t *testing.T) {
+		ms, err := filterMigrations([]string{"...123"}, migrations)
+		require.NoError(t, err)
+		require.Equal(t, []Migration{abc, xyz, one}, ms)
+	})
+}
