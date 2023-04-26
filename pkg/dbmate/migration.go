@@ -224,17 +224,13 @@ type migrationTracking struct {
 }
 
 func filterMigrations(givenMigrations []string, migrations []Migration) ([]Migration, error) {
-	tracking, err := newMigrationTracking(givenMigrations, len(migrations))
-	if tracking == nil || err != nil {
-		return migrations, err
+	tracking := newMigrationTracking(givenMigrations, len(migrations))
+	if tracking == nil {
+		return migrations, nil
 	}
 	filteredMigrations := make([]Migration, 0, len(migrations))
 	for _, migration := range migrations {
-		selected := tracking.addNext(migration)
-		if err != nil {
-			return migrations, err
-		}
-		if !selected {
+		if !tracking.addNext(migration) {
 			continue
 		}
 		filteredMigrations = append(filteredMigrations, migration)
@@ -256,9 +252,9 @@ func filterMigrations(givenMigrations []string, migrations []Migration) ([]Migra
 // dbmate -m ...version # everything before and including version
 // dbmate -m version... # everything starting at version and after
 // dbmate -m version...version2 # everything starting at version and ending at version2
-func newMigrationTracking(givenMigrations []string, lengthOfMigrations int) (*migrationTracking, error) {
+func newMigrationTracking(givenMigrations []string, lengthOfMigrations int) *migrationTracking {
 	if len(givenMigrations) == 0 {
-		return nil, nil
+		return nil
 	}
 
 	singleMigrationsLookup := make(map[string]migrationRange)
@@ -285,7 +281,7 @@ func newMigrationTracking(givenMigrations []string, lengthOfMigrations int) (*mi
 		}
 		// Empty range means all migrations
 		if mr.start == nil && mr.end == nil {
-			return nil, nil
+			return nil
 		}
 		if mr.start == nil {
 			activeMigrationsLookup[*mr.end] = mr
@@ -304,12 +300,12 @@ func newMigrationTracking(givenMigrations []string, lengthOfMigrations int) (*mi
 		activeMigrationsLookup:      activeMigrationsLookup,
 		inactiveMigrationsLookup:    inactiveMigrationsLookup,
 		inactiveEndMigrationsLookup: inactiveEndMigrationsLookup,
-	}, nil
+	}
 }
 
 func (ar *migrationTracking) givenMigrationsNotFound() ([]string, error) {
 	notFound := make([]string, 0)
-	for m, _ := range ar.singleMigrationsLookup {
+	for m := range ar.singleMigrationsLookup {
 		notFound = append(notFound, m)
 	}
 	for _, mr := range ar.inactiveMigrationsLookup {
@@ -355,7 +351,7 @@ func (ar *migrationTracking) retrieveMigration(mapping map[string]migrationRange
 
 // addNext returns true if the migration is selected
 func (ar *migrationTracking) addNext(migration Migration) bool {
-	ar.currentMigration += 1
+	ar.currentMigration++
 	selected := false
 	if _, ok := ar.retrieveMigration(ar.singleMigrationsLookup, migration); ok {
 		selected = true
