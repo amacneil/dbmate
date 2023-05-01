@@ -1,6 +1,7 @@
 package dbmate
 
 import (
+	"bytes"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -11,6 +12,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
+	"text/template"
 	"time"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
@@ -329,7 +332,12 @@ func (db *DB) Migrate() error {
 
 		execMigration := func(tx dbutil.Transaction) error {
 			// run actual migration
-			result, err := tx.Exec(parsed.Up)
+			upScript, err := db.resolveRefs(parsed.Up, parsed.UpOptions.EnvVars())
+			if err != nil {
+				return err
+			}
+
+			result, err := tx.Exec(upScript)
 			if err != nil {
 				return err
 			} else if db.Verbose {
@@ -359,6 +367,38 @@ func (db *DB) Migrate() error {
 	}
 
 	return nil
+}
+
+func (db *DB) resolveRefs(snippet string, envVars []string) (string, error) {
+	if envVars == nil {
+		return snippet, nil
+	}
+
+	envMap := db.getEnvMap()
+	model := make(map[string]string, len(envVars))
+	for _, envVar := range envVars {
+		model[envVar] = envMap[envVar]
+	}
+
+	template := template.Must(template.New("tmpl").Parse(snippet))
+
+	var buffer bytes.Buffer
+	if err := template.Execute(&buffer, model); err != nil {
+		return "", err
+	}
+
+	return buffer.String(), nil
+}
+
+func (db *DB) getEnvMap() map[string]string {
+	envMap := make(map[string]string)
+
+	for _, envVar := range os.Environ() {
+		entry := strings.SplitN(envVar, "=", 2)
+		envMap[entry[0]] = entry[1]
+	}
+
+	return envMap
 }
 
 func (db *DB) printVerbose(result sql.Result) {
@@ -491,7 +531,13 @@ func (db *DB) Rollback() error {
 
 	execMigration := func(tx dbutil.Transaction) error {
 		// rollback migration
-		result, err := tx.Exec(parsed.Down)
+		downScript, err := db.resolveRefs(parsed.Down, parsed.DownOptions.EnvVars())
+		if err != nil {
+			return err
+		}
+
+		result, err := tx.Exec(downScript)
+
 		if err != nil {
 			return err
 		} else if db.Verbose {

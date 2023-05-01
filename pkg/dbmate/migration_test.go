@@ -65,9 +65,11 @@ drop table users;
 
 		require.Equal(t, "--migrate:up\ncreate table users (id serial, name text);\n\n", parsed.Up)
 		require.Equal(t, true, parsed.UpOptions.Transaction())
+		require.Equal(t, []string{}, parsed.UpOptions.EnvVars())
 
 		require.Equal(t, "--migrate:down\ndrop table users;\n", parsed.Down)
 		require.Equal(t, true, parsed.DownOptions.Transaction())
+		require.Equal(t, []string{}, parsed.UpOptions.EnvVars())
 	})
 
 	t.Run("require up before down", func(t *testing.T) {
@@ -98,6 +100,40 @@ ALTER TYPE colors ADD VALUE 'orange' AFTER 'red';
 
 		require.Equal(t, "-- migrate:down transaction:false\nALTER TYPE colors ADD VALUE 'orange' AFTER 'red';\n", parsed.Down)
 		require.Equal(t, false, parsed.DownOptions.Transaction())
+	})
+
+	t.Run("support activating env vars", func(t *testing.T) {
+		migration := `-- migrate:up env-var:THE_ROLE env-var:THE_PASSWORD
+create role {{ .THE_ROLE }} login password {{ .THE_PASSWORD }};
+-- migrate:down env-var:THE_ROLE
+drop role {{ .THE_ROLE }};
+`
+
+		parsed, err := parseMigrationContents(migration)
+		require.Nil(t, err)
+
+		require.Equal(t, "-- migrate:up env-var:THE_ROLE env-var:THE_PASSWORD\ncreate role {{ .THE_ROLE }} login password {{ .THE_PASSWORD }};\n", parsed.Up)
+		require.Equal(t, []string{"THE_ROLE", "THE_PASSWORD"}, parsed.UpOptions.EnvVars())
+
+		require.Equal(t, "-- migrate:down env-var:THE_ROLE\ndrop role {{ .THE_ROLE }};\n", parsed.Down)
+		require.Equal(t, []string{"THE_ROLE"}, parsed.DownOptions.EnvVars())
+	})
+
+	t.Run("support activating env vars", func(t *testing.T) {
+		migration := `-- migrate:up env-var:THE_ROLE env-var:THE_PASSWORD
+create role {{ .THE_ROLE }} login password {{ .THE_PASSWORD }};
+-- migrate:down env-var:THE_ROLE
+drop role {{ .THE_ROLE }};
+`
+
+		parsed, err := parseMigrationContents(migration)
+		require.Nil(t, err)
+
+		require.Equal(t, "-- migrate:up env-var:THE_ROLE env-var:THE_PASSWORD\ncreate role {{ .THE_ROLE }} login password {{ .THE_PASSWORD }};\n", parsed.Up)
+		require.Equal(t, []string{"THE_ROLE", "THE_PASSWORD"}, parsed.UpOptions.EnvVars())
+
+		require.Equal(t, "-- migrate:down env-var:THE_ROLE\ndrop role {{ .THE_ROLE }};\n", parsed.Down)
+		require.Equal(t, []string{"THE_ROLE"}, parsed.DownOptions.EnvVars())
 	})
 
 	t.Run("require migrate blocks", func(t *testing.T) {

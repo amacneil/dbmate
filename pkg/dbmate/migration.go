@@ -48,6 +48,7 @@ type ParsedMigration struct {
 // ParsedMigrationOptions is an interface for accessing migration options
 type ParsedMigrationOptions interface {
 	Transaction() bool
+	EnvVars() []string
 }
 
 type migrationOptions map[string]string
@@ -56,6 +57,21 @@ type migrationOptions map[string]string
 // Defaults to true.
 func (m migrationOptions) Transaction() bool {
 	return m["transaction"] != "false"
+}
+
+// EnvVars returns the list of env vars enabled to templating for this migration
+// Defaults to empty list.
+func (m migrationOptions) EnvVars() []string {
+	result := make([]string, 0)
+	entry := m["env-var"]
+
+	if entry != "" {
+		// decode CSV encoded var names
+		varNames := strings.Split(entry, ",")
+		// add to the slice
+		result = append(result, varNames...)
+	}
+	return result
 }
 
 var (
@@ -143,7 +159,18 @@ func parseMigrationOptions(contents string) ParsedMigrationOptions {
 
 		// if the syntax is well-formed, then store the key and value pair in options
 		if len(pair) == 2 {
-			options[pair[0]] = pair[1]
+			optKey := pair[0]
+			optValue := pair[1]
+			entry := options[optKey]
+			if entry != "" { // "env-var" entry already used
+				varNames := strings.Split(entry, ",")
+				// add new element to the slice
+				varNames = append(varNames, optValue)
+				// keep collected values
+				options[optKey] = strings.Join(varNames, ",")
+			} else { // first "env-var" entry
+				options[optKey] = optValue
+			}
 		}
 	}
 

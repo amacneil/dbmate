@@ -237,7 +237,7 @@ func TestWaitBeforeVerbose(t *testing.T) {
 		`Applying: 20151129054053_test_migration.sql
 Rows affected: 1
 Applying: 20200227231541_test_posts.sql
-Rows affected: 0`)
+Rows affected: 1`)
 	require.Contains(t, output,
 		`Rolling back: 20200227231541_test_posts.sql
 Rows affected: 0`)
@@ -315,6 +315,11 @@ func TestUp(t *testing.T) {
 			err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
 			require.NoError(t, err)
 			require.Equal(t, 1, count)
+
+			var fromEnvVar string
+			err = sqlDB.QueryRow("select name from posts where id=1").Scan(&fromEnvVar)
+			require.NoError(t, err)
+			require.Equal(t, "Yabba dabba doo!", fromEnvVar)
 		})
 	}
 }
