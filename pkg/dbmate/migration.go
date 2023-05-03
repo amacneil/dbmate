@@ -63,7 +63,7 @@ func (m migrationOptions) Transaction() bool {
 // Defaults to empty list.
 func (m migrationOptions) EnvVars() []string {
 	result := make([]string, 0)
-	entry := m["env-var"]
+	entry := m["env"]
 
 	if entry != "" {
 		// decode CSV encoded var names
@@ -162,13 +162,13 @@ func parseMigrationOptions(contents string) ParsedMigrationOptions {
 			optKey := pair[0]
 			optValue := pair[1]
 			entry := options[optKey]
-			if entry != "" { // "env-var" entry already used
+			if entry != "" { // "env" entry already used
 				varNames := strings.Split(entry, ",")
 				// add new element to the slice
 				varNames = append(varNames, optValue)
 				// keep collected values
 				options[optKey] = strings.Join(varNames, ",")
-			} else { // first "env-var" entry
+			} else { // first "env" entry
 				options[optKey] = optValue
 			}
 		}

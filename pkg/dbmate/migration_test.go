@@ -103,36 +103,36 @@ ALTER TYPE colors ADD VALUE 'orange' AFTER 'red';
 	})
 
 	t.Run("support activating env vars", func(t *testing.T) {
-		migration := `-- migrate:up env-var:THE_ROLE env-var:THE_PASSWORD
+		migration := `-- migrate:up env:THE_ROLE env:THE_PASSWORD
 create role {{ .THE_ROLE }} login password {{ .THE_PASSWORD }};
--- migrate:down env-var:THE_ROLE
+-- migrate:down env:THE_ROLE
 drop role {{ .THE_ROLE }};
 `
 
 		parsed, err := parseMigrationContents(migration)
 		require.Nil(t, err)
 
-		require.Equal(t, "-- migrate:up env-var:THE_ROLE env-var:THE_PASSWORD\ncreate role {{ .THE_ROLE }} login password {{ .THE_PASSWORD }};\n", parsed.Up)
+		require.Equal(t, "-- migrate:up env:THE_ROLE env:THE_PASSWORD\ncreate role {{ .THE_ROLE }} login password {{ .THE_PASSWORD }};\n", parsed.Up)
 		require.Equal(t, []string{"THE_ROLE", "THE_PASSWORD"}, parsed.UpOptions.EnvVars())
 
-		require.Equal(t, "-- migrate:down env-var:THE_ROLE\ndrop role {{ .THE_ROLE }};\n", parsed.Down)
+		require.Equal(t, "-- migrate:down env:THE_ROLE\ndrop role {{ .THE_ROLE }};\n", parsed.Down)
 		require.Equal(t, []string{"THE_ROLE"}, parsed.DownOptions.EnvVars())
 	})
 
 	t.Run("support activating env vars", func(t *testing.T) {
-		migration := `-- migrate:up env-var:THE_ROLE env-var:THE_PASSWORD
+		migration := `-- migrate:up env:THE_ROLE env:THE_PASSWORD
 create role {{ .THE_ROLE }} login password {{ .THE_PASSWORD }};
--- migrate:down env-var:THE_ROLE
+-- migrate:down env:THE_ROLE
 drop role {{ .THE_ROLE }};
 `
 
 		parsed, err := parseMigrationContents(migration)
 		require.Nil(t, err)
 
-		require.Equal(t, "-- migrate:up env-var:THE_ROLE env-var:THE_PASSWORD\ncreate role {{ .THE_ROLE }} login password {{ .THE_PASSWORD }};\n", parsed.Up)
+		require.Equal(t, "-- migrate:up env:THE_ROLE env:THE_PASSWORD\ncreate role {{ .THE_ROLE }} login password {{ .THE_PASSWORD }};\n", parsed.Up)
 		require.Equal(t, []string{"THE_ROLE", "THE_PASSWORD"}, parsed.UpOptions.EnvVars())
 
-		require.Equal(t, "-- migrate:down env-var:THE_ROLE\ndrop role {{ .THE_ROLE }};\n", parsed.Down)
+		require.Equal(t, "-- migrate:down env:THE_ROLE\ndrop role {{ .THE_ROLE }};\n", parsed.Down)
 		require.Equal(t, []string{"THE_ROLE"}, parsed.DownOptions.EnvVars())
 	})
 
