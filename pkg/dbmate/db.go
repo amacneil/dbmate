@@ -49,6 +49,8 @@ type DB struct {
 	MigrationsTableName string
 	// SchemaFile specifies the location for schema.sql file
 	SchemaFile string
+	// Ignore out of order pending migrations
+	StrictOrder bool
 	// Verbose prints the result of each statement execution
 	Verbose bool
 	// WaitBefore will wait for database to become available before running any actions
@@ -75,6 +77,7 @@ func New(databaseURL *url.URL) *DB {
 		MigrationsDir:       []string{"./db/migrations"},
 		MigrationsTableName: "schema_migrations",
 		SchemaFile:          "./db/schema.sql",
+		StrictOrder:         false,
 		Verbose:             false,
 		WaitBefore:          false,
 		WaitInterval:        time.Second,
@@ -412,6 +415,13 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 		}
 	}
 
+	var latestAppliedMigration string
+	for migrationVersion := range appliedMigrations {
+		if migrationVersion > latestAppliedMigration {
+			latestAppliedMigration = migrationVersion
+		}
+	}
+
 	migrations := []Migration{}
 	for _, dir := range db.MigrationsDir {
 		// find filesystem migrations
@@ -439,6 +449,10 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 			}
 			if ok := appliedMigrations[migration.Version]; ok {
 				migration.Applied = true
+			}
+
+			if db.StrictOrder && !migration.Applied && migration.Version < latestAppliedMigration {
+				continue
 			}
 
 			migrations = append(migrations, migration)

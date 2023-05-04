@@ -62,6 +62,11 @@ func NewApp() *cli.App {
 			Value:   defaultDB.MigrationsTableName,
 			Usage:   "specify the database table to record migrations in",
 		},
+		&cli.BoolFlag{
+			Name:    "strict-order",
+			EnvVars: []string{"DBMATE_STRICT_ORDER"},
+			Usage:   "ignore out of order pending migrations",
+		},
 		&cli.StringFlag{
 			Name:    "schema-file",
 			Aliases: []string{"s"},
@@ -233,6 +238,7 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 		db.AutoDumpSchema = !c.Bool("no-dump-schema")
 		db.MigrationsDir = c.StringSlice("migrations-dir")
 		db.MigrationsTableName = c.String("migrations-table")
+		db.StrictOrder = c.Bool("strict-order")
 		db.SchemaFile = c.String("schema-file")
 		db.WaitBefore = c.Bool("wait")
 		waitTimeout := c.Duration("wait-timeout")
