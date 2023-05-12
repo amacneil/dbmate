@@ -102,8 +102,8 @@ func NewApp() *cli.App {
 			Usage: "Create database (if necessary) and migrate to the latest version",
 			Flags: []cli.Flag{
 				&cli.BoolFlag{
-					Name:    "strict-order",
-					EnvVars: []string{"DBMATE_STRICT_ORDER"},
+					Name:    "strict",
+					EnvVars: []string{"DBMATE_STRICT"},
 					Usage:   "ignore out of order pending migrations",
 				},
 				&cli.BoolFlag{
@@ -114,7 +114,7 @@ func NewApp() *cli.App {
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
-				db.StrictOrder = c.Bool("strict-order")
+				db.Strict = c.Bool("strict")
 				db.Verbose = c.Bool("verbose")
 				return db.CreateAndMigrate()
 			}),
@@ -138,8 +138,8 @@ func NewApp() *cli.App {
 			Usage: "Migrate to the latest version",
 			Flags: []cli.Flag{
 				&cli.BoolFlag{
-					Name:    "strict-order",
-					EnvVars: []string{"DBMATE_STRICT_ORDER"},
+					Name:    "strict",
+					EnvVars: []string{"DBMATE_STRICT"},
 					Usage:   "ignore out of order pending migrations",
 				},
 				&cli.BoolFlag{
@@ -150,7 +150,7 @@ func NewApp() *cli.App {
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
-				db.StrictOrder = c.Bool("strict-order")
+				db.Strict = c.Bool("strict")
 				db.Verbose = c.Bool("verbose")
 				return db.Migrate()
 			}),
@@ -177,8 +177,8 @@ func NewApp() *cli.App {
 			Usage: "List applied and pending migrations",
 			Flags: []cli.Flag{
 				&cli.BoolFlag{
-					Name:    "strict-order",
-					EnvVars: []string{"DBMATE_STRICT_ORDER"},
+					Name:    "strict",
+					EnvVars: []string{"DBMATE_STRICT"},
 					Usage:   "ignore out of order pending migrations",
 				},
 				&cli.BoolFlag{
@@ -191,7 +191,7 @@ func NewApp() *cli.App {
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
-				db.StrictOrder = c.Bool("strict-order")
+				db.Strict = c.Bool("strict")
 				setExitCode := c.Bool("exit-code")
 				quiet := c.Bool("quiet")
 				if quiet {
