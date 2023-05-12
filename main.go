@@ -62,11 +62,6 @@ func NewApp() *cli.App {
 			Value:   defaultDB.MigrationsTableName,
 			Usage:   "specify the database table to record migrations in",
 		},
-		&cli.BoolFlag{
-			Name:    "strict-order",
-			EnvVars: []string{"DBMATE_STRICT_ORDER"},
-			Usage:   "ignore out of order pending migrations",
-		},
 		&cli.StringFlag{
 			Name:    "schema-file",
 			Aliases: []string{"s"},
@@ -107,6 +102,11 @@ func NewApp() *cli.App {
 			Usage: "Create database (if necessary) and migrate to the latest version",
 			Flags: []cli.Flag{
 				&cli.BoolFlag{
+					Name:    "strict-order",
+					EnvVars: []string{"DBMATE_STRICT_ORDER"},
+					Usage:   "ignore out of order pending migrations",
+				},
+				&cli.BoolFlag{
 					Name:    "verbose",
 					Aliases: []string{"v"},
 					EnvVars: []string{"DBMATE_VERBOSE"},
@@ -114,6 +114,7 @@ func NewApp() *cli.App {
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				db.StrictOrder = c.Bool("strict-order")
 				db.Verbose = c.Bool("verbose")
 				return db.CreateAndMigrate()
 			}),
@@ -137,6 +138,11 @@ func NewApp() *cli.App {
 			Usage: "Migrate to the latest version",
 			Flags: []cli.Flag{
 				&cli.BoolFlag{
+					Name:    "strict-order",
+					EnvVars: []string{"DBMATE_STRICT_ORDER"},
+					Usage:   "ignore out of order pending migrations",
+				},
+				&cli.BoolFlag{
 					Name:    "verbose",
 					Aliases: []string{"v"},
 					EnvVars: []string{"DBMATE_VERBOSE"},
@@ -144,6 +150,7 @@ func NewApp() *cli.App {
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				db.StrictOrder = c.Bool("strict-order")
 				db.Verbose = c.Bool("verbose")
 				return db.Migrate()
 			}),
@@ -170,6 +177,11 @@ func NewApp() *cli.App {
 			Usage: "List applied and pending migrations",
 			Flags: []cli.Flag{
 				&cli.BoolFlag{
+					Name:    "strict-order",
+					EnvVars: []string{"DBMATE_STRICT_ORDER"},
+					Usage:   "ignore out of order pending migrations",
+				},
+				&cli.BoolFlag{
 					Name:  "exit-code",
 					Usage: "return 1 if there are pending migrations",
 				},
@@ -179,6 +191,7 @@ func NewApp() *cli.App {
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				db.StrictOrder = c.Bool("strict-order")
 				setExitCode := c.Bool("exit-code")
 				quiet := c.Bool("quiet")
 				if quiet {
@@ -238,7 +251,6 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 		db.AutoDumpSchema = !c.Bool("no-dump-schema")
 		db.MigrationsDir = c.StringSlice("migrations-dir")
 		db.MigrationsTableName = c.String("migrations-table")
-		db.StrictOrder = c.Bool("strict-order")
 		db.SchemaFile = c.String("schema-file")
 		db.WaitBefore = c.Bool("wait")
 		waitTimeout := c.Duration("wait-timeout")
