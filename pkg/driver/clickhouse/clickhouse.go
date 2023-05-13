@@ -277,7 +277,7 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 	if drv.clusterParameters.OnCluster {
 		escapedZooPath := drv.escapeString(drv.clusterParameters.ZooPath)
 		escapedReplicaMacro := drv.escapeString(drv.clusterParameters.ReplicaMacro)
-		engineClause = fmt.Sprintf("ReplicatedReplacingMergeTree('%s', '%s', ts)", escapedZooPath, escapedReplicaMacro )
+		engineClause = fmt.Sprintf("ReplicatedReplacingMergeTree('%s', '%s', ts)", escapedZooPath, escapedReplicaMacro)
 	}
 
 	_, err := db.Exec(fmt.Sprintf(`
