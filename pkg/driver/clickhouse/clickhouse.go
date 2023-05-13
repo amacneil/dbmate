@@ -102,7 +102,8 @@ func (drv *Driver) openClickHouseDB() (*sql.DB, error) {
 func (drv *Driver) onClusterClause() string {
 	clusterClause := ""
 	if drv.clusterParameters.OnCluster {
-		clusterClause = fmt.Sprintf(" ON CLUSTER '%s'", drv.clusterParameters.ClusterMacro)
+		escapedClusterMacro := drv.escapeString(drv.clusterParameters.ClusterMacro)
+		clusterClause = fmt.Sprintf(" ON CLUSTER '%s'", escapedClusterMacro)
 	}
 	return clusterClause
 }
@@ -274,7 +275,9 @@ func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
 func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 	engineClause := "ReplacingMergeTree(ts)"
 	if drv.clusterParameters.OnCluster {
-		engineClause = fmt.Sprintf("ReplicatedReplacingMergeTree('%s', '%s', ts)", drv.clusterParameters.ZooPath, drv.clusterParameters.ReplicaMacro)
+		escapedZooPath := drv.escapeString(drv.clusterParameters.ZooPath)
+		escapedReplicaMacro := drv.escapeString(drv.clusterParameters.ReplicaMacro)
+		engineClause = fmt.Sprintf("ReplicatedReplacingMergeTree('%s', '%s', ts)", escapedZooPath, escapedReplicaMacro )
 	}
 
 	_, err := db.Exec(fmt.Sprintf(`
