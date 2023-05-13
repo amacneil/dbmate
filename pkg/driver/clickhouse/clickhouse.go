@@ -127,6 +127,12 @@ func (drv *Driver) quoteIdentifier(str string) string {
 	return fmt.Sprintf(`"%s"`, str)
 }
 
+func (drv *Driver) escapeString(str string) string {
+	quoteEscaper := strings.NewReplacer(`'`, `\'`, `\`, `\\`)
+	str = quoteEscaper.Replace(str)
+	return str
+}
+
 // CreateDatabase creates the specified database
 func (drv *Driver) CreateDatabase() error {
 	name := drv.databaseName()

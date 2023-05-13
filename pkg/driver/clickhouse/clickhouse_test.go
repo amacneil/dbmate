@@ -391,3 +391,26 @@ func TestClickHouseQuotedMigrationsTableName(t *testing.T) {
 		require.Equal(t, `"bizarre""$name"`, name)
 	})
 }
+
+func TestEscapeString(t *testing.T) {
+	cases := []struct {
+		input    string
+		expected string
+	}{
+		// nothig to escape
+		{`lets go`, `lets go`},
+		// escape '
+		{`let's go`, `let\'s go`},
+		// escape \
+		{`let\s go`, `let\\s go`},
+	}
+
+	for _, c := range cases {
+		t.Run(c.input, func(t *testing.T) {
+			drv := testClickHouseDriver(t)
+
+			actual := drv.escapeString(c.input)
+			require.Equal(t, c.expected, actual)
+		})
+	}
+}
