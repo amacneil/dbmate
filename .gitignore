@@ -8,3 +8,4 @@
 /vendor
 dist
 node_modules
+.vscode

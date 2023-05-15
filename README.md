@@ -253,6 +253,33 @@ DATABASE_URL="sqlite:/tmp/database.sqlite3"
 DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name"
 ```
 
+To work with ClickHouse cluster, there are 4 connection query parameters that can be supplied:
+
+- `on_cluster` - Indicataion to use cluster statements and replicated migration table. (default: `false`) If this parameter is not supplied, other cluster related query parameters are ignored.
+```sh
+DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_cluster"
+
+DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_cluster=true"
+```
+
+- `cluster_macro` (Optional) - Macro value to be used for ON CLUSTER statements and for the replciated migration table engine zookeeper path. (default: `{cluster}`)
+
+```sh
+DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_cluster&cluster_macro={my_cluster}"
+```
+
+- `replica_macro` (Optional) - Macro value to be used for the replica name in the replciated migration table engine. (default: `{replica}`)
+
+```sh
+DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_cluster&replica_macro={my_replica}"
+```
+
+- `zoo_path` (Optional) - The path to the table migration in ClickHouse/Zoo Keeper. (default: `/clickhouse/tables/<cluster_macro>/{table}`)
+
+```sh
+DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_cluster&zoo_path=/zk/path/tables"
+```
+
 [See other supported connection options](https://github.com/ClickHouse/clickhouse-go#dsn).
 
 ### Creating Migrations

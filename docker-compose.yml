@@ -10,8 +10,12 @@ services:
       - mysql
       - postgres
       - clickhouse
+      - clickhouse-cluster-01
+      - clickhouse-cluster-02
     environment:
       CLICKHOUSE_TEST_URL: clickhouse://clickhouse:9000/dbmate_test
+      CLICKHOUSE_CLUSTER_01_TEST_URL: clickhouse://ch-cluster-01:9000/dbmate_test
+      CLICKHOUSE_CLUSTER_02_TEST_URL: clickhouse://ch-cluster-02:9000/dbmate_test
       MYSQL_TEST_URL: mysql://root:root@mysql/dbmate_test
       POSTGRES_TEST_URL: postgres://postgres:postgres@postgres/dbmate_test?sslmode=disable
       SQLITE_TEST_URL: sqlite3:/tmp/dbmate_test.sqlite3
@@ -35,3 +39,27 @@ services:
 
   clickhouse:
     image: clickhouse/clickhouse-server:22.8
+
+  zookeeper:
+    image: zookeeper
+    hostname: zookeeper
+
+  clickhouse-cluster-01:
+    image: clickhouse/clickhouse-server:22.8
+    hostname: ch-cluster-01
+    environment:
+      - CLICKHOUSE_CONFIG=/etc/clickhouse-server/config.xml
+    depends_on:
+      - zookeeper
+    volumes:
+      - ./pkg/driver/clickhouse/testdata/cluster_config/ch-cluster-01:/etc/clickhouse-server
+
+  clickhouse-cluster-02:
+    image: clickhouse/clickhouse-server:22.8
+    hostname: ch-cluster-02
+    environment:
+      - CLICKHOUSE_CONFIG=/etc/clickhouse-server/config.xml
+    depends_on:
+      - zookeeper
+    volumes:
+      - ./pkg/driver/clickhouse/testdata/cluster_config/ch-cluster-02:/etc/clickhouse-server
