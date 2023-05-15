@@ -316,10 +316,17 @@ func TestUp(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, 1, count)
 
+			// check the value from env var
 			var fromEnvVar string
 			err = sqlDB.QueryRow("select name from posts where id=1").Scan(&fromEnvVar)
 			require.NoError(t, err)
 			require.Equal(t, "Yabba dabba doo!", fromEnvVar)
+
+			// check the value from template default (env var missing)
+			var fromDefault string
+			err = sqlDB.QueryRow("select name from posts where id=2").Scan(&fromDefault)
+			require.NoError(t, err)
+			require.Equal(t, "Dino", fromDefault)
 		})
 	}
 }
