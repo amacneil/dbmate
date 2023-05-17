@@ -221,11 +221,12 @@ func (drv *Driver) DatabaseExists() (bool, error) {
 
 // MigrationsTableExists checks if the schema_migrations table exists
 func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
-	schema, migrationsTable, err := drv.quotedMigrationsTableNameParts(db)
+	schema, migrationsTableNameParts, err := drv.migrationsTableNameParts(db)
 	if err != nil {
 		return false, err
 	}
 
+	migrationsTable := strings.Join(migrationsTableNameParts, ".")
 	exists := false
 	err = db.QueryRow("SELECT 1 FROM information_schema.tables "+
 		"WHERE  table_schema = $1 "+
@@ -371,7 +372,7 @@ func (drv *Driver) quotedMigrationsTableName(db dbutil.Transaction) (string, err
 	return schema + "." + name, nil
 }
 
-func (drv *Driver) quotedMigrationsTableNameParts(db dbutil.Transaction) (string, string, error) {
+func (drv *Driver) migrationsTableNameParts(db dbutil.Transaction) (string, []string, error) {
 	schema := ""
 	tableNameParts := strings.Split(drv.migrationsTableName, ".")
 	if len(tableNameParts) > 1 {
@@ -391,13 +392,23 @@ func (drv *Driver) quotedMigrationsTableNameParts(db dbutil.Transaction) (string
 		// this is a hack because we don't always have the URL context available
 		schema, err = dbutil.QueryValue(db, "select current_schema()")
 		if err != nil {
-			return "", "", err
+			return "", nil, err
 		}
 	}
 
 	// fall back to public schema as last resort
 	if schema == "" {
 		schema = "public"
+	}
+
+	return schema, tableNameParts, nil
+}
+
+func (drv *Driver) quotedMigrationsTableNameParts(db dbutil.Transaction) (string, string, error) {
+	schema, tableNameParts, err := drv.migrationsTableNameParts(db)
+
+	if err != nil {
+		return "", "", err
 	}
 
 	// quote all parts
