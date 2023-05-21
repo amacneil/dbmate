@@ -88,7 +88,7 @@ func TestResolveWithSqlInjection(t *testing.T) {
 	resolved, err := internal.ResolveRefs(parseUp, parsedUpOptsEnvVars, envMap)
 
 	require.NoError(t, err)
-	// sql injectio is not prevented here
+	// sql injection is not prevented here
 	require.Equal(t, "create role 'Slate'; drop table SALARY; create role 'Barney' login password 'Betty';", resolved)
 }
 

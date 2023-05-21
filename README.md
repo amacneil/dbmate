@@ -328,14 +328,14 @@ dbmate supports options passed to a migration block in the form of `key:value` p
 
 **env**
 
-`env` is useful if you need to inject some environment variable into the SQL. Only environment variables explicitly listed will be available for templating:
+`env` is useful if you need to inject some environment variables into the SQL. Only environment variables explicitly listed will be available for templating:
 
 ```sql
 -- migrate:up env:ADMIN_PASSWORD
 create role 'adminuser' login password '{{ .ADMIN_PASSWORD }}';
 ```
 
-`env` supports multiple occurrencies. If a referenced variable is not available the command will return an error:
+`env` supports multiple occurrences. If a referenced variable is not available the command will return an error:
 
 ```sh
 $ dbmate up
