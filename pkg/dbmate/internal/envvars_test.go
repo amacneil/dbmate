@@ -40,6 +40,7 @@ func TestResolveRefsUsingDefaults(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "create role 'Fred' login password 'Wilma';", resolved)
 }
+
 func TestResolveRefsIgnoringDefaults(t *testing.T) {
 	parseUp := `create role '{{ or (index . "THE_ROLE") "Fred" }}' login password '{{ .THE_PASSWORD }}';`
 	parsedUpOptsEnvVars := []string{
@@ -57,6 +58,22 @@ func TestResolveRefsIgnoringDefaults(t *testing.T) {
 	require.Equal(t, "create role 'Dino' login password 'Wilma';", resolved)
 }
 
+func TestResolveRefsErroringOnMissingVar(t *testing.T) {
+	parseUp := `create role '{{ or (index . "THE_ROLE") "Fred" }}' login password '{{ .THE_PASSWORD }}';`
+	parsedUpOptsEnvVars := []string{
+		"THE_ROLE",
+		"THE_PASSWORD",
+	}
+	envMap := map[string]string{
+		"THE_ROLE": "Dino",
+	}
+
+	resolved, err := internal.ResolveRefs(parseUp, parsedUpOptsEnvVars, envMap)
+
+	require.Error(t, err)
+	require.Equal(t, "", resolved)
+}
+
 func TestResolveWithSqlInjection(t *testing.T) {
 	parseUp := `create role '{{ .THE_ROLE }}' login password '{{ .THE_PASSWORD }}';`
 	parsedUpOptsEnvVars := []string{
@@ -71,6 +88,25 @@ func TestResolveWithSqlInjection(t *testing.T) {
 	resolved, err := internal.ResolveRefs(parseUp, parsedUpOptsEnvVars, envMap)
 
 	require.NoError(t, err)
-	// sql injectio in not prevented here
+	// sql injectio is not prevented here
 	require.Equal(t, "create role 'Slate'; drop table SALARY; create role 'Barney' login password 'Betty';", resolved)
+}
+
+func TestResolveMitigatingSqlInjection(t *testing.T) {
+	parseUp := `create role '{{ js .THE_ROLE }}' login password '{{ js .THE_PASSWORD }}';`
+	parsedUpOptsEnvVars := []string{
+		"THE_ROLE",
+		"THE_PASSWORD",
+	}
+	envMap := map[string]string{
+		// simulating naive SQL injection attempt
+		"THE_ROLE":     "Slate'; drop table SALARY; create role 'Barney",
+		"THE_PASSWORD": "Betty",
+	}
+
+	resolved, err := internal.ResolveRefs(parseUp, parsedUpOptsEnvVars, envMap)
+
+	require.NoError(t, err)
+	// sql injection mitigated
+	require.Equal(t, "create role 'Slate\\'; drop table SALARY; create role \\'Barney' login password 'Betty';", resolved)
 }

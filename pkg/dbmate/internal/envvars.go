@@ -25,7 +25,10 @@ func ResolveRefs(snippet string, envVars []string, envMap map[string]string) (st
 
 	model := make(map[string]string, len(envVars))
 	for _, envVar := range envVars {
-		model[envVar] = envMap[envVar]
+		varValue, exists := envMap[envVar]
+		if exists {
+			model[envVar] = varValue
+		}
 	}
 
 	template := template.Must(template.New("tmpl").Option("missingkey=error").Parse(snippet))

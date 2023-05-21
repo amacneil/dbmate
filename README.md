@@ -323,7 +323,39 @@ Writing: ./db/schema.sql
 
 dbmate supports options passed to a migration block in the form of `key:value` pairs. List of supported options:
 
+- `env`
 - `transaction`
+
+**env**
+
+`env` is useful if you need to inject some environment variable into the SQL. Only environment variables explicitly listed will be available for templating:
+
+```sql
+-- migrate:up env:ADMIN_PASSWORD
+create role 'adminuser' login password '{{ .ADMIN_PASSWORD }}';
+```
+
+`env` supports multiple occurrencies. If a referenced variable is not available the command will return an error:
+
+```sh
+$ dbmate up
+Applying: ...
+Error: template: tmpl:35:51: executing "tmpl" at <.ADMIN_PASSWORD>: map has no entry for key "ADMIN_PASSWORD"
+```
+
+Variables injection leverages Go's [template](https://pkg.go.dev/text/template) features. For example you can provide default values in order to prevent errors:
+
+```sql
+-- migrate:up env:THE_ROLE env:THE_PASSWORD
+create role '{{ or (index . "THE_ROLE") "adminuser" }}' login password '{{ .THE_PASSWORD }}';
+```
+
+The `js` function may help to mitigate risks of SQL injection:
+
+```sql
+-- migrate:up env:THE_ROLE env:THE_PASSWORD
+create role '{{ js .THE_ROLE }}' login password '{{ js .THE_PASSWORD }}';
+```
 
 **transaction**
 
