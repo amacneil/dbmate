@@ -581,3 +581,112 @@ func TestPostgresQuotedMigrationsTableName(t *testing.T) {
 		require.Equal(t, "\"whyWould\".i.\"doThis\"", name)
 	})
 }
+
+func TestPostgresMigrationsTableExists(t *testing.T) {
+	t.Run("default schema", func(t *testing.T) {
+		drv := testPostgresDriver(t)
+		drv.migrationsTableName = "test_migrations"
+
+		db := prepTestPostgresDB(t)
+		defer dbutil.MustClose(db)
+
+		exists, err := drv.MigrationsTableExists(db)
+		require.NoError(t, err)
+		require.Equal(t, false, exists)
+
+		err = drv.CreateMigrationsTable(db)
+		require.NoError(t, err)
+
+		exists, err = drv.MigrationsTableExists(db)
+		require.NoError(t, err)
+		require.Equal(t, true, exists)
+	})
+
+	t.Run("custom schema", func(t *testing.T) {
+		drv := testPostgresDriver(t)
+		u, err := url.Parse(drv.databaseURL.String() + "&search_path=foo")
+		require.NoError(t, err)
+		drv.databaseURL = u
+
+		db := prepTestPostgresDB(t)
+		defer dbutil.MustClose(db)
+
+		err = drv.CreateMigrationsTable(db)
+		require.NoError(t, err)
+
+		exists, err := drv.MigrationsTableExists(db)
+		require.NoError(t, err)
+		require.Equal(t, true, exists)
+	})
+
+	t.Run("custom schema with special chars", func(t *testing.T) {
+		drv := testPostgresDriver(t)
+		u, err := url.Parse(drv.databaseURL.String() + "&search_path=custom-schema")
+		require.NoError(t, err)
+		drv.databaseURL = u
+
+		db := prepTestPostgresDB(t)
+		defer dbutil.MustClose(db)
+
+		err = drv.CreateMigrationsTable(db)
+		require.NoError(t, err)
+
+		exists, err := drv.MigrationsTableExists(db)
+		require.NoError(t, err)
+		require.Equal(t, true, exists)
+	})
+
+	t.Run("custom migrations table name containing schema with special chars", func(t *testing.T) {
+		drv := testPostgresDriver(t)
+		drv.migrationsTableName = "custom$schema.schema_migrations"
+		u, err := url.Parse(drv.databaseURL.String())
+		require.NoError(t, err)
+		drv.databaseURL = u
+
+		db := prepTestPostgresDB(t)
+		defer dbutil.MustClose(db)
+
+		err = drv.CreateMigrationsTable(db)
+		require.NoError(t, err)
+
+		exists, err := drv.MigrationsTableExists(db)
+		require.NoError(t, err)
+		require.Equal(t, true, exists)
+	})
+
+	t.Run("custom migrations table name containing table name with special chars", func(t *testing.T) {
+		drv := testPostgresDriver(t)
+		drv.migrationsTableName = "schema.custom#table#name"
+		u, err := url.Parse(drv.databaseURL.String())
+		require.NoError(t, err)
+		drv.databaseURL = u
+
+		db := prepTestPostgresDB(t)
+		defer dbutil.MustClose(db)
+
+		err = drv.CreateMigrationsTable(db)
+		require.NoError(t, err)
+
+		exists, err := drv.MigrationsTableExists(db)
+		require.NoError(t, err)
+		require.Equal(t, true, exists)
+	})
+
+	t.Run("custom migrations table name containing schema and table name with special chars", func(t *testing.T) {
+		drv := testPostgresDriver(t)
+		drv.migrationsTableName = "custom-schema.custom@table@name"
+		u, err := url.Parse(drv.databaseURL.String())
+		require.NoError(t, err)
+		drv.databaseURL = u
+
+		db := prepTestPostgresDB(t)
+		defer dbutil.MustClose(db)
+
+		err = drv.CreateMigrationsTable(db)
+		require.NoError(t, err)
+
+		exists, err := drv.MigrationsTableExists(db)
+		require.NoError(t, err)
+		require.Equal(t, true, exists)
+	})
+}
