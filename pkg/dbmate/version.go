@@ -1,4 +1,4 @@
 package dbmate
 
 // Version of dbmate
-const Version = "2.4.0"
+const Version = "2.5.0"
