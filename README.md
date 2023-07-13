@@ -210,6 +210,19 @@ A `socket` or `host` parameter can be specified to connect through a unix socket
 DATABASE_URL="postgres://username:password@/database_name?socket=/var/run/postgresql"
 ```
 
+For passwordless authentication like Postgres [peer auth-method](https://www.postgresql.org/docs/current/auth-pg-hba-conf.html) the URL can be shortened:
+
+```sh
+DATABASE_URL="postgres://username/database_name?socket=/var/run/postgresql"
+```
+
+Additionaly, when the username and database name are identical the URL can be shortened further:
+
+```sh
+DATABASE_URL="postgres:///database_name?socket=/var/run/postgresql"
+```
+
+
 A `search_path` parameter can be used to specify the [current schema](https://www.postgresql.org/docs/13/ddl-schemas.html#DDL-SCHEMAS-PATH) while applying migrations, as well as for dbmate's `schema_migrations` table.
 If the schema does not exist, it will be created automatically. If multiple comma-separated schemas are passed, the first will be used for the `schema_migrations` table.
 
