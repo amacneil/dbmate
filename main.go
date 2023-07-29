@@ -104,7 +104,7 @@ func NewApp() *cli.App {
 				&cli.BoolFlag{
 					Name:    "strict",
 					EnvVars: []string{"DBMATE_STRICT"},
-					Usage:   "ignore out of order pending migrations",
+					Usage:   "apply migrations strictly in numerical order",
 				},
 				&cli.BoolFlag{
 					Name:    "verbose",
@@ -140,7 +140,7 @@ func NewApp() *cli.App {
 				&cli.BoolFlag{
 					Name:    "strict",
 					EnvVars: []string{"DBMATE_STRICT"},
-					Usage:   "ignore out of order pending migrations",
+					Usage:   "apply migrations strictly in numerical order",
 				},
 				&cli.BoolFlag{
 					Name:    "verbose",
@@ -176,11 +176,6 @@ func NewApp() *cli.App {
 			Name:  "status",
 			Usage: "List applied and pending migrations",
 			Flags: []cli.Flag{
-				&cli.BoolFlag{
-					Name:    "strict",
-					EnvVars: []string{"DBMATE_STRICT"},
-					Usage:   "ignore out of order pending migrations",
-				},
 				&cli.BoolFlag{
 					Name:  "exit-code",
 					Usage: "return 1 if there are pending migrations",
