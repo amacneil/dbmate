@@ -416,9 +416,11 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 	}
 
 	var latestAppliedMigration string
-	for migrationVersion := range appliedMigrations {
-		if migrationVersion > latestAppliedMigration {
-			latestAppliedMigration = migrationVersion
+	if db.Strict {
+		for migrationVersion := range appliedMigrations {
+			if migrationVersion > latestAppliedMigration {
+				latestAppliedMigration = migrationVersion
+			}
 		}
 	}
 
