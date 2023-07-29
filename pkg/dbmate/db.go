@@ -454,7 +454,7 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 			}
 
 			if db.Strict && !migration.Applied && migration.Version < latestAppliedMigration {
-				return nil, fmt.Errorf("Cannot apply migration `%s` after `%s` in --strict mode. Migrations have to be in numerical order.", migration.Version, latestAppliedMigration)
+				return nil, fmt.Errorf("cannot apply migration `%s` after `%s` in --strict mode, migrations have to be in numerical order", migration.Version, latestAppliedMigration)
 			}
 
 			migrations = append(migrations, migration)
