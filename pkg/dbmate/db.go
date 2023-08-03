@@ -49,7 +49,7 @@ type DB struct {
 	MigrationsTableName string
 	// SchemaFile specifies the location for schema.sql file
 	SchemaFile string
-	// Ignore out of order pending migrations
+	// Fail if migrations would be applied out of order
 	Strict bool
 	// Verbose prints the result of each statement execution
 	Verbose bool

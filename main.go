@@ -104,7 +104,7 @@ func NewApp() *cli.App {
 				&cli.BoolFlag{
 					Name:    "strict",
 					EnvVars: []string{"DBMATE_STRICT"},
-					Usage:   "apply migrations strictly in numerical order",
+					Usage:   "fail if migrations would be applied out of order",
 				},
 				&cli.BoolFlag{
 					Name:    "verbose",
@@ -140,7 +140,7 @@ func NewApp() *cli.App {
 				&cli.BoolFlag{
 					Name:    "strict",
 					EnvVars: []string{"DBMATE_STRICT"},
-					Usage:   "apply migrations strictly in numerical order",
+					Usage:   "fail if migrations would be applied out of order",
 				},
 				&cli.BoolFlag{
 					Name:    "verbose",
