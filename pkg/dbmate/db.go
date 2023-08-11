@@ -18,17 +18,16 @@ import (
 
 // Error codes
 var (
-	ErrNoMigrationFiles        = errors.New("no migration files found")
-	ErrNoPendingMigrationFiles = errors.New("no pending migration files found")
-	ErrInvalidURL              = errors.New("invalid url, have you set your --url flag or DATABASE_URL environment variable?")
-	ErrNoRollback              = errors.New("can't rollback: no migrations have been applied")
-	ErrCantConnect             = errors.New("unable to connect to database")
-	ErrUnsupportedDriver       = errors.New("unsupported driver")
-	ErrNoMigrationName         = errors.New("please specify a name for the new migration")
-	ErrMigrationAlreadyExist   = errors.New("file already exists")
-	ErrMigrationDirNotFound    = errors.New("could not find migrations directory")
-	ErrMigrationNotFound       = errors.New("can't find migration file")
-	ErrCreateDirectory         = errors.New("unable to create directory")
+	ErrNoMigrationFiles      = errors.New("no migration files found")
+	ErrInvalidURL            = errors.New("invalid url, have you set your --url flag or DATABASE_URL environment variable?")
+	ErrNoRollback            = errors.New("can't rollback: no migrations have been applied")
+	ErrCantConnect           = errors.New("unable to connect to database")
+	ErrUnsupportedDriver     = errors.New("unsupported driver")
+	ErrNoMigrationName       = errors.New("please specify a name for the new migration")
+	ErrMigrationAlreadyExist = errors.New("file already exists")
+	ErrMigrationDirNotFound  = errors.New("could not find migrations directory")
+	ErrMigrationNotFound     = errors.New("can't find migration file")
+	ErrCreateDirectory       = errors.New("unable to create directory")
 )
 
 // migrationFileRegexp pattern for valid migration files
@@ -323,7 +322,7 @@ func (db *DB) Migrate() error {
 	}
 
 	if len(pendingMigrations) == 0 {
-		return ErrNoPendingMigrationFiles
+		return nil
 	}
 
 	if db.Strict {
