@@ -308,6 +308,15 @@ func (db *DB) Migrate() error {
 		return err
 	}
 
+	pendingMigrations := []Migration{}
+	for _, migration := range migrations {
+		if migration.Applied {
+			continue
+		}
+
+		pendingMigrations = append(pendingMigrations, migration)
+	}
+
 	if db.Strict {
 		appliedMigrations, err := db.FindAppliedMigrations(1)
 		if err != nil {
@@ -319,8 +328,8 @@ func (db *DB) Migrate() error {
 			highestAppliedMigrationVersion = migrationVersion
 		}
 
-		for _, migration := range migrations {
-			if db.Strict && !migration.Applied && migration.Version <= highestAppliedMigrationVersion {
+		for _, migration := range pendingMigrations {
+			if db.Strict && migration.Version <= highestAppliedMigrationVersion {
 				return fmt.Errorf("migration `%s` is out of order with already applied migrations, the version number has to be higher than the applied migration `%s` in --strict mode", migration.Version, highestAppliedMigrationVersion)
 			}
 		}
@@ -336,11 +345,7 @@ func (db *DB) Migrate() error {
 	}
 	defer dbutil.MustClose(sqlDB)
 
-	for _, migration := range migrations {
-		if migration.Applied {
-			continue
-		}
-
+	for _, migration := range pendingMigrations {
 		fmt.Fprintf(db.Log, "Applying: %s\n", migration.FileName)
 
 		parsed, err := migration.Parse()
