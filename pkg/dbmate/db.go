@@ -18,16 +18,17 @@ import (
 
 // Error codes
 var (
-	ErrNoMigrationFiles      = errors.New("no migration files found")
-	ErrInvalidURL            = errors.New("invalid url, have you set your --url flag or DATABASE_URL environment variable?")
-	ErrNoRollback            = errors.New("can't rollback: no migrations have been applied")
-	ErrCantConnect           = errors.New("unable to connect to database")
-	ErrUnsupportedDriver     = errors.New("unsupported driver")
-	ErrNoMigrationName       = errors.New("please specify a name for the new migration")
-	ErrMigrationAlreadyExist = errors.New("file already exists")
-	ErrMigrationDirNotFound  = errors.New("could not find migrations directory")
-	ErrMigrationNotFound     = errors.New("can't find migration file")
-	ErrCreateDirectory       = errors.New("unable to create directory")
+	ErrNoMigrationFiles        = errors.New("no migration files found")
+	ErrNoPendingMigrationFiles = errors.New("no pending migration files found")
+	ErrInvalidURL              = errors.New("invalid url, have you set your --url flag or DATABASE_URL environment variable?")
+	ErrNoRollback              = errors.New("can't rollback: no migrations have been applied")
+	ErrCantConnect             = errors.New("unable to connect to database")
+	ErrUnsupportedDriver       = errors.New("unsupported driver")
+	ErrNoMigrationName         = errors.New("please specify a name for the new migration")
+	ErrMigrationAlreadyExist   = errors.New("file already exists")
+	ErrMigrationDirNotFound    = errors.New("could not find migrations directory")
+	ErrMigrationNotFound       = errors.New("can't find migration file")
+	ErrCreateDirectory         = errors.New("unable to create directory")
 )
 
 // migrationFileRegexp pattern for valid migration files
@@ -308,6 +309,10 @@ func (db *DB) Migrate() error {
 		return err
 	}
 
+	if len(migrations) == 0 {
+		return ErrNoMigrationFiles
+	}
+
 	pendingMigrations := []Migration{}
 	for _, migration := range migrations {
 		if migration.Applied {
@@ -315,6 +320,10 @@ func (db *DB) Migrate() error {
 		}
 
 		pendingMigrations = append(pendingMigrations, migration)
+	}
+
+	if len(pendingMigrations) == 0 {
+		return ErrNoPendingMigrationFiles
 	}
 
 	if db.Strict {
@@ -331,10 +340,6 @@ func (db *DB) Migrate() error {
 		if db.Strict && pendingMigrations[0].Version <= highestAppliedMigrationVersion {
 			return fmt.Errorf("migration `%s` is out of order with already applied migrations, the version number has to be higher than the applied migration `%s` in --strict mode", pendingMigrations[0].Version, highestAppliedMigrationVersion)
 		}
-	}
-
-	if len(migrations) == 0 {
-		return ErrNoMigrationFiles
 	}
 
 	sqlDB, err := db.openDatabaseForMigration(drv)
