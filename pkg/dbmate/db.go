@@ -314,14 +314,14 @@ func (db *DB) Migrate() error {
 			return err
 		}
 
-		var latestAppliedMigration string
+		var highestAppliedMigrationVersion string
 		for migrationVersion := range appliedMigrations {
-			latestAppliedMigration = migrationVersion
+			highestAppliedMigrationVersion = migrationVersion
 		}
 
 		for _, migration := range migrations {
-			if db.Strict && !migration.Applied && migration.Version <= latestAppliedMigration {
-				return fmt.Errorf("cannot apply migration `%s` after `%s` in --strict mode, migrations have to be in numerical order", migration.Version, latestAppliedMigration)
+			if db.Strict && !migration.Applied && migration.Version <= highestAppliedMigrationVersion {
+				return fmt.Errorf("migration `%s` is out of order with already applied migrations, the version number has to be higher than the applied migration `%s` in --strict mode", migration.Version, highestAppliedMigrationVersion)
 			}
 		}
 	}
