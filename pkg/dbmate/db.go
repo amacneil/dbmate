@@ -406,9 +406,29 @@ func (db *DB) readMigrationsDir(dir string) ([]fs.DirEntry, error) {
 
 // FindMigrations lists all available migrations
 func (db *DB) FindMigrations() ([]Migration, error) {
-	appliedMigrations, err := db.FindAppliedMigrations(-1)
+	drv, err := db.Driver()
 	if err != nil {
 		return nil, err
+	}
+
+	sqlDB, err := drv.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer dbutil.MustClose(sqlDB)
+
+	// find applied migrations
+	appliedMigrations := map[string]bool{}
+	migrationsTableExists, err := drv.MigrationsTableExists(sqlDB)
+	if err != nil {
+		return nil, err
+	}
+
+	if migrationsTableExists {
+		appliedMigrations, err = drv.SelectMigrations(sqlDB, -1)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	migrations := []Migration{}
@@ -449,35 +469,6 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 	})
 
 	return migrations, nil
-}
-
-// FindAppliedMigrations lists applied migrations
-func (db *DB) FindAppliedMigrations(limit int) (map[string]bool, error) {
-	drv, err := db.Driver()
-	if err != nil {
-		return nil, err
-	}
-
-	sqlDB, err := drv.Open()
-	if err != nil {
-		return nil, err
-	}
-	defer dbutil.MustClose(sqlDB)
-
-	appliedMigrations := map[string]bool{}
-	migrationsTableExists, err := drv.MigrationsTableExists(sqlDB)
-	if err != nil {
-		return nil, err
-	}
-
-	if migrationsTableExists {
-		appliedMigrations, err = drv.SelectMigrations(sqlDB, limit)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return appliedMigrations, nil
 }
 
 // Rollback rolls back the most recent migration
