@@ -328,10 +328,8 @@ func (db *DB) Migrate() error {
 			highestAppliedMigrationVersion = migrationVersion
 		}
 
-		for _, migration := range pendingMigrations {
-			if db.Strict && migration.Version <= highestAppliedMigrationVersion {
-				return fmt.Errorf("migration `%s` is out of order with already applied migrations, the version number has to be higher than the applied migration `%s` in --strict mode", migration.Version, highestAppliedMigrationVersion)
-			}
+		if db.Strict && pendingMigrations[0].Version <= highestAppliedMigrationVersion {
+			return fmt.Errorf("migration `%s` is out of order with already applied migrations, the version number has to be higher than the applied migration `%s` in --strict mode", pendingMigrations[0].Version, highestAppliedMigrationVersion)
 		}
 	}
 
