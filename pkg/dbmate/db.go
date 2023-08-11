@@ -308,6 +308,24 @@ func (db *DB) Migrate() error {
 		return err
 	}
 
+	if db.Strict {
+		appliedMigrations, err := db.FindAppliedMigrations(1)
+		if err != nil {
+			return err
+		}
+
+		var latestAppliedMigration string
+		for migrationVersion := range appliedMigrations {
+			latestAppliedMigration = migrationVersion
+		}
+
+		for _, migration := range migrations {
+			if db.Strict && !migration.Applied && migration.Version <= latestAppliedMigration {
+				return fmt.Errorf("cannot apply migration `%s` after `%s` in --strict mode, migrations have to be in numerical order", migration.Version, latestAppliedMigration)
+			}
+		}
+	}
+
 	if len(migrations) == 0 {
 		return ErrNoMigrationFiles
 	}
@@ -390,38 +408,9 @@ func (db *DB) readMigrationsDir(dir string) ([]fs.DirEntry, error) {
 
 // FindMigrations lists all available migrations
 func (db *DB) FindMigrations() ([]Migration, error) {
-	drv, err := db.Driver()
+	appliedMigrations, err := db.FindAppliedMigrations(-1)
 	if err != nil {
 		return nil, err
-	}
-
-	sqlDB, err := drv.Open()
-	if err != nil {
-		return nil, err
-	}
-	defer dbutil.MustClose(sqlDB)
-
-	// find applied migrations
-	appliedMigrations := map[string]bool{}
-	migrationsTableExists, err := drv.MigrationsTableExists(sqlDB)
-	if err != nil {
-		return nil, err
-	}
-
-	if migrationsTableExists {
-		appliedMigrations, err = drv.SelectMigrations(sqlDB, -1)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	var latestAppliedMigration string
-	if db.Strict {
-		for migrationVersion := range appliedMigrations {
-			if migrationVersion > latestAppliedMigration {
-				latestAppliedMigration = migrationVersion
-			}
-		}
 	}
 
 	migrations := []Migration{}
@@ -453,10 +442,6 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 				migration.Applied = true
 			}
 
-			if db.Strict && !migration.Applied && migration.Version < latestAppliedMigration {
-				return nil, fmt.Errorf("cannot apply migration `%s` after `%s` in --strict mode, migrations have to be in numerical order", migration.Version, latestAppliedMigration)
-			}
-
 			migrations = append(migrations, migration)
 		}
 	}
@@ -466,6 +451,35 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 	})
 
 	return migrations, nil
+}
+
+// FindAppliedMigrations lists applied migrations
+func (db *DB) FindAppliedMigrations(limit int) (map[string]bool, error) {
+	drv, err := db.Driver()
+	if err != nil {
+		return nil, err
+	}
+
+	sqlDB, err := drv.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer dbutil.MustClose(sqlDB)
+
+	appliedMigrations := map[string]bool{}
+	migrationsTableExists, err := drv.MigrationsTableExists(sqlDB)
+	if err != nil {
+		return nil, err
+	}
+
+	if migrationsTableExists {
+		appliedMigrations, err = drv.SelectMigrations(sqlDB, limit)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return appliedMigrations, nil
 }
 
 // Rollback rolls back the most recent migration
