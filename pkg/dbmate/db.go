@@ -312,33 +312,24 @@ func (db *DB) Migrate() error {
 		return ErrNoMigrationFiles
 	}
 
+	highestAppliedMigrationVersion := ""
 	pendingMigrations := []Migration{}
 	for _, migration := range migrations {
 		if migration.Applied {
-			continue
+			if db.Strict && highestAppliedMigrationVersion <= migration.Version {
+				highestAppliedMigrationVersion = migration.Version
+			}
+		} else {
+			pendingMigrations = append(pendingMigrations, migration)
 		}
-
-		pendingMigrations = append(pendingMigrations, migration)
 	}
 
 	if len(pendingMigrations) == 0 {
 		return nil
 	}
 
-	if db.Strict {
-		appliedMigrations, err := db.FindAppliedMigrations(1)
-		if err != nil {
-			return err
-		}
-
-		var highestAppliedMigrationVersion string
-		for migrationVersion := range appliedMigrations {
-			highestAppliedMigrationVersion = migrationVersion
-		}
-
-		if db.Strict && pendingMigrations[0].Version <= highestAppliedMigrationVersion {
-			return fmt.Errorf("migration `%s` is out of order with already applied migrations, the version number has to be higher than the applied migration `%s` in --strict mode", pendingMigrations[0].Version, highestAppliedMigrationVersion)
-		}
+	if db.Strict && pendingMigrations[0].Version <= highestAppliedMigrationVersion {
+		return fmt.Errorf("migration `%s` is out of order with already applied migrations, the version number has to be higher than the applied migration `%s` in --strict mode", pendingMigrations[0].Version, highestAppliedMigrationVersion)
 	}
 
 	sqlDB, err := db.openDatabaseForMigration(drv)
