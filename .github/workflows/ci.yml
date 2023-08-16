@@ -124,7 +124,7 @@ jobs:
       - name: Start test dependencies
         run: |
           set -x
-          docker-compose pull --quiet
+          docker-compose pull --ignore-buildable --quiet
           docker-compose up --detach
           docker-compose run --rm dev make wait
 
