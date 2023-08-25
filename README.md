@@ -167,6 +167,7 @@ protocol://username:password@host:port/database_name?options
 ```
 
 - `protocol` must be one of `mysql`, `postgres`, `postgresql`, `sqlite`, `sqlite3`, `clickhouse`
+- `password` must be URL encoded (you will get an error if you have special charactors in your password)
 - `host` can be either a hostname or IP address
 - `options` are driver-specific (refer to the underlying Go SQL drivers if you wish to use these)
 
