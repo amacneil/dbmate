@@ -41,7 +41,7 @@ services:
     image: clickhouse/clickhouse-server:22.8
 
   zookeeper:
-    image: zookeeper
+    image: zookeeper:3.8
     hostname: zookeeper
 
   clickhouse-cluster-01:
