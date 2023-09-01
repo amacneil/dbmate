@@ -200,6 +200,13 @@ func NewApp() *cli.App {
 			}),
 		},
 		{
+			Name:  "load",
+			Usage: "Load schema file to the database",
+			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				return db.LoadSchema()
+			}),
+		},
+		{
 			Name:  "wait",
 			Usage: "Wait for the database to become available",
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {

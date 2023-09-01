@@ -155,9 +155,8 @@ func (db *DB) CreateAndMigrate() error {
 		return err
 	}
 
-	// create database if it does not already exist
-	// skip this step if we cannot determine status
-	// (e.g. user does not have list database permission)
+	// create database if it does not already exist skip this step if we cannot
+	// determine status (e.g. user does not have list database permission)
 	exists, err := drv.DatabaseExists()
 	if err == nil && !exists {
 		if err := drv.CreateDatabase(); err != nil {
@@ -216,6 +215,36 @@ func (db *DB) DumpSchema() error {
 
 	// write schema to file
 	return os.WriteFile(db.SchemaFile, schema, 0o644)
+}
+
+// LoadSchema loads schema file to the current database
+func (db *DB) LoadSchema() error {
+	drv, err := db.Driver()
+	if err != nil {
+		return err
+	}
+
+	sqlDB, err := drv.Open()
+	if err != nil {
+		return err
+	}
+	defer dbutil.MustClose(sqlDB)
+
+	fmt.Fprintf(db.Log, "Reading: %s\n", db.SchemaFile)
+
+	bytes, err := os.ReadFile(db.SchemaFile)
+	if err != nil {
+		return err
+	}
+
+	result, err := sqlDB.Exec(string(bytes))
+	if err != nil {
+		return err
+	} else if db.Verbose {
+		db.printVerbose(result)
+	}
+
+	return nil
 }
 
 // ensureDir creates a directory if it does not already exist
