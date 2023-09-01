@@ -35,6 +35,8 @@ var migrationFileRegexp = regexp.MustCompile(`^(\d+).*\.sql$`)
 
 // DB allows dbmate actions to be performed on a specified database
 type DB struct {
+	// AutoLoadSchema loads schema.sql on create and migrate command
+	AutoLoadSchema bool
 	// AutoDumpSchema generates schema.sql after each action
 	AutoDumpSchema bool
 	// DatabaseURL is the database connection string
@@ -68,6 +70,7 @@ type StatusResult struct {
 // New initializes a new dbmate database
 func New(databaseURL *url.URL) *DB {
 	return &DB{
+		AutoLoadSchema:      false,
 		AutoDumpSchema:      true,
 		DatabaseURL:         databaseURL,
 		FS:                  nil,
@@ -148,7 +151,8 @@ func (db *DB) Wait() error {
 	return db.wait(drv)
 }
 
-// CreateAndMigrate creates the database (if necessary) and runs migrations
+// CreateAndMigrate creates the database (if necessary), load schema.sql file
+// to the database (if autoload enabled) and then apply all pending migrations
 func (db *DB) CreateAndMigrate() error {
 	drv, err := db.Driver()
 	if err != nil {
@@ -157,15 +161,31 @@ func (db *DB) CreateAndMigrate() error {
 
 	// create database if it does not already exist skip this step if we cannot
 	// determine status (e.g. user does not have list database permission)
-	exists, err := drv.DatabaseExists()
-	if err == nil && !exists {
+	databaseExists, err := drv.DatabaseExists()
+	if err == nil && !databaseExists {
 		if err := drv.CreateDatabase(); err != nil {
 			return err
 		}
 	}
 
-	// migrate
-	return db.Migrate()
+	sqlDB, err := drv.Open()
+	if err != nil {
+		return err
+	}
+	defer dbutil.MustClose(sqlDB)
+
+	// if autoload enabled and migration table does not exist load schema.sql
+	if db.AutoLoadSchema {
+		migrationsTableExists, err := drv.MigrationsTableExists(sqlDB)
+		if err == nil && !migrationsTableExists {
+			if err := db.loadSchema(sqlDB); err != nil {
+				return err
+			}
+		}
+	}
+
+	// apply any pending migrations
+	return db.migrate()
 }
 
 // Create creates the current database
@@ -217,18 +237,11 @@ func (db *DB) DumpSchema() error {
 	return os.WriteFile(db.SchemaFile, schema, 0o644)
 }
 
-// LoadSchema loads schema file to the current database
-func (db *DB) LoadSchema() error {
-	drv, err := db.Driver()
+func (db *DB) loadSchema(sqlDB *sql.DB) error {
+	_, err := os.Stat(db.SchemaFile)
 	if err != nil {
-		return err
+		return nil
 	}
-
-	sqlDB, err := drv.Open()
-	if err != nil {
-		return err
-	}
-	defer dbutil.MustClose(sqlDB)
 
 	fmt.Fprintf(db.Log, "Reading: %s\n", db.SchemaFile)
 
@@ -245,6 +258,22 @@ func (db *DB) LoadSchema() error {
 	}
 
 	return nil
+}
+
+// LoadSchema loads schema file to the current database
+func (db *DB) LoadSchema() error {
+	drv, err := db.Driver()
+	if err != nil {
+		return err
+	}
+
+	sqlDB, err := drv.Open()
+	if err != nil {
+		return err
+	}
+	defer dbutil.MustClose(sqlDB)
+
+	return db.loadSchema(sqlDB)
 }
 
 // ensureDir creates a directory if it does not already exist
@@ -322,8 +351,7 @@ func (db *DB) openDatabaseForMigration(drv Driver) (*sql.DB, error) {
 	return sqlDB, nil
 }
 
-// Migrate migrates database to the latest version
-func (db *DB) Migrate() error {
+func (db *DB) migrate() error {
 	drv, err := db.Driver()
 	if err != nil {
 		return err
@@ -332,10 +360,6 @@ func (db *DB) Migrate() error {
 	migrations, err := db.FindMigrations()
 	if err != nil {
 		return err
-	}
-
-	if len(migrations) == 0 {
-		return ErrNoMigrationFiles
 	}
 
 	sqlDB, err := db.openDatabaseForMigration(drv)
@@ -388,6 +412,21 @@ func (db *DB) Migrate() error {
 	}
 
 	return nil
+}
+
+// Migrate migrates database to the latest version
+func (db *DB) Migrate() error {
+	migrations, err := db.FindMigrations()
+	if err != nil {
+		return err
+	}
+
+	// return error if migrations folder is empty
+	if len(migrations) == 0 {
+		return ErrNoMigrationFiles
+	}
+
+	return db.migrate()
 }
 
 func (db *DB) printVerbose(result sql.Result) {

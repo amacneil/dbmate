@@ -1,6 +1,7 @@
 package dbmate_test
 
 import (
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -36,6 +37,29 @@ func newTestDB(t *testing.T, u *url.URL) *dbmate.DB {
 	db.AutoDumpSchema = false
 
 	return db
+}
+
+func copyFile(from string, to string) error {
+	_, err := os.Stat(from)
+	if err != nil {
+		return err
+	}
+
+	source, err := os.Open(from)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+
+	target, err := os.Create(to)
+	if err != nil {
+		return err
+	}
+	defer target.Close()
+
+	buffer := make([]byte, 1024)
+	_, err = io.CopyBuffer(target, source, buffer)
+	return err
 }
 
 func TestNew(t *testing.T) {
@@ -209,6 +233,153 @@ func TestLoadSchema(t *testing.T) {
 	require.Nil(t, err)
 }
 
+func TestUp(t *testing.T) {
+	u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
+	db := newTestDB(t, u)
+	drv, err := db.Driver()
+	require.NoError(t, err)
+
+	// drop database
+	err = db.Drop()
+	require.NoError(t, err)
+
+	// create and migrate
+	err = db.CreateAndMigrate()
+	require.NoError(t, err)
+
+	// verify results
+	sqlDB, err := drv.Open()
+	require.NoError(t, err)
+	defer dbutil.MustClose(sqlDB)
+
+	// check applied migrations
+	appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
+	require.NoError(t, err)
+	require.Equal(t, map[string]bool{"20200227231541": true, "20151129054053": true}, appliedMigrations)
+
+	// users table have records
+	count := 0
+	err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+}
+
+func TestUpAutoLoadSchema(t *testing.T) {
+	u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
+	db := newTestDB(t, u)
+	drv, err := db.Driver()
+	require.NoError(t, err)
+
+	// create custom schema file directory
+	dir, err := os.MkdirTemp("", "dbmate")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	// use an isolated schema file to avoid side effects
+	db.MigrationsDir = []string{filepath.Join(dir, "/db/migrations")}
+	db.SchemaFile = filepath.Join(dir, "/db/schema.sql")
+
+	t.Run("schema", func(t *testing.T) {
+		// prepare file system
+		err = os.MkdirAll(filepath.Join(dir, "/db/migrations"), 0666)
+		require.NoError(t, err)
+		err = copyFile(filepath.Join(rootDir, "/testdata/db/schema.sql"), filepath.Join(dir, "/db/schema.sql"))
+		require.NoError(t, err)
+
+		// drop database
+		err = db.Drop()
+		require.NoError(t, err)
+
+		// create and migrate
+		err = db.CreateAndMigrate()
+		require.NoError(t, err)
+
+		// verify results
+		sqlDB, err := drv.Open()
+		require.NoError(t, err)
+		defer dbutil.MustClose(sqlDB)
+
+		// check applied migrations
+		appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
+		require.NoError(t, err)
+		require.Equal(t, map[string]bool{"20200227231541": true, "20151129054053": true}, appliedMigrations)
+
+		// users table does not have records
+		count := 0
+		err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
+		require.NoError(t, err)
+		require.Equal(t, 0, count)
+	})
+
+	t.Run("schema and migrations", func(t *testing.T) {
+		// prepare file system
+		err = copyFile(
+			filepath.Join(rootDir, "/testdata/db/migrations/20151129054053_test_migration.sql"),
+			filepath.Join(dir, "/db/migrations/20151129054053_test_migration.sql"),
+		)
+		require.NoError(t, err)
+		err = copyFile(
+			filepath.Join(rootDir, "/testdata/db/migrations/20200227231541_test_posts.sql"),
+			filepath.Join(dir, "/db/migrations/20200227231541_test_posts.sql"),
+		)
+		require.NoError(t, err)
+
+		// drop database
+		err = db.Drop()
+		require.NoError(t, err)
+
+		// create and migrate
+		err = db.CreateAndMigrate()
+		require.NoError(t, err)
+
+		// verify results
+		sqlDB, err := drv.Open()
+		require.NoError(t, err)
+		defer dbutil.MustClose(sqlDB)
+
+		// check applied migrations
+		appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
+		require.NoError(t, err)
+		require.Equal(t, map[string]bool{"20200227231541": true, "20151129054053": true}, appliedMigrations)
+
+		// users table have records
+		count := 0
+		err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
+		require.NoError(t, err)
+		require.Equal(t, 0, count)
+	})
+
+	t.Run("migrations", func(t *testing.T) {
+		// prepare file system
+		err = os.Remove(filepath.Join(dir, "/db/schema.sql"))
+		require.NoError(t, err)
+
+		// drop database
+		err = db.Drop()
+		require.NoError(t, err)
+
+		// create and migrate
+		err = db.CreateAndMigrate()
+		require.NoError(t, err)
+
+		// verify results
+		sqlDB, err := drv.Open()
+		require.NoError(t, err)
+		defer dbutil.MustClose(sqlDB)
+
+		// check applied migrations
+		appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
+		require.NoError(t, err)
+		require.Equal(t, map[string]bool{"20200227231541": true, "20151129054053": true}, appliedMigrations)
+
+		// users table have records
+		count := 0
+		err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
+		require.NoError(t, err)
+		require.Equal(t, 1, count)
+	})
+}
+
 func checkWaitCalled(t *testing.T, u *url.URL, command func() error) {
 	oldHost := u.Host
 	u.Host = "postgres:404"
@@ -319,40 +490,6 @@ func TestMigrate(t *testing.T) {
 
 			// migrate
 			err = db.Migrate()
-			require.NoError(t, err)
-
-			// verify results
-			sqlDB, err := drv.Open()
-			require.NoError(t, err)
-			defer dbutil.MustClose(sqlDB)
-
-			// check applied migrations
-			appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
-			require.NoError(t, err)
-			require.Equal(t, map[string]bool{"20200227231541": true, "20151129054053": true}, appliedMigrations)
-
-			// users table have records
-			count := 0
-			err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
-			require.NoError(t, err)
-			require.Equal(t, 1, count)
-		})
-	}
-}
-
-func TestUp(t *testing.T) {
-	for _, u := range testURLs() {
-		t.Run(u.Scheme, func(t *testing.T) {
-			db := newTestDB(t, u)
-			drv, err := db.Driver()
-			require.NoError(t, err)
-
-			// drop database
-			err = db.Drop()
-			require.NoError(t, err)
-
-			// create and migrate
-			err = db.CreateAndMigrate()
 			require.NoError(t, err)
 
 			// verify results

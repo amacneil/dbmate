@@ -75,6 +75,11 @@ func NewApp() *cli.App {
 			Usage:   "don't update the schema file on migrate/rollback",
 		},
 		&cli.BoolFlag{
+			Name:    "autoload-schema",
+			EnvVars: []string{"DBMATE_AUTOLOAD_SCHEMA"},
+			Usage:   "automatically load schema file on up",
+		},
+		&cli.BoolFlag{
 			Name:    "wait",
 			EnvVars: []string{"DBMATE_WAIT"},
 			Usage:   "wait for the db to become available before executing the subsequent command",
@@ -237,6 +242,7 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 			return err
 		}
 		db := dbmate.New(u)
+		db.AutoLoadSchema = !c.Bool("autoload-schema")
 		db.AutoDumpSchema = !c.Bool("no-dump-schema")
 		db.MigrationsDir = c.StringSlice("migrations-dir")
 		db.MigrationsTableName = c.String("migrations-table")
