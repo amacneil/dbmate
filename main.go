@@ -200,7 +200,14 @@ func NewApp() *cli.App {
 		{
 			Name:  "dump",
 			Usage: "Write the database schema to disk",
+			Flags: []cli.Flag{
+				&cli.BoolFlag{
+					Name:  "prune",
+					Usage: "used for migrations squashing",
+				},
+			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				db.Prune = c.Bool("prune")
 				return db.DumpSchema()
 			}),
 		},

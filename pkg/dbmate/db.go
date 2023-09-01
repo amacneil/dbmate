@@ -35,10 +35,10 @@ var migrationFileRegexp = regexp.MustCompile(`^(\d+).*\.sql$`)
 
 // DB allows dbmate actions to be performed on a specified database
 type DB struct {
-	// AutoLoadSchema loads schema.sql on create and migrate command
-	AutoLoadSchema bool
 	// AutoDumpSchema generates schema.sql after each action
 	AutoDumpSchema bool
+	// AutoLoadSchema loads schema.sql on create and migrate command
+	AutoLoadSchema bool
 	// DatabaseURL is the database connection string
 	DatabaseURL *url.URL
 	// FS specifies the filesystem, or nil for OS filesystem
@@ -49,6 +49,8 @@ type DB struct {
 	MigrationsDir []string
 	// MigrationsTableName specifies the database table to record migrations in
 	MigrationsTableName string
+	// Prune used for migrations squashing
+	Prune bool
 	// SchemaFile specifies the location for schema.sql file
 	SchemaFile string
 	// Verbose prints the result of each statement execution
@@ -70,8 +72,8 @@ type StatusResult struct {
 // New initializes a new dbmate database
 func New(databaseURL *url.URL) *DB {
 	return &DB{
-		AutoLoadSchema:      false,
 		AutoDumpSchema:      true,
+		AutoLoadSchema:      false,
 		DatabaseURL:         databaseURL,
 		FS:                  nil,
 		Log:                 os.Stdout,
@@ -234,7 +236,21 @@ func (db *DB) DumpSchema() error {
 	}
 
 	// write schema to file
-	return os.WriteFile(db.SchemaFile, schema, 0o644)
+	if err = os.WriteFile(db.SchemaFile, schema, 0o644); err != nil {
+		return err
+	}
+
+	// in prune mode we delete all migrations from disk after dump
+	if db.Prune {
+		for _, dir := range db.MigrationsDir {
+			err := db.cleanMigrationsDir(dir)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func (db *DB) loadSchema(sqlDB *sql.DB) error {
@@ -451,6 +467,23 @@ func (db *DB) readMigrationsDir(dir string) ([]fs.DirEntry, error) {
 	}
 
 	return fs.ReadDir(db.FS, path)
+}
+
+func (db *DB) cleanMigrationsDir(dir string) error {
+	path := filepath.Clean(dir)
+
+	files, err := db.readMigrationsDir(path)
+	if err != nil {
+		return nil
+	}
+
+	for _, file := range files {
+		if err := os.Remove(filepath.Join(path, file.Name())); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // FindMigrations lists all available migrations

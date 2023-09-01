@@ -155,6 +155,55 @@ func TestDumpSchema(t *testing.T) {
 	require.Contains(t, string(schema), "-- PostgreSQL database dump")
 }
 
+func TestDumpSchemaPrune(t *testing.T) {
+	u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
+	db := newTestDB(t, u)
+	db.Prune = true
+
+	// create custom schema file directory
+	dir, err := os.MkdirTemp("", "dbmate")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	// use an isolated schema file to avoid side effects
+	db.MigrationsDir = []string{filepath.Join(dir, "/db/migrations")}
+	db.SchemaFile = filepath.Join(dir, "/db/schema.sql")
+
+	// prepare file system
+	err = os.MkdirAll(filepath.Join(dir, "/db/migrations"), 0666)
+	require.NoError(t, err)
+	err = copyFile(
+		filepath.Join(rootDir, "/testdata/db/migrations/20151129054053_test_migration.sql"),
+		filepath.Join(dir, "/db/migrations/20151129054053_test_migration.sql"),
+	)
+	require.NoError(t, err)
+
+	// drop database
+	err = db.Drop()
+	require.NoError(t, err)
+
+	// create and migrate
+	err = db.CreateAndMigrate()
+	require.NoError(t, err)
+
+	// schema.sql should not exist
+	_, err = os.Stat(db.SchemaFile)
+	require.True(t, os.IsNotExist(err))
+
+	// dump schema
+	err = db.DumpSchema()
+	require.NoError(t, err)
+
+	// verify schema
+	schema, err := os.ReadFile(db.SchemaFile)
+	require.NoError(t, err)
+	require.Contains(t, string(schema), "-- PostgreSQL database dump")
+
+	// migration file should not exist
+	_, err = os.Stat(filepath.Join(dir, "/db/migrations/20151129054053_test_migration.sql"))
+	require.True(t, os.IsNotExist(err))
+}
+
 func TestAutoDumpSchema(t *testing.T) {
 	u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
 	db := newTestDB(t, u)
@@ -267,6 +316,7 @@ func TestUp(t *testing.T) {
 func TestUpAutoLoadSchema(t *testing.T) {
 	u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
 	db := newTestDB(t, u)
+	db.AutoLoadSchema = true
 	drv, err := db.Driver()
 	require.NoError(t, err)
 
