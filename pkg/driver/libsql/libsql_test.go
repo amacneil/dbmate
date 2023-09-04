@@ -67,6 +67,16 @@ func TestConnectionString(t *testing.T) {
 		u := dbutil.MustParseURL("https://example.com/db")
 		require.Equal(t, "https://example.com/db", ConnectionString(u))
 	})
+
+	t.Run("ws protocol", func(t *testing.T) {
+		u := dbutil.MustParseURL("ws://example.com/db")
+		require.Equal(t, "ws://example.com/db", ConnectionString(u))
+	})
+
+	t.Run("wss protocol", func(t *testing.T) {
+		u := dbutil.MustParseURL("wss://example.com/db")
+		require.Equal(t, "wss://example.com/db", ConnectionString(u))
+	})
 }
 
 func TestLibSQLDumpSchema(t *testing.T) {

@@ -22,6 +22,8 @@ func init() {
 	dbmate.RegisterDriver(NewDriver, "libsql")
 	dbmate.RegisterDriver(NewDriver, "http")
 	dbmate.RegisterDriver(NewDriver, "https")
+	dbmate.RegisterDriver(NewDriver, "ws")
+	dbmate.RegisterDriver(NewDriver, "wss")
 }
 
 // Driver provides top level database functions
