@@ -17,6 +17,9 @@ RUN apt-get update \
 RUN curl -fsSL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
 	| sh -s -- -b /usr/local/bin v1.54.2
 
+# libsql-shell-go
+RUN go install github.com/libsql/libsql-shell-go/cmd/libsql-shell@latest
+
 # download modules
 COPY go.* /src/
 RUN go mod download
@@ -32,4 +35,5 @@ RUN apk add --no-cache \
 	sqlite \
 	tzdata
 COPY --from=dev /src/dist/dbmate /usr/local/bin/dbmate
+COPY --from=dev /go/bin/libsql-shell /usr/local/bin/libsql-shell
 ENTRYPOINT ["/usr/local/bin/dbmate"]
