@@ -570,7 +570,9 @@ func (db *DB) WaitForCurrent(quiet bool) error {
 		}
 
 		if len(missing) == 0 {
-			fmt.Fprintln(db.Log, "All migrations are applied, database is current.")
+			if !quiet {
+				fmt.Fprintln(db.Log, "All migrations are applied, database is current.")
+			}
 			return nil
 		}
 
