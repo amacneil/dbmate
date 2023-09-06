@@ -553,3 +553,31 @@ func (db *DB) Status(quiet bool) (int, error) {
 
 	return totalPending, nil
 }
+
+// WaitForCurrent waits until all migrations are applied before exiting.
+func (db *DB) WaitForCurrent(quiet bool) error {
+	for {
+		results, err := db.FindMigrations()
+		if err != nil {
+			return err
+		}
+
+		var missing []string
+		for _, res := range results {
+			if !res.Applied {
+				missing = append(missing, res.FileName)
+			}
+		}
+
+		if len(missing) == 0 {
+			fmt.Fprintln(db.Log, "All migrations are applied, database is current.")
+			return nil
+		}
+
+		if !quiet {
+			fmt.Fprintln(db.Log, "Waiting for migrations to be applied: ", missing)
+		}
+
+		time.Sleep(5 * time.Second)
+	}
+}

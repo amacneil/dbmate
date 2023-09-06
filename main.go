@@ -206,6 +206,21 @@ func NewApp() *cli.App {
 				return db.Wait()
 			}),
 		},
+		{
+			Name:  "wait-for-current",
+			Usage: "Wait for the database schema to become current",
+			Flags: []cli.Flag{
+				&cli.BoolFlag{
+					Name:    "quiet",
+					Aliases: []string{"v"},
+					Usage:   "don't output any text",
+				},
+			},
+			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				quiet := c.Bool("quiet")
+				return db.WaitForCurrent(quiet)
+			}),
+		},
 	}
 
 	return app
