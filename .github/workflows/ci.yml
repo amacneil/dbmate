@@ -56,7 +56,7 @@ jobs:
     env: ${{ matrix.env }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v4
         with:
@@ -94,7 +94,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Configure QEMU
         uses: docker/setup-qemu-action@v2
@@ -177,7 +177,7 @@ jobs:
     needs: build
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v3
         with:
