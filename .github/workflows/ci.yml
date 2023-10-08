@@ -26,11 +26,11 @@ jobs:
           - os: linux
             image: ubuntu-latest
             arch: arm
-            setup: sudo apt-get update && sudo apt-get install -qq gcc-arm-linux-gnueabihf
+            setup: sudo apt-get update && sudo apt-get install -qq gcc-arm-linux-gnueabi
             env:
-              CC: arm-linux-gnueabihf-gcc
-              CXX: arm-linux-gnueabihf-g++
-              GOARM: 7
+              CC: arm-linux-gnueabi-gcc
+              CXX: arm-linux-gnueabi-g++
+              GOARM: 6
           - os: linux
             image: ubuntu-latest
             arch: arm64
