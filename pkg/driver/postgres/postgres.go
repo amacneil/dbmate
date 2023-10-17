@@ -411,6 +411,18 @@ func (drv *Driver) quotedMigrationsTableNameParts(db dbutil.Transaction) (string
 		return "", "", err
 	}
 
+	// Get version of the database
+	dbName, err := dbutil.QueryValue(db, "select version();")
+	if err != nil {
+		return "", "", err
+	}
+
+	// Quote identifiers for Redshift
+	isRedshift := strings.Contains(dbName, "Redshift")
+	if isRedshift {
+		return pq.QuoteIdentifier(schema), pq.QuoteIdentifier(strings.Join(tableNameParts, ".")), nil
+	}
+
 	// quote all parts
 	// use server rather than client to do this to avoid unnecessary quotes
 	// (which would change schema.sql diff)
