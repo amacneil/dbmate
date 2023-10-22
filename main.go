@@ -17,8 +17,6 @@ import (
 )
 
 func main() {
-	loadDotEnv()
-
 	app := NewApp()
 	err := app.Run(os.Args)
 
@@ -37,6 +35,12 @@ func NewApp() *cli.App {
 	app.Version = dbmate.Version
 
 	defaultDB := dbmate.New(nil)
+
+	app.Before = func(c *cli.Context) error {
+		loadDotEnv(c.String("env-file"))
+		return nil
+	}
+
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
 			Name:    "url",
@@ -48,6 +52,12 @@ func NewApp() *cli.App {
 			Aliases: []string{"e"},
 			Value:   "DATABASE_URL",
 			Usage:   "specify an environment variable containing the database URL",
+		},
+		&cli.StringFlag{
+			Name:    "env-file",
+			Aliases: []string{"f"},
+			Value:   ".env",
+			Usage:   "specify an env file containing DATABASE_URL",
 		},
 		&cli.StringSliceFlag{
 			Name:    "migrations-dir",
@@ -211,13 +221,13 @@ func NewApp() *cli.App {
 	return app
 }
 
-// load environment variables from .env file
-func loadDotEnv() {
-	if _, err := os.Stat(".env"); err != nil {
+// load environment variables
+func loadDotEnv(filename string) {
+	if _, err := os.Stat(filename); err != nil {
 		return
 	}
 
-	if err := godotenv.Load(); err != nil {
+	if err := godotenv.Load(filename); err != nil {
 		log.Fatalf("Error loading .env file: %s", err.Error())
 	}
 }
