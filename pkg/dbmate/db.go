@@ -324,51 +324,49 @@ func (db *DB) Migrate() error {
 		}
 	}
 
-	if len(pendingMigrations) == 0 {
-		return nil
-	}
+	if len(pendingMigrations) > 0 {
+		if db.Strict && pendingMigrations[0].Version <= highestAppliedMigrationVersion {
+			return fmt.Errorf("migration `%s` is out of order with already applied migrations, the version number has to be higher than the applied migration `%s` in --strict mode", pendingMigrations[0].Version, highestAppliedMigrationVersion)
+		}
 
-	if db.Strict && pendingMigrations[0].Version <= highestAppliedMigrationVersion {
-		return fmt.Errorf("migration `%s` is out of order with already applied migrations, the version number has to be higher than the applied migration `%s` in --strict mode", pendingMigrations[0].Version, highestAppliedMigrationVersion)
-	}
-
-	sqlDB, err := db.openDatabaseForMigration(drv)
-	if err != nil {
-		return err
-	}
-	defer dbutil.MustClose(sqlDB)
-
-	for _, migration := range pendingMigrations {
-		fmt.Fprintf(db.Log, "Applying: %s\n", migration.FileName)
-
-		parsed, err := migration.Parse()
+		sqlDB, err := db.openDatabaseForMigration(drv)
 		if err != nil {
 			return err
 		}
+		defer dbutil.MustClose(sqlDB)
 
-		execMigration := func(tx dbutil.Transaction) error {
-			// run actual migration
-			result, err := tx.Exec(parsed.Up)
+		for _, migration := range pendingMigrations {
+			fmt.Fprintf(db.Log, "Applying: %s\n", migration.FileName)
+
+			parsed, err := migration.Parse()
 			if err != nil {
 				return err
-			} else if db.Verbose {
-				db.printVerbose(result)
 			}
 
-			// record migration
-			return drv.InsertMigration(tx, migration.Version)
-		}
+			execMigration := func(tx dbutil.Transaction) error {
+				// run actual migration
+				result, err := tx.Exec(parsed.Up)
+				if err != nil {
+					return err
+				} else if db.Verbose {
+					db.printVerbose(result)
+				}
 
-		if parsed.UpOptions.Transaction() {
-			// begin transaction
-			err = doTransaction(sqlDB, execMigration)
-		} else {
-			// run outside of transaction
-			err = execMigration(sqlDB)
-		}
+				// record migration
+				return drv.InsertMigration(tx, migration.Version)
+			}
 
-		if err != nil {
-			return err
+			if parsed.UpOptions.Transaction() {
+				// begin transaction
+				err = doTransaction(sqlDB, execMigration)
+			} else {
+				// run outside of transaction
+				err = execMigration(sqlDB)
+			}
+
+			if err != nil {
+				return err
+			}
 		}
 	}
 
