@@ -598,8 +598,8 @@ func TestMigrateUnrestrictedOrder(t *testing.T) {
 
 	// test to apply new migrations on empty database
 	db.FS = fstest.MapFS{
-		"db/migrations/001_test_migration_a.sql": { Data: emptyMigration },
-		"db/migrations/100_test_migration_b.sql": { Data: emptyMigration },
+		"db/migrations/001_test_migration_a.sql": {Data: emptyMigration},
+		"db/migrations/100_test_migration_b.sql": {Data: emptyMigration},
 	}
 
 	err = db.Migrate()
@@ -607,9 +607,9 @@ func TestMigrateUnrestrictedOrder(t *testing.T) {
 
 	// test to apply an out of order migration
 	db.FS = fstest.MapFS{
-		"db/migrations/001_test_migration_a.sql": { Data: emptyMigration },
-		"db/migrations/100_test_migration_b.sql": { Data: emptyMigration },
-		"db/migrations/010_test_migration_c.sql": { Data: emptyMigration },
+		"db/migrations/001_test_migration_a.sql": {Data: emptyMigration},
+		"db/migrations/100_test_migration_b.sql": {Data: emptyMigration},
+		"db/migrations/010_test_migration_c.sql": {Data: emptyMigration},
 	}
 
 	err = db.Migrate()
@@ -631,8 +631,8 @@ func TestMigrateStrictOrder(t *testing.T) {
 
 	// test to apply new migrations on empty database
 	db.FS = fstest.MapFS{
-		"db/migrations/001_test_migration_a.sql": { Data: emptyMigration },
-		"db/migrations/010_test_migration_b.sql": { Data: emptyMigration },
+		"db/migrations/001_test_migration_a.sql": {Data: emptyMigration},
+		"db/migrations/010_test_migration_b.sql": {Data: emptyMigration},
 	}
 
 	err = db.Migrate()
@@ -640,9 +640,9 @@ func TestMigrateStrictOrder(t *testing.T) {
 
 	// test to apply an in order migration
 	db.FS = fstest.MapFS{
-		"db/migrations/001_test_migration_a.sql": { Data: emptyMigration },
-		"db/migrations/010_test_migration_b.sql": { Data: emptyMigration },
-		"db/migrations/100_test_migration_c.sql": { Data: emptyMigration },
+		"db/migrations/001_test_migration_a.sql": {Data: emptyMigration},
+		"db/migrations/010_test_migration_b.sql": {Data: emptyMigration},
+		"db/migrations/100_test_migration_c.sql": {Data: emptyMigration},
 	}
 
 	err = db.Migrate()
@@ -650,10 +650,10 @@ func TestMigrateStrictOrder(t *testing.T) {
 
 	// test to apply an out of order migration
 	db.FS = fstest.MapFS{
-		"db/migrations/001_test_migration_a.sql": { Data: emptyMigration },
-		"db/migrations/010_test_migration_b.sql": { Data: emptyMigration },
-		"db/migrations/100_test_migration_c.sql": { Data: emptyMigration },
-		"db/migrations/050_test_migration_d.sql": { Data: emptyMigration },
+		"db/migrations/001_test_migration_a.sql": {Data: emptyMigration},
+		"db/migrations/010_test_migration_b.sql": {Data: emptyMigration},
+		"db/migrations/100_test_migration_c.sql": {Data: emptyMigration},
+		"db/migrations/050_test_migration_d.sql": {Data: emptyMigration},
 	}
 
 	err = db.Migrate()
