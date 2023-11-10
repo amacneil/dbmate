@@ -583,3 +583,75 @@ func TestFindMigrationsFSMultipleDirs(t *testing.T) {
 	require.Equal(t, "db/migrations_a/005_test_migration_a.sql", actual[4].FilePath)
 	require.Equal(t, "db/migrations_c/006_test_migration_c.sql", actual[5].FilePath)
 }
+
+func TestMigrateUnrestrictedOrder(t *testing.T) {
+	emptyMigration := []byte("-- migrate:up\n-- migrate:down")
+
+	// initialize database
+	u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
+	db := newTestDB(t, u)
+
+	db.Drop()
+	db.Create()
+
+	// test to apply new migrations on empty database
+	db.FS = fstest.MapFS{
+		"db/migrations/001_test_migration_a.sql": { Data: emptyMigration },
+		"db/migrations/100_test_migration_b.sql": { Data: emptyMigration },
+	}
+
+	err := db.Migrate()
+	require.NoError(t, err)
+
+	// test to apply an out of order migration
+	db.FS = fstest.MapFS{
+		"db/migrations/001_test_migration_a.sql": { Data: emptyMigration },
+		"db/migrations/100_test_migration_b.sql": { Data: emptyMigration },
+		"db/migrations/010_test_migration_c.sql": { Data: emptyMigration },
+	}
+
+	err = db.Migrate()
+	require.NoError(t, err)
+}
+
+func TestMigrateStrictOrder(t *testing.T) {
+	emptyMigration := []byte("-- migrate:up\n-- migrate:down")
+
+	// initialize database
+	u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
+	db := newTestDB(t, u)
+	db.Strict = true
+
+	db.Drop()
+	db.Create()
+
+	// test to apply new migrations on empty database
+	db.FS = fstest.MapFS{
+		"db/migrations/001_test_migration_a.sql": { Data: emptyMigration },
+		"db/migrations/010_test_migration_b.sql": { Data: emptyMigration },
+	}
+
+	err := db.Migrate()
+	require.NoError(t, err)
+
+	// test to apply an in order migration
+	db.FS = fstest.MapFS{
+		"db/migrations/001_test_migration_a.sql": { Data: emptyMigration },
+		"db/migrations/010_test_migration_b.sql": { Data: emptyMigration },
+		"db/migrations/100_test_migration_c.sql": { Data: emptyMigration },
+	}
+
+	err = db.Migrate()
+	require.NoError(t, err)
+
+	// test to apply an out of order migration
+	db.FS = fstest.MapFS{
+		"db/migrations/001_test_migration_a.sql": { Data: emptyMigration },
+		"db/migrations/010_test_migration_b.sql": { Data: emptyMigration },
+		"db/migrations/100_test_migration_c.sql": { Data: emptyMigration },
+		"db/migrations/050_test_migration_d.sql": { Data: emptyMigration },
+	}
+
+	err = db.Migrate()
+	require.Error(t, err)
+}
