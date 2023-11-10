@@ -591,8 +591,10 @@ func TestMigrateUnrestrictedOrder(t *testing.T) {
 	u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
 	db := newTestDB(t, u)
 
-	db.Drop()
-	db.Create()
+	err := db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
 
 	// test to apply new migrations on empty database
 	db.FS = fstest.MapFS{
@@ -600,7 +602,7 @@ func TestMigrateUnrestrictedOrder(t *testing.T) {
 		"db/migrations/100_test_migration_b.sql": { Data: emptyMigration },
 	}
 
-	err := db.Migrate()
+	err = db.Migrate()
 	require.NoError(t, err)
 
 	// test to apply an out of order migration
@@ -622,8 +624,10 @@ func TestMigrateStrictOrder(t *testing.T) {
 	db := newTestDB(t, u)
 	db.Strict = true
 
-	db.Drop()
-	db.Create()
+	err := db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
 
 	// test to apply new migrations on empty database
 	db.FS = fstest.MapFS{
@@ -631,7 +635,7 @@ func TestMigrateStrictOrder(t *testing.T) {
 		"db/migrations/010_test_migration_b.sql": { Data: emptyMigration },
 	}
 
-	err := db.Migrate()
+	err = db.Migrate()
 	require.NoError(t, err)
 
 	// test to apply an in order migration
