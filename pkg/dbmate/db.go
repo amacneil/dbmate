@@ -49,6 +49,8 @@ type DB struct {
 	MigrationsTableName string
 	// SchemaFile specifies the location for schema.sql file
 	SchemaFile string
+	// Fail if migrations would be applied out of order
+	Strict bool
 	// Verbose prints the result of each statement execution
 	Verbose bool
 	// WaitBefore will wait for database to become available before running any actions
@@ -75,6 +77,7 @@ func New(databaseURL *url.URL) *DB {
 		MigrationsDir:       []string{"./db/migrations"},
 		MigrationsTableName: "schema_migrations",
 		SchemaFile:          "./db/schema.sql",
+		Strict:              false,
 		Verbose:             false,
 		WaitBefore:          false,
 		WaitInterval:        time.Second,
@@ -309,17 +312,29 @@ func (db *DB) Migrate() error {
 		return ErrNoMigrationFiles
 	}
 
+	highestAppliedMigrationVersion := ""
+	pendingMigrations := []Migration{}
+	for _, migration := range migrations {
+		if migration.Applied {
+			if db.Strict && highestAppliedMigrationVersion <= migration.Version {
+				highestAppliedMigrationVersion = migration.Version
+			}
+		} else {
+			pendingMigrations = append(pendingMigrations, migration)
+		}
+	}
+
+	if len(pendingMigrations) > 0 && db.Strict && pendingMigrations[0].Version <= highestAppliedMigrationVersion {
+		return fmt.Errorf("migration `%s` is out of order with already applied migrations, the version number has to be higher than the applied migration `%s` in --strict mode", pendingMigrations[0].Version, highestAppliedMigrationVersion)
+	}
+
 	sqlDB, err := db.openDatabaseForMigration(drv)
 	if err != nil {
 		return err
 	}
 	defer dbutil.MustClose(sqlDB)
 
-	for _, migration := range migrations {
-		if migration.Applied {
-			continue
-		}
-
+	for _, migration := range pendingMigrations {
 		fmt.Fprintf(db.Log, "Applying: %s\n", migration.FileName)
 
 		parsed, err := migration.Parse()

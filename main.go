@@ -102,6 +102,11 @@ func NewApp() *cli.App {
 			Usage: "Create database (if necessary) and migrate to the latest version",
 			Flags: []cli.Flag{
 				&cli.BoolFlag{
+					Name:    "strict",
+					EnvVars: []string{"DBMATE_STRICT"},
+					Usage:   "fail if migrations would be applied out of order",
+				},
+				&cli.BoolFlag{
 					Name:    "verbose",
 					Aliases: []string{"v"},
 					EnvVars: []string{"DBMATE_VERBOSE"},
@@ -109,6 +114,7 @@ func NewApp() *cli.App {
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				db.Strict = c.Bool("strict")
 				db.Verbose = c.Bool("verbose")
 				return db.CreateAndMigrate()
 			}),
@@ -132,6 +138,11 @@ func NewApp() *cli.App {
 			Usage: "Migrate to the latest version",
 			Flags: []cli.Flag{
 				&cli.BoolFlag{
+					Name:    "strict",
+					EnvVars: []string{"DBMATE_STRICT"},
+					Usage:   "fail if migrations would be applied out of order",
+				},
+				&cli.BoolFlag{
 					Name:    "verbose",
 					Aliases: []string{"v"},
 					EnvVars: []string{"DBMATE_VERBOSE"},
@@ -139,6 +150,7 @@ func NewApp() *cli.App {
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				db.Strict = c.Bool("strict")
 				db.Verbose = c.Bool("verbose")
 				return db.Migrate()
 			}),
@@ -174,6 +186,7 @@ func NewApp() *cli.App {
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				db.Strict = c.Bool("strict")
 				setExitCode := c.Bool("exit-code")
 				quiet := c.Bool("quiet")
 				if quiet {
