@@ -659,3 +659,79 @@ func TestMigrateStrictOrder(t *testing.T) {
 	err = db.Migrate()
 	require.Error(t, err)
 }
+
+func TestMigrateQueryErrorMessage(t *testing.T) {
+	u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
+	db := newTestDB(t, u)
+
+	err := db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
+
+	t.Run("ASCII SQL, error in migrate up", func(t *testing.T) {
+		db.FS = fstest.MapFS{
+			"db/migrations/001_ascii_error_up.sql": {
+				Data: []byte("-- migrate:up\n-- line 2\nnot_valid_sql;\n-- migrate:down"),
+			},
+		}
+
+		err = db.Migrate()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "line: 3, column: 1, position: 25:")
+	})
+
+	t.Run("ASCII SQL, error in migrate down", func(t *testing.T) {
+		db.FS = fstest.MapFS{
+			"db/migrations/002_ascii_error_down.sql": {
+				Data: []byte("-- migrate:up\n--migrate:down\n  not_valid_sql; -- indented"),
+			},
+		}
+
+		err = db.Migrate()
+		require.NoError(t, err)
+
+		err = db.Rollback()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "line: 2, column: 3, position: 18:")
+	})
+
+	t.Run("UTF-8 SQL, error in migrate up", func(t *testing.T) {
+		db.FS = fstest.MapFS{
+			"db/migrations/003_utf8_error_up.sql": {
+				Data: []byte("-- migrate:up\n-- line 2\n/* สวัสดี hello */ not_valid_sql;\n--migrate:down"),
+			},
+		}
+
+		err = db.Migrate()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "line: 3, column: 20, position: 44:")
+	})
+
+	t.Run("UTF-8 SQL, error in migrate down", func(t *testing.T) {
+		db.FS = fstest.MapFS{
+			"db/migrations/004_utf8_error_up.sql": {
+				Data: []byte("-- migrate:up\n-- migrate:down\n/* สวัสดี hello */ not_valid_sql;"),
+			},
+		}
+
+		err = db.Migrate()
+		require.NoError(t, err)
+
+		err = db.Rollback()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "line: 2, column: 20, position: 36:")
+	})
+
+	t.Run("correctly count with CR-LF line endings present", func(t *testing.T) {
+		db.FS = fstest.MapFS{
+			"db/migrations/005_cr_lf_line_endings.sql": {
+				Data: []byte("-- migrate:up\r\n-- line 2\r\n  not_valid_sql; -- indented\r\n-- migrate:down"),
+			},
+		}
+
+		err = db.Migrate()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "line: 3, column: 3, position: 29:")
+	})
+}

@@ -243,6 +243,11 @@ func (drv *Driver) Ping() error {
 	return db.Ping()
 }
 
+// Return a normalized version of the driver-specific error type.
+func (drv *Driver) QueryError(query string, err error) error {
+	return &dbmate.QueryError{Err: err, Query: query}
+}
+
 func (drv *Driver) quotedMigrationsTableName() string {
 	return drv.quoteIdentifier(drv.migrationsTableName)
 }

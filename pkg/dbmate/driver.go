@@ -2,6 +2,7 @@ package dbmate
 
 import (
 	"database/sql"
+	"fmt"
 	"io"
 	"net/url"
 
@@ -21,6 +22,7 @@ type Driver interface {
 	InsertMigration(dbutil.Transaction, string) error
 	DeleteMigration(dbutil.Transaction, string) error
 	Ping() error
+	QueryError(string, error) error
 }
 
 // DriverConfig holds configuration passed to driver constructors
@@ -32,6 +34,39 @@ type DriverConfig struct {
 
 // DriverFunc represents a driver constructor
 type DriverFunc func(DriverConfig) Driver
+
+type QueryError struct {
+	Err      error
+	Query    string
+	Position int
+}
+
+func (e *QueryError) Error() string {
+	if e.Position > 0 {
+		line := 1
+		column := 1
+		offset := 0
+		for _, ch := range e.Query {
+			offset++
+			if offset >= e.Position {
+				break
+			}
+			// don't count CR as a column in CR/LF sequences
+			if ch == '\r' {
+				continue
+			}
+			if ch == '\n' {
+				line++
+				column = 1
+				continue
+			}
+			column++
+		}
+		return fmt.Sprintf("line: %d, column: %d, position: %d: %s", line, column, e.Position, e.Err.Error())
+	}
+
+	return e.Err.Error()
+}
 
 var drivers = map[string]DriverFunc{}
 
