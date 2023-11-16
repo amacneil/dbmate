@@ -198,6 +198,5 @@ DROP COLUMN status;
 			require.Equal(t, migrationOptions{"transaction": "true"}, parsed.DownOptions)
 			require.Equal(t, true, parsed.DownOptions.Transaction())
 		})
-
 	})
 }
