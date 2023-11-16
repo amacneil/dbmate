@@ -15,7 +15,7 @@
   "files.insertFinalNewline": true,
   "files.trimFinalNewlines": true,
   "files.trimTrailingWhitespace": true,
-  "prettier.prettierPath": "./typescript/node_modules/prettier",
+  "prettier.prettierPath": "./typescript/node_modules/prettier/index.cjs",
   "go.formatTool": "goimports",
   "[go]": {
     "editor.defaultFormatter": "golang.go",
