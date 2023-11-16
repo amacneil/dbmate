@@ -1,21 +1,24 @@
 # development image
 FROM golang:1.21 as dev
 WORKDIR /src
+ENV PATH="/src/typescript/node_modules/.bin:${PATH}"
 RUN git config --global --add safe.directory /src
 
-# install database clients
+# install development tools
 RUN apt-get update \
-	&& apt-get install -qq --no-install-recommends \
-		curl \
-		file \
-		mariadb-client \
-		postgresql-client \
-		sqlite3 \
-	&& rm -rf /var/lib/apt/lists/*
+  && apt-get install -qq --no-install-recommends \
+    curl \
+    file \
+    mariadb-client \
+    postgresql-client \
+    sqlite3 \
+    nodejs \
+    npm \
+  && rm -rf /var/lib/apt/lists/*
 
 # golangci-lint
 RUN curl -fsSL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
-	| sh -s -- -b /usr/local/bin v1.55.1
+  | sh -s -- -b /usr/local/bin v1.55.2
 
 # download modules
 COPY go.* /src/
@@ -26,10 +29,10 @@ RUN make build
 # release stage
 FROM alpine as release
 RUN apk add --no-cache \
-	mariadb-client \
-	mariadb-connector-c \
-	postgresql-client \
-	sqlite \
-	tzdata
+  mariadb-client \
+  mariadb-connector-c \
+  postgresql-client \
+  sqlite \
+  tzdata
 COPY --from=dev /src/dist/dbmate /usr/local/bin/dbmate
 ENTRYPOINT ["/usr/local/bin/dbmate"]

@@ -56,6 +56,13 @@ wait:
 	dist/dbmate -e MYSQL_TEST_URL wait
 	dist/dbmate -e POSTGRES_TEST_URL wait
 
+.PHONY: update-deps
+update-deps:
+	go get -u ./...
+	go mod tidy
+	go mod verify
+	cd typescript && ./node_modules/.bin/npm-check-updates --upgrade && npm install
+
 .PHONY: docker-all
 docker-all:
 	docker-compose pull --ignore-buildable
