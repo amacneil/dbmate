@@ -346,7 +346,7 @@ func (db *DB) Migrate() error {
 			// run actual migration
 			result, err := tx.Exec(parsed.Up)
 			if err != nil {
-				return err
+				return drv.QueryError(parsed.Up, err)
 			} else if db.Verbose {
 				db.printVerbose(result)
 			}
@@ -508,7 +508,7 @@ func (db *DB) Rollback() error {
 		// rollback migration
 		result, err := tx.Exec(parsed.Down)
 		if err != nil {
-			return err
+			return drv.QueryError(parsed.Down, err)
 		} else if db.Verbose {
 			db.printVerbose(result)
 		}
