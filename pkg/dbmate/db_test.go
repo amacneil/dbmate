@@ -735,3 +735,44 @@ func TestMigrateQueryErrorMessage(t *testing.T) {
 		require.Contains(t, err.Error(), "line: 3, column: 3, position: 29:")
 	})
 }
+
+func TestMigrationContents(t *testing.T) {
+	for _, u := range testURLs() {
+		t.Run(u.Scheme, func(t *testing.T) {
+			t.Run("ensure Windows CR/LF line endings in migration files work", func(t *testing.T) {
+				db := newTestDB(t, u)
+				drv, err := db.Driver()
+				require.NoError(t, err)
+
+				err = db.Drop()
+				require.NoError(t, err)
+				err = db.Create()
+				require.NoError(t, err)
+
+				sqlDB, err := drv.Open()
+				require.NoError(t, err)
+				defer dbutil.MustClose(sqlDB)
+
+				db.FS = fstest.MapFS{
+					"db/migrations/001_win_crlf_migration_empty.sql": {
+						Data: []byte("-- migrate:up\r\n-- migrate:down\r\n"),
+					},
+					"db/migrations/002_win_crlf_migration_basic.sql": {
+						Data: []byte("-- migrate:up\r\ncreate table users (\r\n  id integer,\r\n  name varchar(255)\r\n);\r\n-- migrate:down\r\ndrop table users;\r\n"),
+					},
+					"db/migrations/003_win_crlf_migration_options.sql": {
+						Data: []byte("-- migrate:up transaction:true\r\ncreate table users (\r\n  id integer,\r\n  name varchar(255)\r\n);\r\n-- migrate:down transaction:true\r\ndrop table users;\r\n"),
+					},
+				}
+
+				// run migrations
+				err = db.Migrate()
+				require.NoError(t, err)
+
+				// rollback last migration
+				err = db.Rollback()
+				require.NoError(t, err)
+			})
+		})
+	}
+}
