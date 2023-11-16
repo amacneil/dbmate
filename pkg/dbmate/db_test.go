@@ -758,10 +758,10 @@ func TestMigrationContents(t *testing.T) {
 						Data: []byte("-- migrate:up\r\n-- migrate:down\r\n"),
 					},
 					"db/migrations/002_win_crlf_migration_basic.sql": {
-						Data: []byte("-- migrate:up\r\ncreate table users (\r\n  id integer,\r\n  name varchar(255)\r\n);\r\n-- migrate:down\r\ndrop table users;\r\n"),
+						Data: []byte("-- migrate:up\r\ncreate table test_win_crlf_basic (\r\n  id integer,\r\n  name varchar(255)\r\n);\r\n-- migrate:down\r\ndrop table test_win_crlf_basic;\r\n"),
 					},
 					"db/migrations/003_win_crlf_migration_options.sql": {
-						Data: []byte("-- migrate:up transaction:true\r\ncreate table users (\r\n  id integer,\r\n  name varchar(255)\r\n);\r\n-- migrate:down transaction:true\r\ndrop table users;\r\n"),
+						Data: []byte("-- migrate:up transaction:true\r\ncreate table test_win_crlf_options (\r\n  id integer,\r\n  name varchar(255)\r\n);\r\n-- migrate:down transaction:true\r\ndrop table test_win_crlf_options;\r\n"),
 					},
 				}
 
