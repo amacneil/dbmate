@@ -228,12 +228,12 @@ func NewApp() *cli.App {
 func loadDotEnv(filenames ...string) error {
 	for _, filename := range filenames {
 		if _, err := os.Stat(filename); err != nil {
-			return err
+			return fmt.Errorf("Error loading %s\n%s", filename, err.Error())
 		}
 	}
 
 	if err := godotenv.Load(filenames...); err != nil {
-		return err
+		return fmt.Errorf("Error loading %s\n%s", filenames, err.Error())
 	}
 
 	return nil
