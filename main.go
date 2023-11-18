@@ -37,7 +37,11 @@ func NewApp() *cli.App {
 	defaultDB := dbmate.New(nil)
 
 	app.Before = func(c *cli.Context) error {
-		loadDotEnv(c.String("env-file"))
+		if err := loadDotEnv(c.String("env-file")); err != nil {
+			log.Fatalf(err.Error())
+			return err
+		}
+
 		return nil
 	}
 
@@ -54,10 +58,9 @@ func NewApp() *cli.App {
 			Usage:   "specify an environment variable containing the database URL",
 		},
 		&cli.StringFlag{
-			Name:    "env-file",
-			Aliases: []string{"f"},
-			Value:   ".env",
-			Usage:   "specify an env file containing DATABASE_URL",
+			Name:  "env-file",
+			Value: ".env",
+			Usage: "specify an env file containing DATABASE_URL",
 		},
 		&cli.StringSliceFlag{
 			Name:    "migrations-dir",
@@ -222,14 +225,18 @@ func NewApp() *cli.App {
 }
 
 // load environment variables
-func loadDotEnv(filename string) {
-	if _, err := os.Stat(filename); err != nil {
-		return
+func loadDotEnv(filenames ...string) error {
+	for _, filename := range filenames {
+		if _, err := os.Stat(filename); err != nil {
+			return err
+		}
 	}
 
-	if err := godotenv.Load(filename); err != nil {
-		log.Fatalf("Error loading .env file: %s", err.Error())
+	if err := godotenv.Load(filenames...); err != nil {
+		return err
 	}
+
+	return nil
 }
 
 // action wraps a cli.ActionFunc with dbmate initialization logic
