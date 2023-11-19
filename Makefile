@@ -2,7 +2,7 @@
 export CGO_ENABLED = 1
 
 # strip binaries
-FLAGS := -tags sqlite_omit_load_extension,sqlite_json -ldflags '-s'
+override FLAGS := -tags sqlite_omit_load_extension,sqlite_json -ldflags '-s' $(FLAGS)
 
 # default output file
 OUTPUT ?= dbmate
@@ -11,7 +11,7 @@ OUTPUT ?= dbmate
 GOOS := $(shell go env GOOS)
 ifeq ($(GOOS),linux)
 	# statically link binaries to support alpine linux
-	FLAGS := -tags netgo,osusergo,sqlite_omit_load_extension,sqlite_json  -ldflags '-s -extldflags "-static"'
+	override FLAGS := -tags netgo,osusergo,sqlite_omit_load_extension,sqlite_json  -ldflags '-s -extldflags "-static"' $(FLAGS)
 endif
 ifeq ($(GOOS),darwin)
 	export SDKROOT ?= $(shell xcrun --sdk macosx --show-sdk-path)
