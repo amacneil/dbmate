@@ -17,8 +17,14 @@ import (
 )
 
 func main() {
+	err := loadEnvFiles(os.Args[1:])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(3)
+	}
+
 	app := NewApp()
-	err := app.Run(os.Args)
+	err = app.Run(os.Args)
 
 	if err != nil {
 		errText := redactLogString(fmt.Sprintf("Error: %s\n", err))
@@ -35,10 +41,6 @@ func NewApp() *cli.App {
 	app.Version = dbmate.Version
 
 	defaultDB := dbmate.New(nil)
-
-	app.Before = func(c *cli.Context) error {
-		return loadEnvFiles(c.StringSlice("env-file")...)
-	}
 
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
@@ -220,19 +222,45 @@ func NewApp() *cli.App {
 }
 
 // load environment variables from file(s)
-func loadEnvFiles(filenames ...string) error {
-	err := godotenv.Load(filenames...)
-	if err == nil {
-		return nil
+func loadEnvFiles(args []string) error {
+	var envFiles []string
+
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--env-file" {
+			if i+1 >= len(args) {
+				// returning nil here, even though it's an error
+				// because we want the caller to proceed anyway,
+				// and produce the actual arg parsing error response
+				return nil
+			}
+
+			envFiles = append(envFiles, args[i+1])
+			i++
+		}
 	}
 
-	var perr *os.PathError
-	if errors.As(err, &perr) && errors.Is(perr, os.ErrNotExist) {
-		// Ignoring file not found error
-		return nil
+	if len(envFiles) == 0 {
+		envFiles = []string{".env"}
 	}
 
-	return fmt.Errorf("loading env file(s) %v: %v", filenames, err)
+	// try to load all files in sequential order,
+	// ignoring any that do not exist
+	for _, file := range envFiles {
+		err := godotenv.Load([]string{file}...)
+		if err == nil {
+			continue
+		}
+
+		var perr *os.PathError
+		if errors.As(err, &perr) && errors.Is(perr, os.ErrNotExist) {
+			// Ignoring file not found error
+			continue
+		}
+
+		return fmt.Errorf("loading env file(s) %v: %v", envFiles, err)
+	}
+
+	return nil
 }
 
 // action wraps a cli.ActionFunc with dbmate initialization logic
