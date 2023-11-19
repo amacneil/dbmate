@@ -37,7 +37,7 @@ func NewApp() *cli.App {
 	defaultDB := dbmate.New(nil)
 
 	app.Before = func(c *cli.Context) error {
-		return loadEnvFiles(c.String("env-file"))
+		return loadEnvFiles(c.StringSlice("env-file")...)
 	}
 
 	app.Flags = []cli.Flag{
@@ -52,9 +52,9 @@ func NewApp() *cli.App {
 			Value:   "DATABASE_URL",
 			Usage:   "specify an environment variable containing the database URL",
 		},
-		&cli.StringFlag{
+		&cli.StringSliceFlag{
 			Name:  "env-file",
-			Value: ".env",
+			Value: cli.NewStringSlice(".env"),
 			Usage: "specify a file to load environment variables from",
 		},
 		&cli.StringSliceFlag{
