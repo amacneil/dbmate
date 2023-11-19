@@ -68,13 +68,21 @@ func TestLoadEnvFiles(t *testing.T) {
 		}
 
 		env := os.Environ()
-
 		os.Clearenv()
-		os.Chdir("fixtures/loadEnvFiles")
+
+		err = os.Chdir("fixtures/loadEnvFiles")
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		t.Cleanup(func() {
-			os.Chdir(cwd)
+			err := os.Chdir(cwd)
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			os.Clearenv()
+
 			for _, e := range env {
 				pair := strings.SplitN(e, "=", 2)
 				os.Setenv(pair[0], pair[1])
