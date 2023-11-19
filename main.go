@@ -1,8 +1,8 @@
 package main
 
 import (
+	"errors"
 	"fmt"
-	"log"
 	"net/url"
 	"os"
 	"regexp"
@@ -37,12 +37,7 @@ func NewApp() *cli.App {
 	defaultDB := dbmate.New(nil)
 
 	app.Before = func(c *cli.Context) error {
-		if err := loadDotEnv(c.String("env-file")); err != nil {
-			log.Fatalf(err.Error())
-			return err
-		}
-
-		return nil
+		return loadEnvFiles(c.String("env-file"))
 	}
 
 	app.Flags = []cli.Flag{
@@ -60,7 +55,7 @@ func NewApp() *cli.App {
 		&cli.StringFlag{
 			Name:  "env-file",
 			Value: ".env",
-			Usage: "specify an env file containing DATABASE_URL",
+			Usage: "specify a file to load environment variables from",
 		},
 		&cli.StringSliceFlag{
 			Name:    "migrations-dir",
@@ -224,19 +219,20 @@ func NewApp() *cli.App {
 	return app
 }
 
-// load environment variables
-func loadDotEnv(filenames ...string) error {
-	for _, filename := range filenames {
-		if _, err := os.Stat(filename); err != nil {
-			return nil
-		}
+// load environment variables from file(s)
+func loadEnvFiles(filenames ...string) error {
+	err := godotenv.Load(filenames...)
+	if err == nil {
+		return nil
 	}
 
-	if err := godotenv.Load(filenames...); err != nil {
-		return fmt.Errorf("Error loading env file: %s", err.Error())
+	var perr *os.PathError
+	if errors.As(err, &perr) && errors.Is(perr, os.ErrNotExist) {
+		// Ignoring file not found error
+		return nil
 	}
 
-	return nil
+	return fmt.Errorf("loading env file(s) %v: %v", filenames, err)
 }
 
 // action wraps a cli.ActionFunc with dbmate initialization logic

@@ -138,7 +138,7 @@ The following options are available with all commands. You must use command line
 
 - `--url, -u "protocol://host:port/dbname"` - specify the database url directly. _(env: `DATABASE_URL`)_
 - `--env, -e "DATABASE_URL"` - specify an environment variable to read the database connection URL from.
-- `--env-file "./env"` - specify an alternate environment variables file to load.
+- `--env-file ".env"` - specify an alternate environment variables file to load.
 - `--migrations-dir, -d "./db/migrations"` - where to keep the migration files. _(env: `DBMATE_MIGRATIONS_DIR`)_
 - `--migrations-table "schema_migrations"` - database table to record migrations in. _(env: `DBMATE_MIGRATIONS_TABLE`)_
 - `--schema-file, -s "./db/schema.sql"` - a path to keep the schema.sql file. _(env: `DBMATE_SCHEMA_FILE`)_
