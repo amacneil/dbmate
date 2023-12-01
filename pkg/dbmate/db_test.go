@@ -189,11 +189,21 @@ func TestLoadSchema(t *testing.T) {
 	// create schema.sql in subdirectory to test creating directory
 	db.SchemaFile = filepath.Join(dir, "/schema/schema.sql")
 
-	// create schema file
+	// prepare database state
 	err = db.Drop()
 	require.NoError(t, err)
 	err = db.CreateAndMigrate()
 	require.NoError(t, err)
+
+	// schema.sql should not exist
+	_, err = os.Stat(db.SchemaFile)
+	require.True(t, os.IsNotExist(err))
+
+	// load schema should return error
+	err = db.LoadSchema()
+	require.EqualError(t, err, "could not find the schema file")
+
+	// create schema file
 	err = db.DumpSchema()
 	require.NoError(t, err)
 
@@ -224,9 +234,9 @@ func TestLoadSchema(t *testing.T) {
 	// users and posts tables have been created
 	var count int
 	err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	err = sqlDB.QueryRow("select count(*) from posts").Scan(&count)
-	require.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func checkWaitCalled(t *testing.T, u *url.URL, command func() error) {
@@ -421,9 +431,9 @@ func TestRollback(t *testing.T) {
 			// users and posts tables have been created
 			var count int
 			err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
-			require.Nil(t, err)
+			require.NoError(t, err)
 			err = sqlDB.QueryRow("select count(*) from posts").Scan(&count)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			// rollback second migration
 			err = db.Rollback()

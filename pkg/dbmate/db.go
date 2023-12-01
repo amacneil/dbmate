@@ -28,6 +28,7 @@ var (
 	ErrMigrationDirNotFound  = errors.New("could not find migrations directory")
 	ErrMigrationNotFound     = errors.New("can't find migration file")
 	ErrCreateDirectory       = errors.New("unable to create directory")
+	ErrSchemaNotFound        = errors.New("could not find the schema file")
 )
 
 // migrationFileRegexp pattern for valid migration files
@@ -233,7 +234,7 @@ func (db *DB) LoadSchema() error {
 
 	_, err = os.Stat(db.SchemaFile)
 	if err != nil {
-		return nil
+		return ErrSchemaNotFound
 	}
 
 	fmt.Fprintf(db.Log, "Reading: %s\n", db.SchemaFile)
