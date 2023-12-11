@@ -221,6 +221,41 @@ func (db *DB) DumpSchema() error {
 	return os.WriteFile(db.SchemaFile, schema, 0o644)
 }
 
+// LoadSchema loads schema file to the current database
+func (db *DB) LoadSchema() error {
+	drv, err := db.Driver()
+	if err != nil {
+		return err
+	}
+
+	sqlDB, err := drv.Open()
+	if err != nil {
+		return err
+	}
+	defer dbutil.MustClose(sqlDB)
+
+	_, err = os.Stat(db.SchemaFile)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(db.Log, "Reading: %s\n", db.SchemaFile)
+
+	bytes, err := os.ReadFile(db.SchemaFile)
+	if err != nil {
+		return err
+	}
+
+	result, err := sqlDB.Exec(string(bytes))
+	if err != nil {
+		return err
+	} else if db.Verbose {
+		db.printVerbose(result)
+	}
+
+	return nil
+}
+
 // ensureDir creates a directory if it does not already exist
 func ensureDir(dir string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {

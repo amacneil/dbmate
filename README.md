@@ -129,6 +129,7 @@ dbmate rollback  # roll back the most recent migration
 dbmate down      # alias for rollback
 dbmate status    # show the status of all migrations (supports --exit-code and --quiet)
 dbmate dump      # write the database schema.sql file
+dbmate load      # load schema.sql file to the database
 dbmate wait      # wait for the database server to become available
 ```
 

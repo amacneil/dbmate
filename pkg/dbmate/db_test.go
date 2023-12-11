@@ -175,6 +175,71 @@ func TestAutoDumpSchema(t *testing.T) {
 	require.Contains(t, string(schema), "-- PostgreSQL database dump")
 }
 
+func TestLoadSchema(t *testing.T) {
+	u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
+	db := newTestDB(t, u)
+	drv, err := db.Driver()
+	require.NoError(t, err)
+
+	// create custom schema file directory
+	dir, err := os.MkdirTemp("", "dbmate")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	// create schema.sql in subdirectory to test creating directory
+	db.SchemaFile = filepath.Join(dir, "/schema/schema.sql")
+
+	// prepare database state
+	err = db.Drop()
+	require.NoError(t, err)
+	err = db.CreateAndMigrate()
+	require.NoError(t, err)
+
+	// schema.sql should not exist
+	_, err = os.Stat(db.SchemaFile)
+	require.True(t, os.IsNotExist(err))
+
+	// load schema should return error
+	err = db.LoadSchema()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no such file or directory")
+
+	// create schema file
+	err = db.DumpSchema()
+	require.NoError(t, err)
+
+	// schema.sql should exist
+	_, err = os.Stat(db.SchemaFile)
+	require.NoError(t, err)
+
+	// drop and create database
+	err = db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
+
+	// load schema.sql into database
+	err = db.LoadSchema()
+	require.NoError(t, err)
+
+	// verify result
+	sqlDB, err := drv.Open()
+	require.NoError(t, err)
+	defer dbutil.MustClose(sqlDB)
+
+	// check applied migrations
+	appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
+	require.NoError(t, err)
+	require.Equal(t, map[string]bool{"20200227231541": true, "20151129054053": true}, appliedMigrations)
+
+	// users and posts tables have been created
+	var count int
+	err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
+	require.NoError(t, err)
+	err = sqlDB.QueryRow("select count(*) from posts").Scan(&count)
+	require.NoError(t, err)
+}
+
 func checkWaitCalled(t *testing.T, u *url.URL, command func() error) {
 	oldHost := u.Host
 	u.Host = "postgres:404"
@@ -223,6 +288,17 @@ func testWaitBefore(t *testing.T, verbose bool) {
 	err = db.DumpSchema()
 	require.NoError(t, err)
 	checkWaitCalled(t, u, db.DumpSchema)
+
+	// drop and recreate database before load
+	err = db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
+
+	// load
+	err = db.LoadSchema()
+	require.NoError(t, err)
+	checkWaitCalled(t, u, db.LoadSchema)
 }
 
 func TestWaitBefore(t *testing.T) {
@@ -273,12 +349,13 @@ func TestMigrate(t *testing.T) {
 			require.NoError(t, err)
 			defer dbutil.MustClose(sqlDB)
 
-			count := 0
-			err = sqlDB.QueryRow(`select count(*) from schema_migrations
-				where version = '20151129054053'`).Scan(&count)
+			// check applied migrations
+			appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
 			require.NoError(t, err)
-			require.Equal(t, 1, count)
+			require.Equal(t, map[string]bool{"20200227231541": true, "20151129054053": true}, appliedMigrations)
 
+			// users table have records
+			count := 0
 			err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
 			require.NoError(t, err)
 			require.Equal(t, 1, count)
@@ -306,12 +383,13 @@ func TestUp(t *testing.T) {
 			require.NoError(t, err)
 			defer dbutil.MustClose(sqlDB)
 
-			count := 0
-			err = sqlDB.QueryRow(`select count(*) from schema_migrations
-				where version = '20151129054053'`).Scan(&count)
+			// check applied migrations
+			appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
 			require.NoError(t, err)
-			require.Equal(t, 1, count)
+			require.Equal(t, map[string]bool{"20200227231541": true, "20151129054053": true}, appliedMigrations)
 
+			// users table have records
+			count := 0
 			err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
 			require.NoError(t, err)
 			require.Equal(t, 1, count)
@@ -346,24 +424,17 @@ func TestRollback(t *testing.T) {
 			require.NoError(t, err)
 			defer dbutil.MustClose(sqlDB)
 
-			var applied []string
-			rows, err := sqlDB.Query("select version from schema_migrations order by version asc")
+			// check applied migrations
+			appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
 			require.NoError(t, err)
-			defer rows.Close()
-			for rows.Next() {
-				var version string
-				require.NoError(t, rows.Scan(&version))
-				applied = append(applied, version)
-			}
-			require.NoError(t, rows.Err())
-			require.Equal(t, []string{"20151129054053", "20200227231541"}, applied)
+			require.Equal(t, map[string]bool{"20200227231541": true, "20151129054053": true}, appliedMigrations)
 
 			// users and posts tables have been created
 			var count int
 			err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
-			require.Nil(t, err)
+			require.NoError(t, err)
 			err = sqlDB.QueryRow("select count(*) from posts").Scan(&count)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			// rollback second migration
 			err = db.Rollback()
