@@ -1,5 +1,6 @@
 .DS_Store
 .env
+.idea
 *.log
 /.cache
 /db
@@ -8,5 +9,3 @@
 /vendor
 dist
 node_modules
-.vscode
-.idea

@@ -1,5 +1,5 @@
 # development image
-FROM golang:1.21 as dev
+FROM golang:1.21.4 as dev
 WORKDIR /src
 ENV PATH="/src/typescript/node_modules/.bin:${PATH}"
 RUN git config --global --add safe.directory /src
@@ -27,7 +27,7 @@ COPY . /src/
 RUN make build
 
 # release stage
-FROM alpine as release
+FROM alpine:3.19.0 as release
 RUN apk add --no-cache \
   mariadb-client \
   mariadb-connector-c \
