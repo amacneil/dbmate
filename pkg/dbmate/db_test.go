@@ -175,6 +175,71 @@ func TestAutoDumpSchema(t *testing.T) {
 	require.Contains(t, string(schema), "-- PostgreSQL database dump")
 }
 
+func TestLoadSchema(t *testing.T) {
+	u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
+	db := newTestDB(t, u)
+	drv, err := db.Driver()
+	require.NoError(t, err)
+
+	// create custom schema file directory
+	dir, err := os.MkdirTemp("", "dbmate")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	// create schema.sql in subdirectory to test creating directory
+	db.SchemaFile = filepath.Join(dir, "/schema/schema.sql")
+
+	// prepare database state
+	err = db.Drop()
+	require.NoError(t, err)
+	err = db.CreateAndMigrate()
+	require.NoError(t, err)
+
+	// schema.sql should not exist
+	_, err = os.Stat(db.SchemaFile)
+	require.True(t, os.IsNotExist(err))
+
+	// load schema should return error
+	err = db.LoadSchema()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no such file or directory")
+
+	// create schema file
+	err = db.DumpSchema()
+	require.NoError(t, err)
+
+	// schema.sql should exist
+	_, err = os.Stat(db.SchemaFile)
+	require.NoError(t, err)
+
+	// drop and create database
+	err = db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
+
+	// load schema.sql into database
+	err = db.LoadSchema()
+	require.NoError(t, err)
+
+	// verify result
+	sqlDB, err := drv.Open()
+	require.NoError(t, err)
+	defer dbutil.MustClose(sqlDB)
+
+	// check applied migrations
+	appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
+	require.NoError(t, err)
+	require.Equal(t, map[string]bool{"20200227231541": true, "20151129054053": true}, appliedMigrations)
+
+	// users and posts tables have been created
+	var count int
+	err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
+	require.NoError(t, err)
+	err = sqlDB.QueryRow("select count(*) from posts").Scan(&count)
+	require.NoError(t, err)
+}
+
 func checkWaitCalled(t *testing.T, u *url.URL, command func() error) {
 	oldHost := u.Host
 	u.Host = "postgres:404"
@@ -223,6 +288,17 @@ func testWaitBefore(t *testing.T, verbose bool) {
 	err = db.DumpSchema()
 	require.NoError(t, err)
 	checkWaitCalled(t, u, db.DumpSchema)
+
+	// drop and recreate database before load
+	err = db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
+
+	// load
+	err = db.LoadSchema()
+	require.NoError(t, err)
+	checkWaitCalled(t, u, db.LoadSchema)
 }
 
 func TestWaitBefore(t *testing.T) {
@@ -273,12 +349,13 @@ func TestMigrate(t *testing.T) {
 			require.NoError(t, err)
 			defer dbutil.MustClose(sqlDB)
 
-			count := 0
-			err = sqlDB.QueryRow(`select count(*) from schema_migrations
-				where version = '20151129054053'`).Scan(&count)
+			// check applied migrations
+			appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
 			require.NoError(t, err)
-			require.Equal(t, 1, count)
+			require.Equal(t, map[string]bool{"20200227231541": true, "20151129054053": true}, appliedMigrations)
 
+			// users table have records
+			count := 0
 			err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
 			require.NoError(t, err)
 			require.Equal(t, 1, count)
@@ -306,12 +383,13 @@ func TestUp(t *testing.T) {
 			require.NoError(t, err)
 			defer dbutil.MustClose(sqlDB)
 
-			count := 0
-			err = sqlDB.QueryRow(`select count(*) from schema_migrations
-				where version = '20151129054053'`).Scan(&count)
+			// check applied migrations
+			appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
 			require.NoError(t, err)
-			require.Equal(t, 1, count)
+			require.Equal(t, map[string]bool{"20200227231541": true, "20151129054053": true}, appliedMigrations)
 
+			// users table have records
+			count := 0
 			err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
 			require.NoError(t, err)
 			require.Equal(t, 1, count)
@@ -346,24 +424,17 @@ func TestRollback(t *testing.T) {
 			require.NoError(t, err)
 			defer dbutil.MustClose(sqlDB)
 
-			var applied []string
-			rows, err := sqlDB.Query("select version from schema_migrations order by version asc")
+			// check applied migrations
+			appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
 			require.NoError(t, err)
-			defer rows.Close()
-			for rows.Next() {
-				var version string
-				require.NoError(t, rows.Scan(&version))
-				applied = append(applied, version)
-			}
-			require.NoError(t, rows.Err())
-			require.Equal(t, []string{"20151129054053", "20200227231541"}, applied)
+			require.Equal(t, map[string]bool{"20200227231541": true, "20151129054053": true}, appliedMigrations)
 
 			// users and posts tables have been created
 			var count int
 			err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
-			require.Nil(t, err)
+			require.NoError(t, err)
 			err = sqlDB.QueryRow("select count(*) from posts").Scan(&count)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			// rollback second migration
 			err = db.Rollback()
@@ -582,4 +653,197 @@ func TestFindMigrationsFSMultipleDirs(t *testing.T) {
 	require.Equal(t, "db/migrations_b/004_test_migration_b.sql", actual[3].FilePath)
 	require.Equal(t, "db/migrations_a/005_test_migration_a.sql", actual[4].FilePath)
 	require.Equal(t, "db/migrations_c/006_test_migration_c.sql", actual[5].FilePath)
+}
+
+func TestMigrateUnrestrictedOrder(t *testing.T) {
+	emptyMigration := []byte("-- migrate:up\n-- migrate:down")
+
+	// initialize database
+	u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
+	db := newTestDB(t, u)
+
+	err := db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
+
+	// test to apply new migrations on empty database
+	db.FS = fstest.MapFS{
+		"db/migrations/001_test_migration_a.sql": {Data: emptyMigration},
+		"db/migrations/100_test_migration_b.sql": {Data: emptyMigration},
+	}
+
+	err = db.Migrate()
+	require.NoError(t, err)
+
+	// test to apply an out of order migration
+	db.FS = fstest.MapFS{
+		"db/migrations/001_test_migration_a.sql": {Data: emptyMigration},
+		"db/migrations/100_test_migration_b.sql": {Data: emptyMigration},
+		"db/migrations/010_test_migration_c.sql": {Data: emptyMigration},
+	}
+
+	err = db.Migrate()
+	require.NoError(t, err)
+}
+
+func TestMigrateStrictOrder(t *testing.T) {
+	emptyMigration := []byte("-- migrate:up\n-- migrate:down")
+
+	// initialize database
+	u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
+	db := newTestDB(t, u)
+	db.Strict = true
+
+	err := db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
+
+	// test to apply new migrations on empty database
+	db.FS = fstest.MapFS{
+		"db/migrations/001_test_migration_a.sql": {Data: emptyMigration},
+		"db/migrations/010_test_migration_b.sql": {Data: emptyMigration},
+	}
+
+	err = db.Migrate()
+	require.NoError(t, err)
+
+	// test to apply an in order migration
+	db.FS = fstest.MapFS{
+		"db/migrations/001_test_migration_a.sql": {Data: emptyMigration},
+		"db/migrations/010_test_migration_b.sql": {Data: emptyMigration},
+		"db/migrations/100_test_migration_c.sql": {Data: emptyMigration},
+	}
+
+	err = db.Migrate()
+	require.NoError(t, err)
+
+	// test to apply an out of order migration
+	db.FS = fstest.MapFS{
+		"db/migrations/001_test_migration_a.sql": {Data: emptyMigration},
+		"db/migrations/010_test_migration_b.sql": {Data: emptyMigration},
+		"db/migrations/100_test_migration_c.sql": {Data: emptyMigration},
+		"db/migrations/050_test_migration_d.sql": {Data: emptyMigration},
+	}
+
+	err = db.Migrate()
+	require.Error(t, err)
+}
+
+func TestMigrateQueryErrorMessage(t *testing.T) {
+	u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
+	db := newTestDB(t, u)
+
+	err := db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
+
+	t.Run("ASCII SQL, error in migrate up", func(t *testing.T) {
+		db.FS = fstest.MapFS{
+			"db/migrations/001_ascii_error_up.sql": {
+				Data: []byte("-- migrate:up\n-- line 2\nnot_valid_sql;\n-- migrate:down"),
+			},
+		}
+
+		err = db.Migrate()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "line: 3, column: 1, position: 25:")
+	})
+
+	t.Run("ASCII SQL, error in migrate down", func(t *testing.T) {
+		db.FS = fstest.MapFS{
+			"db/migrations/002_ascii_error_down.sql": {
+				Data: []byte("-- migrate:up\n--migrate:down\n  not_valid_sql; -- indented"),
+			},
+		}
+
+		err = db.Migrate()
+		require.NoError(t, err)
+
+		err = db.Rollback()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "line: 2, column: 3, position: 18:")
+	})
+
+	t.Run("UTF-8 SQL, error in migrate up", func(t *testing.T) {
+		db.FS = fstest.MapFS{
+			"db/migrations/003_utf8_error_up.sql": {
+				Data: []byte("-- migrate:up\n-- line 2\n/* สวัสดี hello */ not_valid_sql;\n--migrate:down"),
+			},
+		}
+
+		err = db.Migrate()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "line: 3, column: 20, position: 44:")
+	})
+
+	t.Run("UTF-8 SQL, error in migrate down", func(t *testing.T) {
+		db.FS = fstest.MapFS{
+			"db/migrations/004_utf8_error_up.sql": {
+				Data: []byte("-- migrate:up\n-- migrate:down\n/* สวัสดี hello */ not_valid_sql;"),
+			},
+		}
+
+		err = db.Migrate()
+		require.NoError(t, err)
+
+		err = db.Rollback()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "line: 2, column: 20, position: 36:")
+	})
+
+	t.Run("correctly count with CR-LF line endings present", func(t *testing.T) {
+		db.FS = fstest.MapFS{
+			"db/migrations/005_cr_lf_line_endings.sql": {
+				Data: []byte("-- migrate:up\r\n-- line 2\r\n  not_valid_sql; -- indented\r\n-- migrate:down"),
+			},
+		}
+
+		err = db.Migrate()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "line: 3, column: 3, position: 29:")
+	})
+}
+
+func TestMigrationContents(t *testing.T) {
+	for _, u := range testURLs() {
+		t.Run(u.Scheme, func(t *testing.T) {
+			t.Run("ensure Windows CR/LF line endings in migration files work", func(t *testing.T) {
+				db := newTestDB(t, u)
+				drv, err := db.Driver()
+				require.NoError(t, err)
+
+				err = db.Drop()
+				require.NoError(t, err)
+				err = db.Create()
+				require.NoError(t, err)
+
+				sqlDB, err := drv.Open()
+				require.NoError(t, err)
+				defer dbutil.MustClose(sqlDB)
+
+				db.FS = fstest.MapFS{
+					"db/migrations/001_win_crlf_migration_empty.sql": {
+						Data: []byte("-- migrate:up\r\n-- migrate:down\r\n"),
+					},
+					"db/migrations/002_win_crlf_migration_basic.sql": {
+						Data: []byte("-- migrate:up\r\ncreate table test_win_crlf_basic (\r\n  id integer,\r\n  name varchar(255)\r\n);\r\n-- migrate:down\r\ndrop table test_win_crlf_basic;\r\n"),
+					},
+					"db/migrations/003_win_crlf_migration_options.sql": {
+						Data: []byte("-- migrate:up transaction:true\r\ncreate table test_win_crlf_options (\r\n  id integer,\r\n  name varchar(255)\r\n);\r\n-- migrate:down transaction:true\r\ndrop table test_win_crlf_options;\r\n"),
+					},
+				}
+
+				// run migrations
+				err = db.Migrate()
+				require.NoError(t, err)
+
+				// rollback last migration
+				err = db.Rollback()
+				require.NoError(t, err)
+			})
+		})
+	}
 }

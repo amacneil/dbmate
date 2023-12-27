@@ -1,8 +1,8 @@
 package main
 
 import (
+	"errors"
 	"fmt"
-	"log"
 	"net/url"
 	"os"
 	"regexp"
@@ -17,10 +17,14 @@ import (
 )
 
 func main() {
-	loadDotEnv()
+	err := loadEnvFiles(os.Args[1:])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(3)
+	}
 
 	app := NewApp()
-	err := app.Run(os.Args)
+	err = app.Run(os.Args)
 
 	if err != nil {
 		errText := redactLogString(fmt.Sprintf("Error: %s\n", err))
@@ -37,6 +41,7 @@ func NewApp() *cli.App {
 	app.Version = dbmate.Version
 
 	defaultDB := dbmate.New(nil)
+
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
 			Name:    "url",
@@ -48,6 +53,11 @@ func NewApp() *cli.App {
 			Aliases: []string{"e"},
 			Value:   "DATABASE_URL",
 			Usage:   "specify an environment variable containing the database URL",
+		},
+		&cli.StringSliceFlag{
+			Name:  "env-file",
+			Value: cli.NewStringSlice(".env"),
+			Usage: "specify a file to load environment variables from",
 		},
 		&cli.StringSliceFlag{
 			Name:    "migrations-dir",
@@ -102,6 +112,11 @@ func NewApp() *cli.App {
 			Usage: "Create database (if necessary) and migrate to the latest version",
 			Flags: []cli.Flag{
 				&cli.BoolFlag{
+					Name:    "strict",
+					EnvVars: []string{"DBMATE_STRICT"},
+					Usage:   "fail if migrations would be applied out of order",
+				},
+				&cli.BoolFlag{
 					Name:    "verbose",
 					Aliases: []string{"v"},
 					EnvVars: []string{"DBMATE_VERBOSE"},
@@ -109,6 +124,7 @@ func NewApp() *cli.App {
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				db.Strict = c.Bool("strict")
 				db.Verbose = c.Bool("verbose")
 				return db.CreateAndMigrate()
 			}),
@@ -132,6 +148,11 @@ func NewApp() *cli.App {
 			Usage: "Migrate to the latest version",
 			Flags: []cli.Flag{
 				&cli.BoolFlag{
+					Name:    "strict",
+					EnvVars: []string{"DBMATE_STRICT"},
+					Usage:   "fail if migrations would be applied out of order",
+				},
+				&cli.BoolFlag{
 					Name:    "verbose",
 					Aliases: []string{"v"},
 					EnvVars: []string{"DBMATE_VERBOSE"},
@@ -139,6 +160,7 @@ func NewApp() *cli.App {
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				db.Strict = c.Bool("strict")
 				db.Verbose = c.Bool("verbose")
 				return db.Migrate()
 			}),
@@ -174,6 +196,7 @@ func NewApp() *cli.App {
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				db.Strict = c.Bool("strict")
 				setExitCode := c.Bool("exit-code")
 				quiet := c.Bool("quiet")
 				if quiet {
@@ -200,6 +223,13 @@ func NewApp() *cli.App {
 			}),
 		},
 		{
+			Name:  "load",
+			Usage: "Load schema file to the database",
+			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				return db.LoadSchema()
+			}),
+		},
+		{
 			Name:  "wait",
 			Usage: "Wait for the database to become available",
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
@@ -211,15 +241,46 @@ func NewApp() *cli.App {
 	return app
 }
 
-// load environment variables from .env file
-func loadDotEnv() {
-	if _, err := os.Stat(".env"); err != nil {
-		return
+// load environment variables from file(s)
+func loadEnvFiles(args []string) error {
+	var envFiles []string
+
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--env-file" {
+			if i+1 >= len(args) {
+				// returning nil here, even though it's an error
+				// because we want the caller to proceed anyway,
+				// and produce the actual arg parsing error response
+				return nil
+			}
+
+			envFiles = append(envFiles, args[i+1])
+			i++
+		}
 	}
 
-	if err := godotenv.Load(); err != nil {
-		log.Fatalf("Error loading .env file: %s", err.Error())
+	if len(envFiles) == 0 {
+		envFiles = []string{".env"}
 	}
+
+	// try to load all files in sequential order,
+	// ignoring any that do not exist
+	for _, file := range envFiles {
+		err := godotenv.Load([]string{file}...)
+		if err == nil {
+			continue
+		}
+
+		var perr *os.PathError
+		if errors.As(err, &perr) && errors.Is(perr, os.ErrNotExist) {
+			// Ignoring file not found error
+			continue
+		}
+
+		return fmt.Errorf("loading env file(s) %v: %v", envFiles, err)
+	}
+
+	return nil
 }
 
 // action wraps a cli.ActionFunc with dbmate initialization logic

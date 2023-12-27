@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
-    tags: "*"
+    tags: ["*"]
   pull_request:
 
 jobs:
@@ -58,7 +58,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
 
@@ -76,7 +76,7 @@ jobs:
         if: ${{ matrix.arch == 'amd64' }}
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dbmate-${{ matrix.os }}-${{ matrix.arch }}
           path: dist/dbmate-*
@@ -179,14 +179,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: 16
           registry-url: https://registry.npmjs.org
           cache: npm
           cache-dependency-path: typescript/package-lock.json
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           path: dist
 

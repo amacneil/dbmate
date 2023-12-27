@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/url"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
@@ -372,6 +373,19 @@ func (drv *Driver) Ping() error {
 	}
 
 	return err
+}
+
+// Return a normalized version of the driver-specific error type.
+func (drv *Driver) QueryError(query string, err error) error {
+	position := 0
+
+	if pqErr, ok := err.(*pq.Error); ok {
+		if pos, err := strconv.Atoi(pqErr.Position); err == nil {
+			position = pos
+		}
+	}
+
+	return &dbmate.QueryError{Err: err, Query: query, Position: position}
 }
 
 func (drv *Driver) quotedMigrationsTableName(db dbutil.Transaction) (string, error) {
