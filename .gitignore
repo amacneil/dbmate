@@ -9,3 +9,4 @@
 dist
 node_modules
 .vscode
+docker-compose.override.yml
