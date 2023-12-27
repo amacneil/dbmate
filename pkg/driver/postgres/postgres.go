@@ -18,6 +18,7 @@ import (
 func init() {
 	dbmate.RegisterDriver(NewDriver, "postgres")
 	dbmate.RegisterDriver(NewDriver, "postgresql")
+	dbmate.RegisterDriver(NewDriver, "redshift")
 }
 
 // Driver provides top level database functions
@@ -70,11 +71,19 @@ func connectionString(u *url.URL) string {
 		query.Del("port")
 	}
 	if port == "" {
-		port = "5432"
+		switch u.Scheme {
+		case "postgresql":
+			fallthrough
+		case "postgres":
+			port = "5432"
+		case "redshift":
+			port = "5439"
+		}
 	}
 
 	// generate output URL
 	out, _ := url.Parse(u.String())
+	out.Scheme = "postgres"
 	out.Host = fmt.Sprintf("%s:%s", hostname, port)
 	out.RawQuery = query.Encode()
 
@@ -114,10 +123,12 @@ func (drv *Driver) openPostgresDB() (*sql.DB, error) {
 		return nil, err
 	}
 
-	// connect to postgres database
-	postgresURL.Path = "postgres"
+	// connect to postgres database, unless this is a Redshift connection
+	if drv.databaseURL.Scheme != "redshift" {
+		postgresURL.Path = "postgres"
+	}
 
-	return sql.Open("postgres", postgresURL.String())
+	return sql.Open("postgres", connectionString(postgresURL))
 }
 
 // CreateDatabase creates the specified database
@@ -411,15 +422,8 @@ func (drv *Driver) quotedMigrationsTableNameParts(db dbutil.Transaction) (string
 		return "", "", err
 	}
 
-	// Get version of the database
-	dbName, err := dbutil.QueryValue(db, "select version();")
-	if err != nil {
-		return "", "", err
-	}
-
 	// Quote identifiers for Redshift
-	isRedshift := strings.Contains(dbName, "Redshift")
-	if isRedshift {
+	if drv.databaseURL.Scheme == "redshift" {
 		return pq.QuoteIdentifier(schema), pq.QuoteIdentifier(strings.Join(tableNameParts, ".")), nil
 	}
 
