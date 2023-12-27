@@ -88,7 +88,7 @@ scoop install dbmate
 
 **Docker**
 
-Docker images are published to both Docker Hub ([`amacneil/dbmate`](https://hub.docker.com/r/amacneil/dbmate)) and Github Container Registry ([`ghcr.io/amacneil/dbmate`](https://ghcr.io/amacneil/dbmate)).
+Docker images are published to GitHub Container Registry ([`ghcr.io/amacneil/dbmate`](https://ghcr.io/amacneil/dbmate)).
 
 Remember to set `--network=host` or see [this comment](https://github.com/amacneil/dbmate/issues/128#issuecomment-615924611) for more tips on using dbmate with docker networking):
 
@@ -260,6 +260,7 @@ DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name"
 To work with ClickHouse cluster, there are 4 connection query parameters that can be supplied:
 
 - `on_cluster` - Indicataion to use cluster statements and replicated migration table. (default: `false`) If this parameter is not supplied, other cluster related query parameters are ignored.
+
 ```sh
 DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_cluster"
 
@@ -552,7 +553,7 @@ Why another database schema migration tool? Dbmate was inspired by many other to
 | Ability to wait for database to become ready                 |              :white_check_mark:              |                                           |                                                      |                                                             |                                                                             |                                                                          |                                 |
 | Database connection string loaded from environment variables |              :white_check_mark:              |                                           |                                                      |                                                             |                                                                             |                                                                          |       :white_check_mark:        |
 | Automatically load .env file                                 |              :white_check_mark:              |                                           |                                                      |                                                             |                                                                             |                                                                          |                                 |
-| No separate configuration file                               |              :white_check_mark:              |              :white_check_mark:           |                                                      |                     :white_check_mark:                      |                             :white_check_mark:                              |                            :white_check_mark:                            |                                 |
+| No separate configuration file                               |              :white_check_mark:              |            :white_check_mark:             |                                                      |                     :white_check_mark:                      |                             :white_check_mark:                              |                            :white_check_mark:                            |                                 |
 | Language/framework independent                               |              :white_check_mark:              |            :white_check_mark:             |                                                      |                     :white_check_mark:                      |                                                                             |                                                                          |       :white_check_mark:        |      :white_check_mark:       |
 | **Drivers**                                                  |
 | PostgreSQL                                                   |              :white_check_mark:              |            :white_check_mark:             |                  :white_check_mark:                  |                     :white_check_mark:                      |                             :white_check_mark:                              |                            :white_check_mark:                            |       :white_check_mark:        |      :white_check_mark:       |
