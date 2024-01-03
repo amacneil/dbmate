@@ -129,7 +129,7 @@ func (drv *Driver) openPostgresDB() (*sql.DB, error) {
 		postgresURL.Path = "postgres"
 	}
 
-	return sql.Open("postgres", connectionString(postgresURL))
+	return sql.Open("postgres", postgresURL.String())
 }
 
 // CreateDatabase creates the specified database
