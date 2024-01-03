@@ -8,5 +8,5 @@
 /testdata/db/schema.sql
 /vendor
 dist
-node_modules
 docker-compose.override.yml
+node_modules
