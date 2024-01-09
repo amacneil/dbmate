@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"database/sql"
+	"fmt"
 	"net/url"
 	"os"
 	"runtime"
@@ -21,6 +22,18 @@ func testPostgresDriver(t *testing.T) *Driver {
 	return drv.(*Driver)
 }
 
+func testRedshiftDriver(t *testing.T) *Driver {
+	url, ok := os.LookupEnv("REDSHIFT_TEST_URL")
+	if !ok {
+		t.Skip("skipping test, no REDSHIFT_TEST_URL provided")
+	}
+	u := dbutil.MustParseURL(url)
+	drv, err := dbmate.New(u).Driver()
+	require.NoError(t, err)
+
+	return drv.(*Driver)
+}
+
 func prepTestPostgresDB(t *testing.T) *sql.DB {
 	drv := testPostgresDriver(t)
 
@@ -33,7 +46,23 @@ func prepTestPostgresDB(t *testing.T) *sql.DB {
 	require.NoError(t, err)
 
 	// connect database
-	db, err := sql.Open("postgres", drv.databaseURL.String())
+	db, err := sql.Open("postgres", connectionString(drv.databaseURL))
+	require.NoError(t, err)
+
+	return db
+}
+
+func prepRedshiftTestDB(t *testing.T, drv *Driver) *sql.DB {
+	// connect database
+	db, err := sql.Open("postgres", connectionString(drv.databaseURL))
+	require.NoError(t, err)
+
+	_, migrationsTable, err := drv.quotedMigrationsTableNameParts(db)
+	if err != nil {
+		t.Error(err)
+	}
+
+	_, err = db.Exec(fmt.Sprintf("drop table if exists %s", migrationsTable))
 	require.NoError(t, err)
 
 	return db
@@ -80,6 +109,8 @@ func TestConnectionString(t *testing.T) {
 		{"postgres:///foo?socket=/var/run/postgresql", "postgres://:5432/foo?host=%2Fvar%2Frun%2Fpostgresql"},
 		{"postgres://bob:secret@/foo?socket=/var/run/postgresql", "postgres://bob:secret@:5432/foo?host=%2Fvar%2Frun%2Fpostgresql"},
 		{"postgres://bob:secret@/foo?host=/var/run/postgresql", "postgres://bob:secret@:5432/foo?host=%2Fvar%2Frun%2Fpostgresql"},
+		// redshift default port is 5439, not 5432
+		{"redshift://myhost/foo", "postgres://myhost:5439/foo"},
 	}
 
 	for _, c := range cases {
@@ -360,6 +391,36 @@ func TestPostgresCreateMigrationsTable(t *testing.T) {
 		err = db.QueryRow("select count(*) from foo.\"testMigrations\"").Scan(&count)
 		require.Error(t, err)
 		require.Equal(t, "pq: relation \"foo.testMigrations\" does not exist", err.Error())
+
+		// create table should be idempotent
+		err = drv.CreateMigrationsTable(db)
+		require.NoError(t, err)
+	})
+}
+
+func TestRedshiftCreateMigrationsTable(t *testing.T) {
+	if _, ok := os.LookupEnv("REDSHIFT_TEST_URL"); !ok {
+		t.Skip("skipping test, no REDSHIFT_TEST_URL provided")
+	}
+
+	t.Run("default schema", func(t *testing.T) {
+		drv := testRedshiftDriver(t)
+		db := prepRedshiftTestDB(t, drv)
+		defer dbutil.MustClose(db)
+
+		// migrations table should not exist
+		count := 0
+		err := db.QueryRow("select count(*) from public.schema_migrations").Scan(&count)
+		require.Error(t, err, "migrations table exists when it shouldn't")
+		require.Equal(t, "pq: relation \"public.schema_migrations\" does not exist", err.Error())
+
+		// create table
+		err = drv.CreateMigrationsTable(db)
+		require.NoError(t, err)
+
+		// migrations table should exist
+		err = db.QueryRow("select count(*) from public.schema_migrations").Scan(&count)
+		require.NoError(t, err)
 
 		// create table should be idempotent
 		err = drv.CreateMigrationsTable(db)
