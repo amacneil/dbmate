@@ -170,11 +170,23 @@ func (drv *Driver) DropDatabase() error {
 	return err
 }
 
+func (drv *Driver) parseSchemas(schemasString string) string {
+	schemasList := strings.Split(schemasString, ",")
+
+	quotedSchemasList := []string{}
+	for _, schema := range schemasList {
+		quotedSchemasList = append(quotedSchemasList, drv.quoteIdentifier(schema))
+	}
+	return strings.Join(quotedSchemasList, ",")
+}
+
 func (drv *Driver) schemaDump(db *sql.DB, buf *bytes.Buffer, databaseName string) error {
 	buf.WriteString("\n--\n-- Database schema\n--\n\n")
 	buf.WriteString(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s%s;\n\n", drv.quoteIdentifier(databaseName), drv.onClusterClause()))
 
-	tables, err := dbutil.QueryColumn(db, "show tables")
+	schemas := drv.parseSchemas(drv.clusterParameters.Schemas)
+	query := fmt.Sprintf("SELECT name FROM system.tables WHERE NOT is_temporary AND database IN (%s);", schemas)
+	tables, err := dbutil.QueryColumn(db, query)
 	if err != nil {
 		return err
 	}

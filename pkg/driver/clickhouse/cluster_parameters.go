@@ -10,6 +10,7 @@ const (
 	ZooPathQueryParam      = "zoo_path"
 	ClusterMacroQueryParam = "cluster_macro"
 	ReplicaMacroQueryParam = "replica_macro"
+	SchemasQueryParam      = "schemas"
 )
 
 type ClusterParameters struct {
@@ -17,6 +18,7 @@ type ClusterParameters struct {
 	ZooPath      string
 	ClusterMacro string
 	ReplicaMacro string
+	Schemas      string
 }
 
 func ClearClusterParametersFromURL(u *url.URL) *url.URL {
@@ -24,6 +26,7 @@ func ClearClusterParametersFromURL(u *url.URL) *url.URL {
 	q.Del(OnClusterQueryParam)
 	q.Del(ClusterMacroQueryParam)
 	q.Del(ReplicaMacroQueryParam)
+	q.Del(SchemasQueryParam)
 	q.Del(ZooPathQueryParam)
 	u.RawQuery = q.Encode()
 
@@ -34,6 +37,7 @@ func ExtractClusterParametersFromURL(u *url.URL) *ClusterParameters {
 	onCluster := extractOnCluster(u)
 	clusterMacro := extractClusterMacro(u)
 	replicaMacro := extractReplicaMacro(u)
+	schemas := extractSchemas(u)
 	zookeeperPath := extractZookeeperPath(u)
 
 	r := &ClusterParameters{
@@ -41,6 +45,7 @@ func ExtractClusterParametersFromURL(u *url.URL) *ClusterParameters {
 		ZooPath:      zookeeperPath,
 		ClusterMacro: clusterMacro,
 		ReplicaMacro: replicaMacro,
+		Schemas:      schemas,
 	}
 
 	return r
@@ -70,6 +75,15 @@ func extractReplicaMacro(u *url.URL) string {
 		replicaMacro = "{replica}"
 	}
 	return replicaMacro
+}
+
+func extractSchemas(u *url.URL) string {
+	v := u.Query()
+	schemas := v.Get(SchemasQueryParam)
+	if schemas == "" {
+		schemas = "default"
+	}
+	return schemas
 }
 
 func extractZookeeperPath(u *url.URL) string {
