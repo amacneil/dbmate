@@ -175,9 +175,10 @@ func (drv *Driver) parseSchemas(schemasString string) string {
 
 	quotedSchemasList := []string{}
 	for _, schema := range schemasList {
-		quotedSchemasList = append(quotedSchemasList, drv.quoteIdentifier(schema))
+		quotedSchema := drv.quoteIdentifier(schema)
+		quotedSchemasList = append(quotedSchemasList, quotedSchema)
 	}
-	return strings.Join(quotedSchemasList, ",")
+	return "'" + strings.Join(quotedSchemasList, "','") + "'"
 }
 
 func (drv *Driver) schemaDump(db *sql.DB, buf *bytes.Buffer, databaseName string) error {
@@ -185,7 +186,7 @@ func (drv *Driver) schemaDump(db *sql.DB, buf *bytes.Buffer, databaseName string
 	buf.WriteString(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s%s;\n\n", drv.quoteIdentifier(databaseName), drv.onClusterClause()))
 
 	schemas := drv.parseSchemas(drv.clusterParameters.Schemas)
-	query := fmt.Sprintf("SELECT name FROM system.tables WHERE NOT is_temporary AND database IN (%s);", schemas)
+	query := fmt.Sprintf("SELECT database||'.'||name FROM system.tables WHERE NOT is_temporary AND database IN (%s);", schemas)
 	tables, err := dbutil.QueryColumn(db, query)
 	if err != nil {
 		return err
@@ -194,7 +195,7 @@ func (drv *Driver) schemaDump(db *sql.DB, buf *bytes.Buffer, databaseName string
 
 	for _, table := range tables {
 		var clause string
-		err = db.QueryRow("show create table " + drv.quoteIdentifier(table)).Scan(&clause)
+		err = db.QueryRow("show create table " + table).Scan(&clause)
 		if err != nil {
 			return err
 		}
