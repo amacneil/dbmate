@@ -185,7 +185,12 @@ func (drv *Driver) schemaDump(db *sql.DB, buf *bytes.Buffer, databaseName string
 	buf.WriteString("\n--\n-- Database schema\n--\n\n")
 	buf.WriteString(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s%s;\n\n", drv.quoteIdentifier(databaseName), drv.onClusterClause()))
 
-	schemas := drv.parseSchemas(drv.clusterParameters.Schemas)
+	var schemas string
+	if drv.clusterParameters.Schemas != "" {
+		schemas = drv.parseSchemas(drv.clusterParameters.Schemas)
+	} else {
+		schemas = fmt.Sprintf("'%s'", databaseName)
+	}
 	query := fmt.Sprintf("SELECT database||'.'||name FROM system.tables WHERE NOT is_temporary AND database IN (%s);", schemas)
 	tables, err := dbutil.QueryColumn(db, query)
 	if err != nil {

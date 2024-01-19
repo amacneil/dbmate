@@ -80,9 +80,6 @@ func extractReplicaMacro(u *url.URL) string {
 func extractSchemas(u *url.URL) string {
 	v := u.Query()
 	schemas := v.Get(SchemasQueryParam)
-	if schemas == "" {
-		schemas = "default"
-	}
 	return schemas
 }
 
