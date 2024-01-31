@@ -206,3 +206,21 @@ jobs:
         working-directory: typescript
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
+
+  dependabot:
+    name: Dependabot
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    steps:
+      - name: Automatically approve dependabot PRs
+        uses: octokit/request-action@v2.x
+        with:
+          route: POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews
+          owner: ${{ github.event.repository.owner.login }}
+          repo: ${{ github.event.repository.name }}
+          pull_number: ${{ github.event.pull_request.number }}
+          event: APPROVE
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
