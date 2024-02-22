@@ -1,0 +1,127 @@
+<?xml version="1.0"?>
+<!--
+  NOTE: User and query level settings are set up in "users.xml" file.
+  If you have accidentally specified user-level settings here, server won't start.
+  You can either move the settings to the right place inside "users.xml" file
+   or add <skip_check_for_incorrect_settings>1</skip_check_for_incorrect_settings> here.
+-->
+<clickhouse>
+    <logger>
+        <level>trace</level>
+        <log>/var/log/clickhouse-server/clickhouse-server.log</log>
+        <errorlog>/var/log/clickhouse-server/clickhouse-server.err.log</errorlog>
+        <size>100M</size>
+        <count>2</count>
+    </logger>
+
+    <http_port>8123</http_port>
+    <tcp_port>9000</tcp_port>
+    <interserver_http_port>9009</interserver_http_port>
+
+    <max_connections>4096</max_connections>
+    <keep_alive_timeout>3</keep_alive_timeout>
+    <concurrent_threads_soft_limit>0</concurrent_threads_soft_limit>
+    <max_concurrent_queries>100</max_concurrent_queries>
+    <max_server_memory_usage>0</max_server_memory_usage>
+    <max_thread_pool_size>10000</max_thread_pool_size>
+    <max_server_memory_usage_to_ram_ratio>0.9</max_server_memory_usage_to_ram_ratio>
+    <total_memory_profiler_step>4194304</total_memory_profiler_step>
+    <total_memory_tracker_sample_probability>0</total_memory_tracker_sample_probability>
+    <uncompressed_cache_size>8589934592</uncompressed_cache_size>
+    <mark_cache_size>5368709120</mark_cache_size>
+    <mmap_cache_size>1000</mmap_cache_size>
+    <compiled_expression_cache_size>134217728</compiled_expression_cache_size>
+    <compiled_expression_cache_elements_size>10000</compiled_expression_cache_elements_size>
+
+    <path>/var/lib/clickhouse/</path>
+    <tmp_path>/var/lib/clickhouse/tmp/</tmp_path>
+    <user_files_path>/var/lib/clickhouse/user_files/</user_files_path>
+
+    <user_directories>
+        <users_xml>
+            <path>users.xml</path>
+        </users_xml>
+        <local_directory>
+            <path>/var/lib/clickhouse/access/</path>
+        </local_directory>
+    </user_directories>
+
+    <access_control_improvements>
+        <users_without_row_policies_can_read_rows>false</users_without_row_policies_can_read_rows>
+        <on_cluster_queries_require_cluster_grant>false</on_cluster_queries_require_cluster_grant>
+        <select_from_system_db_requires_grant>false</select_from_system_db_requires_grant>
+        <select_from_information_schema_requires_grant>false</select_from_information_schema_requires_grant>
+    </access_control_improvements>
+
+    <default_profile>default</default_profile>
+    <default_database>default</default_database>
+    <mlock_executable>true</mlock_executable>
+
+
+    <!-- Configuration of clusters that could be used in Distributed tables.
+         https://clickhouse.com/docs/en/operations/table_engines/distributed/
+      -->
+    <remote_servers>
+      <cluster-01>
+        <shard>
+            <!-- Optional. Whether to write data to just one of the replicas. Default: false (write data to all replicas). -->
+            <!-- <internal_replication>false</internal_replication> -->
+            <!-- Optional. Shard weight when writing data. Default: 1. -->
+            <!-- <weight>1</weight> -->
+            <internal_replication>true</internal_replication>
+            <replica>
+                <host>ch-cluster-01</host>
+                <port>9000</port>
+                <!-- Optional. Priority of the replica for load_balancing. Default: 1 (less value has more priority). -->
+                <!-- <priority>1</priority> -->
+            </replica>
+        </shard>
+        <shard>
+            <internal_replication>true</internal_replication>
+            <replica>
+                <host>ch-cluster-02</host>
+                <port>9000</port>
+            </replica>
+        </shard>
+      </cluster-01>
+    </remote_servers>
+
+    <zookeeper>
+        <node>
+            <host>zookeeper</host>
+            <port>2181</port>
+        </node>
+    </zookeeper>
+
+    <macros>
+        <cluster>cluster-01</cluster>
+        <shard>shard-01</shard>
+        <replica>ch_cluster-01</replica>
+    </macros>
+
+
+    <builtin_dictionaries_reload_interval>3600</builtin_dictionaries_reload_interval>
+    <max_session_timeout>3600</max_session_timeout>
+    <default_session_timeout>60</default_session_timeout>
+
+    <query_log>
+        <database>system</database>
+        <table>query_log</table>
+        <partition_by>toYYYYMM(event_date)</partition_by>
+
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    </query_log>
+
+    <dictionaries_config>*_dictionary.xml</dictionaries_config>
+
+    <!-- Allow to execute distributed DDL queries (CREATE, DROP, ALTER, RENAME) on cluster.
+         Works only if ZooKeeper is enabled. Comment it if such functionality isn't required. -->
+    <distributed_ddl>
+        <!-- Path in ZooKeeper to queue with DDL queries -->
+        <path>/clickhouse/task_queue/ddl</path>
+
+    </distributed_ddl>
+
+    <format_schema_path>/var/lib/clickhouse/format_schemas/</format_schema_path>
+
+</clickhouse>

@@ -3,7 +3,6 @@ package clickhouse
 import (
 	"database/sql"
 	"net/url"
-	"os"
 	"testing"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
@@ -11,32 +10,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 )
-
-func testClickHouseDriver(t *testing.T) *Driver {
-	u := dbutil.MustParseURL(os.Getenv("CLICKHOUSE_TEST_URL"))
-	drv, err := dbmate.New(u).Driver()
-	require.NoError(t, err)
-
-	return drv.(*Driver)
-}
-
-func prepTestClickHouseDB(t *testing.T) *sql.DB {
-	drv := testClickHouseDriver(t)
-
-	// drop any existing database
-	err := drv.DropDatabase()
-	require.NoError(t, err)
-
-	// create database
-	err = drv.CreateDatabase()
-	require.NoError(t, err)
-
-	// connect database
-	db, err := sql.Open("clickhouse", drv.databaseURL.String())
-	require.NoError(t, err)
-
-	return db
-}
 
 func TestGetDriver(t *testing.T) {
 	db := dbmate.New(dbutil.MustParseURL("clickhouse://"))
@@ -123,7 +96,7 @@ func TestClickHouseDumpSchema(t *testing.T) {
 	drv.migrationsTableName = "test_migrations"
 
 	// prepare database
-	db := prepTestClickHouseDB(t)
+	db := prepTestClickHouseDB(t, drv)
 	defer dbutil.MustClose(db)
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
@@ -203,7 +176,7 @@ func TestClickHouseDatabaseExists_Error(t *testing.T) {
 func TestClickHouseCreateMigrationsTable(t *testing.T) {
 	t.Run("default table", func(t *testing.T) {
 		drv := testClickHouseDriver(t)
-		db := prepTestClickHouseDB(t)
+		db := prepTestClickHouseDB(t, drv)
 		defer dbutil.MustClose(db)
 
 		// migrations table should not exist
@@ -242,7 +215,7 @@ func TestClickHouseCreateMigrationsTable(t *testing.T) {
 		drv := testClickHouseDriver(t)
 		drv.migrationsTableName = "testMigrations"
 
-		db := prepTestClickHouseDB(t)
+		db := prepTestClickHouseDB(t, drv)
 		defer dbutil.MustClose(db)
 
 		// migrations table should not exist
@@ -282,7 +255,7 @@ func TestClickHouseSelectMigrations(t *testing.T) {
 	drv := testClickHouseDriver(t)
 	drv.migrationsTableName = "test_migrations"
 
-	db := prepTestClickHouseDB(t)
+	db := prepTestClickHouseDB(t, drv)
 	defer dbutil.MustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
@@ -319,7 +292,7 @@ func TestClickHouseInsertMigration(t *testing.T) {
 	drv := testClickHouseDriver(t)
 	drv.migrationsTableName = "test_migrations"
 
-	db := prepTestClickHouseDB(t)
+	db := prepTestClickHouseDB(t, drv)
 	defer dbutil.MustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
@@ -347,7 +320,7 @@ func TestClickHouseDeleteMigration(t *testing.T) {
 	drv := testClickHouseDriver(t)
 	drv.migrationsTableName = "test_migrations"
 
-	db := prepTestClickHouseDB(t)
+	db := prepTestClickHouseDB(t, drv)
 	defer dbutil.MustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
@@ -417,4 +390,27 @@ func TestClickHouseQuotedMigrationsTableName(t *testing.T) {
 		name := drv.quotedMigrationsTableName()
 		require.Equal(t, `"bizarre""$name"`, name)
 	})
+}
+
+func TestEscapeString(t *testing.T) {
+	cases := []struct {
+		input    string
+		expected string
+	}{
+		// nothig to escape
+		{`lets go`, `lets go`},
+		// escape '
+		{`let's go`, `let\'s go`},
+		// escape \
+		{`let\s go`, `let\\s go`},
+	}
+
+	for _, c := range cases {
+		t.Run(c.input, func(t *testing.T) {
+			drv := testClickHouseDriver(t)
+
+			actual := drv.escapeString(c.input)
+			require.Equal(t, c.expected, actual)
+		})
+	}
 }

@@ -1,5 +1,6 @@
 .DS_Store
 .env
+.idea
 *.log
 /.cache
 /db
@@ -7,6 +8,7 @@
 /testdata/db/schema.sql
 /vendor
 dist
+docker-compose.override.yml
 node_modules
 
 # Devenv

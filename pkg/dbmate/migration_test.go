@@ -167,6 +167,38 @@ DROP COLUMN status;
 		_, err := parseMigrationContents(migration)
 		require.Error(t, err, "dbmate does not support statements preceding the '-- migrate:up' block")
 	})
+
+	t.Run("ensure Windows CR/LF line endings in migration files are parsed correctly", func(t *testing.T) {
+		t.Run("without migration options", func(t *testing.T) {
+			migration := "-- migrate:up\r\ncreate table users (id serial, name text);\r\n-- migrate:down\r\ndrop table users;\r\n"
+
+			parsed, err := parseMigrationContents(migration)
+			require.Nil(t, err)
+
+			require.Equal(t, "-- migrate:up\r\ncreate table users (id serial, name text);\r\n", parsed.Up)
+			require.Equal(t, migrationOptions{}, parsed.UpOptions)
+			require.Equal(t, true, parsed.UpOptions.Transaction())
+
+			require.Equal(t, "-- migrate:down\r\ndrop table users;\r\n", parsed.Down)
+			require.Equal(t, migrationOptions{}, parsed.DownOptions)
+			require.Equal(t, true, parsed.DownOptions.Transaction())
+		})
+
+		t.Run("with migration options", func(t *testing.T) {
+			migration := "-- migrate:up transaction:true\r\ncreate table users (id serial, name text);\r\n-- migrate:down transaction:true\r\ndrop table users;\r\n"
+
+			parsed, err := parseMigrationContents(migration)
+			require.Nil(t, err)
+
+			require.Equal(t, "-- migrate:up transaction:true\r\ncreate table users (id serial, name text);\r\n", parsed.Up)
+			require.Equal(t, migrationOptions{"transaction": "true"}, parsed.UpOptions)
+			require.Equal(t, true, parsed.UpOptions.Transaction())
+
+			require.Equal(t, "-- migrate:down transaction:true\r\ndrop table users;\r\n", parsed.Down)
+			require.Equal(t, migrationOptions{"transaction": "true"}, parsed.DownOptions)
+			require.Equal(t, true, parsed.DownOptions.Transaction())
+		})
+	})
 }
 
 func TestMigrationRange(t *testing.T) {

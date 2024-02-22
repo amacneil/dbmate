@@ -88,7 +88,7 @@ scoop install dbmate
 
 **Docker**
 
-Docker images are published to both Docker Hub ([`amacneil/dbmate`](https://hub.docker.com/r/amacneil/dbmate)) and Github Container Registry ([`ghcr.io/amacneil/dbmate`](https://ghcr.io/amacneil/dbmate)).
+Docker images are published to GitHub Container Registry ([`ghcr.io/amacneil/dbmate`](https://ghcr.io/amacneil/dbmate)).
 
 Remember to set `--network=host` or see [this comment](https://github.com/amacneil/dbmate/issues/128#issuecomment-615924611) for more tips on using dbmate with docker networking):
 
@@ -129,6 +129,7 @@ dbmate rollback  # roll back the most recent migration
 dbmate down      # alias for rollback
 dbmate status    # show the status of all migrations (supports --exit-code and --quiet)
 dbmate dump      # write the database schema.sql file
+dbmate load      # load schema.sql file to the database
 dbmate wait      # wait for the database server to become available
 ```
 
@@ -138,11 +139,13 @@ The following options are available with all commands. You must use command line
 
 - `--url, -u "protocol://host:port/dbname"` - specify the database url directly. _(env: `DATABASE_URL`)_
 - `--env, -e "DATABASE_URL"` - specify an environment variable to read the database connection URL from.
+- `--env-file ".env"` - specify an alternate environment variables file(s) to load.
 - `--migrations, -m "VERSION"` - operate on only the migrations specified. _(env: `DBMATE_MIGRATIONS`)_
 - `--migrations-dir, -d "./db/migrations"` - where to keep the migration files. _(env: `DBMATE_MIGRATIONS_DIR`)_
 - `--migrations-table "schema_migrations"` - database table to record migrations in. _(env: `DBMATE_MIGRATIONS_TABLE`)_
 - `--schema-file, -s "./db/schema.sql"` - a path to keep the schema.sql file. _(env: `DBMATE_SCHEMA_FILE`)_
 - `--no-dump-schema` - don't auto-update the schema.sql file on migrate/rollback _(env: `DBMATE_NO_DUMP_SCHEMA`)_
+- `--strict` - fail if migrations would be applied out of order _(env: `DBMATE_STRICT`)_
 - `--wait` - wait for the db to become available before executing the subsequent command _(env: `DBMATE_WAIT`)_
 - `--wait-timeout 60s` - timeout for --wait flag _(env: `DBMATE_WAIT_TIMEOUT`)_
 
@@ -168,6 +171,7 @@ protocol://username:password@host:port/database_name?options
 ```
 
 - `protocol` must be one of `mysql`, `postgres`, `postgresql`, `sqlite`, `sqlite3`, `clickhouse`
+- `username` and `password` must be URL encoded (you will get an error if you use special charactors)
 - `host` can be either a hostname or IP address
 - `options` are driver-specific (refer to the underlying Go SQL drivers if you wish to use these)
 
@@ -252,6 +256,34 @@ DATABASE_URL="sqlite:/tmp/database.sqlite3"
 
 ```sh
 DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name"
+```
+
+To work with ClickHouse cluster, there are 4 connection query parameters that can be supplied:
+
+- `on_cluster` - Indicataion to use cluster statements and replicated migration table. (default: `false`) If this parameter is not supplied, other cluster related query parameters are ignored.
+
+```sh
+DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_cluster"
+
+DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_cluster=true"
+```
+
+- `cluster_macro` (Optional) - Macro value to be used for ON CLUSTER statements and for the replciated migration table engine zookeeper path. (default: `{cluster}`)
+
+```sh
+DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_cluster&cluster_macro={my_cluster}"
+```
+
+- `replica_macro` (Optional) - Macro value to be used for the replica name in the replciated migration table engine. (default: `{replica}`)
+
+```sh
+DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_cluster&replica_macro={my_replica}"
+```
+
+- `zoo_path` (Optional) - The path to the table migration in ClickHouse/Zoo Keeper. (default: `/clickhouse/tables/<cluster_macro>/{table}`)
+
+```sh
+DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_cluster&zoo_path=/zk/path/tables"
 ```
 
 [See other supported connection options](https://github.com/ClickHouse/clickhouse-go#dsn).
@@ -380,7 +412,7 @@ When you run the `up`, `migrate`, or `rollback` commands, dbmate will automatica
 
 It is recommended to check this file into source control, so that you can easily review changes to the schema in commits or pull requests. It's also possible to use this file when you want to quickly load a database schema, without running each migration sequentially (for example in your test harness). However, if you do not wish to save this file, you could add it to your `.gitignore`, or pass the `--no-dump-schema` command line option.
 
-To dump the `schema.sql` file without performing any other actions, run `dbmate dump`. Unlike other dbmate actions, this command relies on the respective `pg_dump`, `mysqldump`, or `sqlite3` commands being available in your PATH. If these tools are not available, dbmate will silenty skip the schema dump step during `up`, `migrate`, or `rollback` actions. You can diagnose the issue by running `dbmate dump` and looking at the output:
+To dump the `schema.sql` file without performing any other actions, run `dbmate dump`. Unlike other dbmate actions, this command relies on the respective `pg_dump`, `mysqldump`, or `sqlite3` commands being available in your PATH. If these tools are not available, dbmate will silently skip the schema dump step during `up`, `migrate`, or `rollback` actions. You can diagnose the issue by running `dbmate dump` and looking at the output:
 
 ```sh
 $ dbmate dump
@@ -522,7 +554,7 @@ Why another database schema migration tool? Dbmate was inspired by many other to
 | Ability to wait for database to become ready                 |              :white_check_mark:              |                                           |                                                      |                                                             |                                                                             |                                                                          |                                 |
 | Database connection string loaded from environment variables |              :white_check_mark:              |                                           |                                                      |                                                             |                                                                             |                                                                          |       :white_check_mark:        |
 | Automatically load .env file                                 |              :white_check_mark:              |                                           |                                                      |                                                             |                                                                             |                                                                          |                                 |
-| No separate configuration file                               |              :white_check_mark:              |                                           |                                                      |                     :white_check_mark:                      |                             :white_check_mark:                              |                            :white_check_mark:                            |                                 |
+| No separate configuration file                               |              :white_check_mark:              |            :white_check_mark:             |                                                      |                     :white_check_mark:                      |                             :white_check_mark:                              |                            :white_check_mark:                            |                                 |
 | Language/framework independent                               |              :white_check_mark:              |            :white_check_mark:             |                                                      |                     :white_check_mark:                      |                                                                             |                                                                          |       :white_check_mark:        |      :white_check_mark:       |
 | **Drivers**                                                  |
 | PostgreSQL                                                   |              :white_check_mark:              |            :white_check_mark:             |                  :white_check_mark:                  |                     :white_check_mark:                      |                             :white_check_mark:                              |                            :white_check_mark:                            |       :white_check_mark:        |      :white_check_mark:       |

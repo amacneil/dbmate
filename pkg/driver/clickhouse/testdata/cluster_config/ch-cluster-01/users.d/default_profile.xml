@@ -1,0 +1,10 @@
+<clickhouse>
+    <profiles>
+        <default>
+        <!-- Used for tests only
+             INSERT succeeds only when ClickHouse manages to correctly write data to the insert_quorum of replicas during the insert_quorum_timeout
+             Helps querying data right after inserting it into the replciated table  -->
+            <insert_quorum>2</insert_quorum>
+        </default>
+    </profiles>
+</clickhouse>

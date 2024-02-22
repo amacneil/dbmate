@@ -62,12 +62,12 @@ func (m migrationOptions) Transaction() bool {
 
 var (
 	upRegExp              = regexp.MustCompile(`(?m)^--\s*migrate:up(\s*$|\s+\S+)`)
-	downRegExp            = regexp.MustCompile(`(?m)^--\s*migrate:down(\s*$|\s+\S+)$`)
+	downRegExp            = regexp.MustCompile(`(?m)^--\s*migrate:down(\s*$|\s+\S+)`)
 	emptyLineRegExp       = regexp.MustCompile(`^\s*$`)
 	commentLineRegExp     = regexp.MustCompile(`^\s*--`)
 	whitespaceRegExp      = regexp.MustCompile(`\s+`)
 	optionSeparatorRegExp = regexp.MustCompile(`:`)
-	blockDirectiveRegExp  = regexp.MustCompile(`^--\s*migrate:[up|down]]`)
+	blockDirectiveRegExp  = regexp.MustCompile(`^--\s*migrate:(up|down)`)
 )
 
 // Error codes

@@ -51,6 +51,8 @@ type DB struct {
 	MigrationsTableName string
 	// SchemaFile specifies the location for schema.sql file
 	SchemaFile string
+	// Fail if migrations would be applied out of order
+	Strict bool
 	// Verbose prints the result of each statement execution
 	Verbose bool
 	// WaitBefore will wait for database to become available before running any actions
@@ -78,6 +80,7 @@ func New(databaseURL *url.URL) *DB {
 		MigrationsDir:       []string{"./db/migrations"},
 		MigrationsTableName: "schema_migrations",
 		SchemaFile:          "./db/schema.sql",
+		Strict:              false,
 		Verbose:             false,
 		WaitBefore:          false,
 		WaitInterval:        time.Second,
@@ -221,6 +224,41 @@ func (db *DB) DumpSchema() error {
 	return os.WriteFile(db.SchemaFile, schema, 0o644)
 }
 
+// LoadSchema loads schema file to the current database
+func (db *DB) LoadSchema() error {
+	drv, err := db.Driver()
+	if err != nil {
+		return err
+	}
+
+	sqlDB, err := drv.Open()
+	if err != nil {
+		return err
+	}
+	defer dbutil.MustClose(sqlDB)
+
+	_, err = os.Stat(db.SchemaFile)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(db.Log, "Reading: %s\n", db.SchemaFile)
+
+	bytes, err := os.ReadFile(db.SchemaFile)
+	if err != nil {
+		return err
+	}
+
+	result, err := sqlDB.Exec(string(bytes))
+	if err != nil {
+		return err
+	} else if db.Verbose {
+		db.printVerbose(result)
+	}
+
+	return nil
+}
+
 // ensureDir creates a directory if it does not already exist
 func ensureDir(dir string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -312,17 +350,29 @@ func (db *DB) Migrate() error {
 		return ErrNoMigrationFiles
 	}
 
+	highestAppliedMigrationVersion := ""
+	pendingMigrations := []Migration{}
+	for _, migration := range migrations {
+		if migration.Applied {
+			if db.Strict && highestAppliedMigrationVersion <= migration.Version {
+				highestAppliedMigrationVersion = migration.Version
+			}
+		} else {
+			pendingMigrations = append(pendingMigrations, migration)
+		}
+	}
+
+	if len(pendingMigrations) > 0 && db.Strict && pendingMigrations[0].Version <= highestAppliedMigrationVersion {
+		return fmt.Errorf("migration `%s` is out of order with already applied migrations, the version number has to be higher than the applied migration `%s` in --strict mode", pendingMigrations[0].Version, highestAppliedMigrationVersion)
+	}
+
 	sqlDB, err := db.openDatabaseForMigration(drv)
 	if err != nil {
 		return err
 	}
 	defer dbutil.MustClose(sqlDB)
 
-	for _, migration := range migrations {
-		if migration.Applied {
-			continue
-		}
-
+	for _, migration := range pendingMigrations {
 		fmt.Fprintf(db.Log, "Applying: %s\n", migration.FileName)
 
 		parsed, err := migration.Parse()
@@ -334,7 +384,7 @@ func (db *DB) Migrate() error {
 			// run actual migration
 			result, err := tx.Exec(parsed.Up)
 			if err != nil {
-				return err
+				return drv.QueryError(parsed.Up, err)
 			} else if db.Verbose {
 				db.printVerbose(result)
 			}
@@ -497,7 +547,7 @@ func (db *DB) Rollback() error {
 		// rollback migration
 		result, err := tx.Exec(parsed.Down)
 		if err != nil {
-			return err
+			return drv.QueryError(parsed.Down, err)
 		} else if db.Verbose {
 			db.printVerbose(result)
 		}

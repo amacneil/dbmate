@@ -233,7 +233,7 @@ func (drv *Driver) DatabaseExists() (bool, error) {
 // MigrationsTableExists checks if the schema_migrations table exists
 func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
 	match := ""
-	err := db.QueryRow(fmt.Sprintf("SHOW TABLES LIKE \"%s\"",
+	err := db.QueryRow(fmt.Sprintf("show tables like '%s'",
 		drv.migrationsTableName)).
 		Scan(&match)
 	if err == sql.ErrNoRows {
@@ -311,6 +311,11 @@ func (drv *Driver) Ping() error {
 	defer dbutil.MustClose(db)
 
 	return db.Ping()
+}
+
+// Return a normalized version of the driver-specific error type.
+func (drv *Driver) QueryError(query string, err error) error {
+	return &dbmate.QueryError{Err: err, Query: query}
 }
 
 func (drv *Driver) quotedMigrationsTableName() string {

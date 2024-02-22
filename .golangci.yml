@@ -1,7 +1,6 @@
 linters:
   enable:
     - bodyclose
-    - depguard
     - errcheck
     - goimports
     - gosimple

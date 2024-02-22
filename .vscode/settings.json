@@ -1,7 +1,7 @@
 // -*- jsonc -*-
 {
   "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true
+    "source.fixAll.eslint": "explicit"
   },
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.detectIndentation": false,
@@ -15,7 +15,7 @@
   "files.insertFinalNewline": true,
   "files.trimFinalNewlines": true,
   "files.trimTrailingWhitespace": true,
-  "prettier.prettierPath": "./typescript/node_modules/prettier",
+  "prettier.prettierPath": "./typescript/node_modules/prettier/index.cjs",
   "go.formatTool": "goimports",
   "[go]": {
     "editor.defaultFormatter": "golang.go",
