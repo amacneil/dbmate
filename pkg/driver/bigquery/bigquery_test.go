@@ -74,7 +74,7 @@ func TestConnectionString(t *testing.T) {
 	}
 }
 
-func TestMySQLCreateDropDatabase(t *testing.T) {
+func TestBigQueryCreateDropDatabase(t *testing.T) {
 	drv := testBigqueryDriver(t)
 
 	// drop any existing database
@@ -130,7 +130,7 @@ func TestBigqueryCreateAndInsertMigration(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestMySQLCreateMigrationsTable(t *testing.T) {
+func TestBigQueryCreateMigrationsTable(t *testing.T) {
 	drv := testBigqueryDriver(t)
 	drv.migrationsTableName = "test_migrations_1"
 
@@ -156,7 +156,7 @@ func TestMySQLCreateMigrationsTable(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestMySQLSelectMigrations(t *testing.T) {
+func TestBigQuerySelectMigrations(t *testing.T) {
 	drv := testBigqueryDriver(t)
 	drv.migrationsTableName = "test_migrations_2"
 
@@ -185,7 +185,7 @@ func TestMySQLSelectMigrations(t *testing.T) {
 	require.Equal(t, false, migrations["abc2"])
 }
 
-func TestMySQLInsertMigration(t *testing.T) {
+func TestBigQueryInsertMigration(t *testing.T) {
 	drv := testBigqueryDriver(t)
 	drv.migrationsTableName = "test_migrations_3"
 
@@ -210,7 +210,7 @@ func TestMySQLInsertMigration(t *testing.T) {
 	require.Equal(t, 1, count)
 }
 
-func TestMySQLDeleteMigration(t *testing.T) {
+func TestBigQueryDeleteMigration(t *testing.T) {
 	drv := testBigqueryDriver(t)
 	drv.migrationsTableName = "test_migrations_4"
 
@@ -233,7 +233,7 @@ func TestMySQLDeleteMigration(t *testing.T) {
 	require.Equal(t, 1, count)
 }
 
-func TestMySQLDatabaseExists(t *testing.T) {
+func TestBigQueryDatabaseExists(t *testing.T) {
 	drv := testBigqueryDriver(t)
 
 	// drop any existing database
