@@ -133,14 +133,14 @@ func NewApp() *cli.App {
 		{
 			Name:  "create",
 			Usage: "Create database",
-			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+			Action: action(func(db *dbmate.DB, _ *cli.Context) error {
 				return db.Create()
 			}),
 		},
 		{
 			Name:  "drop",
 			Usage: "Drop database (if it exists)",
-			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+			Action: action(func(db *dbmate.DB, _ *cli.Context) error {
 				return db.Drop()
 			}),
 		},
@@ -219,21 +219,21 @@ func NewApp() *cli.App {
 		{
 			Name:  "dump",
 			Usage: "Write the database schema to disk",
-			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+			Action: action(func(db *dbmate.DB, _ *cli.Context) error {
 				return db.DumpSchema()
 			}),
 		},
 		{
 			Name:  "load",
 			Usage: "Load schema file to the database",
-			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+			Action: action(func(db *dbmate.DB, _ *cli.Context) error {
 				return db.LoadSchema()
 			}),
 		},
 		{
 			Name:  "wait",
 			Usage: "Wait for the database to become available",
-			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+			Action: action(func(db *dbmate.DB, _ *cli.Context) error {
 				return db.Wait()
 			}),
 		},

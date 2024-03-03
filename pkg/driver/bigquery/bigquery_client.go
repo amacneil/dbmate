@@ -21,7 +21,7 @@ type bigQueryConfig struct {
 }
 
 func GetClient(ctx context.Context, uri string) (*bigquery.Client, error) {
-	config, err := configFromUri(uri)
+	config, err := configFromURI(uri)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func GetClient(ctx context.Context, uri string) (*bigquery.Client, error) {
 	return client, nil
 }
 
-func configFromUri(uri string) (*bigQueryConfig, error) {
+func configFromURI(uri string) (*bigQueryConfig, error) {
 	u, err := url.Parse(uri)
 	if err != nil {
 		return nil, invalidConnectionStringError(uri)

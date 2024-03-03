@@ -9,11 +9,12 @@ import (
 	"strings"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/amacneil/dbmate/v2/pkg/dbmate"
-	"github.com/amacneil/dbmate/v2/pkg/dbutil"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
-	_ "gorm.io/driver/bigquery"
+	_ "gorm.io/driver/bigquery" // database/sql driver
+
+	"github.com/amacneil/dbmate/v2/pkg/dbmate"
+	"github.com/amacneil/dbmate/v2/pkg/dbutil"
 )
 
 func init() {
@@ -54,7 +55,7 @@ func (drv *Driver) withBigQueryClient(operation func(context.Context, *bigquery.
 }
 
 // Helper function to check whether a table exists or not in a dataset
-func tableExists(client *bigquery.Client, ctx context.Context, datasetID, tableName string) (bool, error) {
+func tableExists(ctx context.Context, client *bigquery.Client, datasetID, tableName string) (bool, error) {
 	table := client.Dataset(datasetID).Table(tableName)
 	_, err := table.Metadata(ctx)
 	if err == nil {
@@ -98,9 +99,9 @@ func (drv *Driver) CreateDatabase() error {
 	return nil
 }
 
-func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
+func (drv *Driver) CreateMigrationsTable(*sql.DB) error {
 	tableExists := func(ctx context.Context, client *bigquery.Client) (bool, error) {
-		return tableExists(client, ctx, drv.datasetID, drv.migrationsTableName)
+		return tableExists(ctx, client, drv.datasetID, drv.migrationsTableName)
 	}
 
 	createTable := func(ctx context.Context, client *bigquery.Client) (bool, error) {
@@ -206,6 +207,11 @@ func generateDDL(db *sql.DB, projectID, datasetID, objectName, objectType string
 		}
 		defer dbutil.MustClose(rows)
 
+		// Check for any error that occurred during the query execution
+		if err := rows.Err(); err != nil {
+			return "", err
+		}
+
 		// Generate DDL for tables
 		for rows.Next() {
 			var columnName, dataType, isNullable string
@@ -271,6 +277,11 @@ func generateDDL(db *sql.DB, projectID, datasetID, objectName, objectType string
 			return "", err
 		}
 		defer dbutil.MustClose(paramRows)
+
+		// Check for any error that occurred during the query execution
+		if err := paramRows.Err(); err != nil {
+			return "", err
+		}
 
 		// Construct function parameters list
 		var paramList []string
@@ -363,9 +374,9 @@ func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
 	return script, nil
 }
 
-func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
+func (drv *Driver) MigrationsTableExists(*sql.DB) (bool, error) {
 	tableExists := func(ctx context.Context, client *bigquery.Client) (bool, error) {
-		return tableExists(client, ctx, drv.datasetID, drv.migrationsTableName)
+		return tableExists(ctx, client, drv.datasetID, drv.migrationsTableName)
 	}
 
 	exists, err := drv.withBigQueryClient(tableExists)

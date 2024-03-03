@@ -6,12 +6,13 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
-	"github.com/stretchr/testify/require"
 )
 
-func getUrl() string {
+func getURL() string {
 	return os.Getenv("BIGQUERY_TEST_URL")
 }
 
@@ -20,7 +21,7 @@ func getDbConnection(url string) (*sql.DB, error) {
 }
 
 func testBigqueryDriver(t *testing.T) *Driver {
-	u := dbutil.MustParseURL(getUrl())
+	u := dbutil.MustParseURL(getURL())
 	drv, err := dbmate.New(u).Driver()
 	require.NoError(t, err)
 
@@ -46,7 +47,7 @@ func prepTestDB(t *testing.T) *sql.DB {
 }
 
 func TestGetDriver(t *testing.T) {
-	db := dbmate.New(dbutil.MustParseURL(getUrl()))
+	db := dbmate.New(dbutil.MustParseURL(getURL()))
 	drvInterface, err := db.Driver()
 	require.NoError(t, err)
 
