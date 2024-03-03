@@ -20,7 +20,7 @@ services:
       MYSQL_TEST_URL: mysql://root:root@mysql/dbmate_test
       POSTGRES_TEST_URL: postgres://postgres:postgres@postgres/dbmate_test?sslmode=disable
       SQLITE_TEST_URL: sqlite3:/tmp/dbmate_test.sqlite3
-      BIGQUERY_TEST_URL: bigquery://test/dbmate_test?endpoint=http%3A%2F%2F0.0.0.0%3A9050&disable_auth=true
+      BIGQUERY_TEST_URL: bigquery://test/dbmate_test?endpoint=http%3A%2F%2Fbigquery%3A9050&disable_auth=true
 
   dbmate:
     build:
@@ -69,6 +69,6 @@ services:
   bigquery:
     image: ghcr.io/goccy/bigquery-emulator:0.4.4
     ports:
-      - "9050:9050"
+      - "0.0.0.0:9050:9050"
     command: |
       --project=test --dataset=dbmate_test
