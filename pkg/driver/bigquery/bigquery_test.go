@@ -25,6 +25,9 @@ func testBigqueryDriver(t *testing.T) *Driver {
 	drv, err := dbmate.New(u).Driver()
 	require.NoError(t, err)
 
+	_, err = drv.Open()
+	require.NoError(t, err)
+
 	return drv.(*Driver)
 }
 
@@ -54,16 +57,17 @@ func TestGetDriver(t *testing.T) {
 	// driver should have URL and default migrations table set
 	drv, ok := drvInterface.(*Driver)
 	require.True(t, ok)
-	require.Equal(t, db.DatabaseURL.String(), drv.databaseURL.String())
+	require.Equal(t, db.DatabaseURL.String(), drv.sqlConnectionURL)
 	require.Equal(t, "schema_migrations", drv.migrationsTableName)
 }
 
 func TestConnectionString(t *testing.T) {
-	cases := [4]string{
+	cases := [5]string{
 		"bigquery://projectid/dataset",
 		"bigquery://projectid/location/dataset",
 		"bigquery://projectid/dataset?endpoint=http%3A%2F%2F0.0.0.0%3A9050",
 		"bigquery://projectid/location/dataset?endpoint=http%3A%2F%2F0.0.0.0%3A9050&disable_auth=true",
+		"bigquery://bigquery:9050/test/dbmate_test?disable_auth=true",
 	}
 
 	for _, c := range cases {
@@ -134,7 +138,7 @@ func TestBigQueryCreateMigrationsTable(t *testing.T) {
 	drv := testBigqueryDriver(t)
 	drv.migrationsTableName = "test_migrations_1"
 
-	db, err := getDbConnection(drv.databaseURL.String())
+	db, err := getDbConnection(drv.databaseURL)
 	require.NoError(t, err)
 	defer dbutil.MustClose(db)
 
@@ -160,7 +164,7 @@ func TestBigQuerySelectMigrations(t *testing.T) {
 	drv := testBigqueryDriver(t)
 	drv.migrationsTableName = "test_migrations_2"
 
-	db, err := getDbConnection(drv.databaseURL.String())
+	db, err := getDbConnection(drv.databaseURL)
 	require.NoError(t, err)
 	defer dbutil.MustClose(db)
 
@@ -189,7 +193,7 @@ func TestBigQueryInsertMigration(t *testing.T) {
 	drv := testBigqueryDriver(t)
 	drv.migrationsTableName = "test_migrations_3"
 
-	db, err := getDbConnection(drv.databaseURL.String())
+	db, err := getDbConnection(drv.databaseURL)
 	require.NoError(t, err)
 	defer dbutil.MustClose(db)
 
@@ -214,7 +218,7 @@ func TestBigQueryDeleteMigration(t *testing.T) {
 	drv := testBigqueryDriver(t)
 	drv.migrationsTableName = "test_migrations_4"
 
-	db, err := getDbConnection(drv.databaseURL.String())
+	db, err := getDbConnection(drv.databaseURL)
 	require.NoError(t, err)
 	defer dbutil.MustClose(db)
 
