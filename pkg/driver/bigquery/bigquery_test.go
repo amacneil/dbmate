@@ -16,23 +16,16 @@ func getURL() string {
 	return os.Getenv("BIGQUERY_TEST_URL")
 }
 
-func getDbConnection(url string) (*sql.DB, error) {
-	return sql.Open("bigquery", url)
-}
-
-func testBigqueryDriver(t *testing.T) *Driver {
+func testBigQueryDriver(t *testing.T) *Driver {
 	u := dbutil.MustParseURL(getURL())
 	drv, err := dbmate.New(u).Driver()
-	require.NoError(t, err)
-
-	_, err = drv.Open()
 	require.NoError(t, err)
 
 	return drv.(*Driver)
 }
 
-func prepTestDB(t *testing.T) *sql.DB {
-	drv := testBigqueryDriver(t)
+func prepTestBigQueryDB(t *testing.T) *sql.DB {
+	drv := testBigQueryDriver(t)
 
 	// drop any existing database
 	err := drv.DropDatabase()
@@ -50,36 +43,42 @@ func prepTestDB(t *testing.T) *sql.DB {
 }
 
 func TestGetDriver(t *testing.T) {
-	db := dbmate.New(dbutil.MustParseURL(getURL()))
+	db := dbmate.New(dbutil.MustParseURL("bigquery://test/db_mate"))
 	drvInterface, err := db.Driver()
 	require.NoError(t, err)
 
 	// driver should have URL and default migrations table set
 	drv, ok := drvInterface.(*Driver)
 	require.True(t, ok)
-	require.Equal(t, db.DatabaseURL.String(), drv.sqlConnectionURL)
+	require.Equal(t, db.DatabaseURL.String(), drv.databaseURL.String())
 	require.Equal(t, "schema_migrations", drv.migrationsTableName)
 }
 
 func TestConnectionString(t *testing.T) {
-	cases := [5]string{
-		"bigquery://projectid/dataset",
-		"bigquery://projectid/location/dataset",
-		"bigquery://projectid/dataset?endpoint=http%3A%2F%2F0.0.0.0%3A9050",
-		"bigquery://projectid/location/dataset?endpoint=http%3A%2F%2F0.0.0.0%3A9050&disable_auth=true",
-		"bigquery://bigquery:9050/test/dbmate_test?disable_auth=true",
+	cases := []struct {
+		input    string
+		expected string
+	}{
+		{"bigquery://projectid/dataset", "bigquery://projectid/dataset?disable_auth=false"},
+		{"bigquery://projectid/location/dataset", "bigquery://projectid/location/dataset?disable_auth=false"},
+		{"bigquery://projectid/dataset?endpoint=http%3A%2F%2F0.0.0.0%3A9050", "bigquery://projectid/dataset?disable_auth=false"},
+		{"bigquery://projectid/location/dataset?endpoint=http%3A%2F%2F0.0.0.0%3A9050&disable_auth=true", "bigquery://projectid/location/dataset?disable_auth=true"},
+		{"bigquery://bigquery:9050/test/dbmate_test?disable_auth=true", "bigquery://test/dbmate_test?disable_auth=true&endpoint=http://bigquery:9050"},
+		{"bigquery://bigquery:9050/test/location/dbmate_test?disable_auth=true", "bigquery://test/location/dbmate_test?disable_auth=true&endpoint=http://bigquery:9050"},
 	}
 
 	for _, c := range cases {
-		t.Run(c, func(t *testing.T) {
-			_, err := url.Parse(c)
+		t.Run(c.input, func(t *testing.T) {
+			u, err := url.Parse(c.input)
 			require.NoError(t, err)
+
+			actual := connectionString(u)
+			require.Equal(t, c.expected, actual)
 		})
 	}
 }
-
 func TestBigQueryCreateDropDatabase(t *testing.T) {
-	drv := testBigqueryDriver(t)
+	drv := testBigQueryDriver(t)
 
 	// drop any existing database
 	err := drv.DropDatabase()
@@ -115,130 +114,8 @@ func TestBigQueryCreateDropDatabase(t *testing.T) {
 	}()
 }
 
-func TestBigqueryCreateAndInsertMigration(t *testing.T) {
-	drv := testBigqueryDriver(t)
-	drv.migrationsTableName = "test_migrations"
-
-	// prepare database
-	db := prepTestDB(t)
-	defer dbutil.MustClose(db)
-
-	// create migrations table
-	err := drv.CreateMigrationsTable(db)
-	require.NoError(t, err)
-
-	// insert migration
-	err = drv.InsertMigration(db, "abc1")
-	require.NoError(t, err)
-	err = drv.InsertMigration(db, "abc2")
-	require.NoError(t, err)
-}
-
-func TestBigQueryCreateMigrationsTable(t *testing.T) {
-	drv := testBigqueryDriver(t)
-	drv.migrationsTableName = "test_migrations_1"
-
-	db, err := getDbConnection(drv.databaseURL)
-	require.NoError(t, err)
-	defer dbutil.MustClose(db)
-
-	// migrations table should not exist
-	count := 0
-	err = db.QueryRow("select count(*) from test_migrations_1").Scan(&count)
-	require.Error(t, err)
-
-	// create table
-	err = drv.CreateMigrationsTable(db)
-	require.NoError(t, err)
-
-	// migrations table should exist
-	err = db.QueryRow("select count(*) from test_migrations_1").Scan(&count)
-	require.NoError(t, err)
-
-	// create table should be idempotent
-	err = drv.CreateMigrationsTable(db)
-	require.NoError(t, err)
-}
-
-func TestBigQuerySelectMigrations(t *testing.T) {
-	drv := testBigqueryDriver(t)
-	drv.migrationsTableName = "test_migrations_2"
-
-	db, err := getDbConnection(drv.databaseURL)
-	require.NoError(t, err)
-	defer dbutil.MustClose(db)
-
-	err = drv.CreateMigrationsTable(db)
-	require.NoError(t, err)
-
-	_, err = db.Exec(`insert into test_migrations_2 (version)
-		values ('abc2'), ('abc1'), ('abc3')`)
-	require.NoError(t, err)
-
-	migrations, err := drv.SelectMigrations(db, -1)
-	require.NoError(t, err)
-	require.Equal(t, true, migrations["abc1"])
-	require.Equal(t, true, migrations["abc2"])
-	require.Equal(t, true, migrations["abc2"])
-
-	// test limit param
-	migrations, err = drv.SelectMigrations(db, 1)
-	require.NoError(t, err)
-	require.Equal(t, true, migrations["abc3"])
-	require.Equal(t, false, migrations["abc1"])
-	require.Equal(t, false, migrations["abc2"])
-}
-
-func TestBigQueryInsertMigration(t *testing.T) {
-	drv := testBigqueryDriver(t)
-	drv.migrationsTableName = "test_migrations_3"
-
-	db, err := getDbConnection(drv.databaseURL)
-	require.NoError(t, err)
-	defer dbutil.MustClose(db)
-
-	err = drv.CreateMigrationsTable(db)
-	require.NoError(t, err)
-
-	count := 0
-	err = db.QueryRow("select count(*) from test_migrations_3").Scan(&count)
-	require.NoError(t, err)
-	require.Equal(t, 0, count)
-
-	// insert migration
-	err = drv.InsertMigration(db, "abc1")
-	require.NoError(t, err)
-
-	err = db.QueryRow("select count(*) from test_migrations_3 where version = 'abc1'").Scan(&count)
-	require.NoError(t, err)
-	require.Equal(t, 1, count)
-}
-
-func TestBigQueryDeleteMigration(t *testing.T) {
-	drv := testBigqueryDriver(t)
-	drv.migrationsTableName = "test_migrations_4"
-
-	db, err := getDbConnection(drv.databaseURL)
-	require.NoError(t, err)
-	defer dbutil.MustClose(db)
-
-	err = drv.CreateMigrationsTable(db)
-	require.NoError(t, err)
-
-	_, err = db.Exec(`insert into test_migrations_4 (version) values ('abc1'), ('abc2')`)
-	require.NoError(t, err)
-
-	err = drv.DeleteMigration(db, "abc2")
-	require.NoError(t, err)
-
-	count := 0
-	err = db.QueryRow("select count(*) from test_migrations_4").Scan(&count)
-	require.NoError(t, err)
-	require.Equal(t, 1, count)
-}
-
 func TestBigQueryDatabaseExists(t *testing.T) {
-	drv := testBigqueryDriver(t)
+	drv := testBigQueryDriver(t)
 
 	// drop any existing database
 	err := drv.DropDatabase()
@@ -257,4 +134,119 @@ func TestBigQueryDatabaseExists(t *testing.T) {
 	exists, err = drv.DatabaseExists()
 	require.NoError(t, err)
 	require.Equal(t, true, exists)
+}
+
+func TestBigQueryCreateMigrationsTable(t *testing.T) {
+	drv := testBigQueryDriver(t)
+	drv.migrationsTableName = "test_migrations"
+
+	db := prepTestBigQueryDB(t)
+	defer dbutil.MustClose(db)
+
+	// migrations table should not exist
+	count := 0
+	err := db.QueryRow("select count(*) from test_migrations").Scan(&count)
+	require.Error(t, err)
+	require.Regexp(t, "Table not found: test_migrations", err.Error())
+
+	// create table
+	err = drv.CreateMigrationsTable(db)
+	require.NoError(t, err)
+
+	// migrations table should exist
+	err = db.QueryRow("select count(*) from test_migrations").Scan(&count)
+	require.NoError(t, err)
+
+	// create table should be idempotent
+	err = drv.CreateMigrationsTable(db)
+	require.NoError(t, err)
+}
+
+func TestBigQuerySelectMigrations(t *testing.T) {
+	drv := testBigQueryDriver(t)
+	drv.migrationsTableName = "test_migrations"
+
+	db := prepTestBigQueryDB(t)
+	defer dbutil.MustClose(db)
+
+	err := drv.CreateMigrationsTable(db)
+	require.NoError(t, err)
+
+	_, err = db.Exec(`insert into test_migrations (version)
+		values ('abc2'), ('abc1'), ('abc3')`)
+	require.NoError(t, err)
+
+	migrations, err := drv.SelectMigrations(db, -1)
+	require.NoError(t, err)
+	require.Equal(t, true, migrations["abc1"])
+	require.Equal(t, true, migrations["abc2"])
+	require.Equal(t, true, migrations["abc2"])
+
+	// test limit param
+	migrations, err = drv.SelectMigrations(db, 1)
+	require.NoError(t, err)
+	require.Equal(t, true, migrations["abc3"])
+	require.Equal(t, false, migrations["abc1"])
+	require.Equal(t, false, migrations["abc2"])
+}
+
+func TestBigQueryInsertMigration(t *testing.T) {
+	drv := testBigQueryDriver(t)
+	drv.migrationsTableName = "test_migrations"
+
+	db := prepTestBigQueryDB(t)
+	defer dbutil.MustClose(db)
+
+	err := drv.CreateMigrationsTable(db)
+	require.NoError(t, err)
+
+	count := 0
+	err = db.QueryRow("select count(*) from test_migrations").Scan(&count)
+	require.NoError(t, err)
+	require.Equal(t, 0, count)
+
+	// insert migration
+	err = drv.InsertMigration(db, "abc1")
+	require.NoError(t, err)
+
+	err = db.QueryRow("select count(*) from test_migrations where version = 'abc1'").
+		Scan(&count)
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+}
+
+func TestBigQueryDeleteMigration(t *testing.T) {
+	drv := testBigQueryDriver(t)
+	drv.migrationsTableName = "test_migrations"
+
+	db := prepTestBigQueryDB(t)
+	defer dbutil.MustClose(db)
+
+	err := drv.CreateMigrationsTable(db)
+	require.NoError(t, err)
+
+	_, err = db.Exec(`insert into test_migrations (version)
+		values ('abc1'), ('abc2')`)
+	require.NoError(t, err)
+
+	err = drv.DeleteMigration(db, "abc2")
+	require.NoError(t, err)
+
+	count := 0
+	err = db.QueryRow("select count(*) from test_migrations").Scan(&count)
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+}
+
+func TestBigQueryPing(t *testing.T) {
+	drv := testBigQueryDriver(t)
+
+	// drop any existing database
+	err := drv.DropDatabase()
+	require.NoError(t, err)
+
+	// ping database
+	err = drv.Ping()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "dataset dbmate_test is not found")
 }
