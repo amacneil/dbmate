@@ -82,7 +82,7 @@ jobs:
           path: dist/dbmate-*
 
       - name: Publish binaries
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         if: ${{ startsWith(github.ref, 'refs/tags/v') }}
         with:
           files: dist/dbmate-*
