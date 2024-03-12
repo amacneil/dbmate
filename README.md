@@ -23,6 +23,7 @@ For a comparison between dbmate and other popular database schema migration tool
     - [SQLite](#sqlite)
     - [ClickHouse](#clickhouse)
   - [Creating Migrations](#creating-migrations)
+  - [Migration Templates](#migration-templates)
   - [Running Migrations](#running-migrations)
   - [Rolling Back Migrations](#rolling-back-migrations)
   - [Migration Options](#migration-options)
@@ -147,6 +148,7 @@ The following options are available with all commands. You must use command line
 - `--strict` - fail if migrations would be applied out of order _(env: `DBMATE_STRICT`)_
 - `--wait` - wait for the db to become available before executing the subsequent command _(env: `DBMATE_WAIT`)_
 - `--wait-timeout 60s` - timeout for --wait flag _(env: `DBMATE_WAIT_TIMEOUT`)_
+- `--templates-dir, "~/.config/dbmate"` - where template files (`.tmpl`) are stored. _(env: `DBMATE_TEMPLATES_DIR`)_
 
 ## Usage
 
@@ -311,6 +313,47 @@ create table users (
 ```
 
 > Note: Migration files are named in the format `[version]_[description].sql`. Only the version (defined as all leading numeric characters in the file name) is recorded in the database, so you can safely rename a migration file without having any effect on its current application state.
+
+### Migration Templates
+
+By default, dbmate generates a relatively blank migration file. With `.tmpl` files, you can now generate migrations based off of a template.
+
+Consider:
+
+`~/.config/dbmate/create.tmpl`
+```sql
+-- migrate:up
+create table {{ .Schema }}.{{ .Name }} (
+  id integer,
+  name varchar(255),
+  email varchar(255) not null
+);
+-- migrate:down
+drop table if exists {{ .Schema }}.{{ .Name }};
+```
+
+To use the template, pass the `-t` flag and any keys using the `--set` flag.
+For example:
+
+```sh
+dbmate --templates-dir ~/.config/dbmate new -t create --set "Schema=public" --set "Name=users" create_users
+```
+
+This will produce the migration file:
+
+
+```sql
+-- migrate:up
+create table public.users (
+  id integer,
+  name varchar(255),
+  email varchar(255) not null
+);
+-- migrate:down
+drop table if exists public.users
+```
+
+Make sure to include the `-- migrate:up` and `-- migrate:down` lines in every template you create.
 
 ### Running Migrations
 
