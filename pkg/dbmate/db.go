@@ -13,6 +13,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/amacneil/dbmate/v2/pkg/dbmate/internal"
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
 )
 
@@ -379,7 +380,12 @@ func (db *DB) Migrate() error {
 
 		execMigration := func(tx dbutil.Transaction) error {
 			// run actual migration
-			result, err := tx.Exec(parsed.Up)
+			upScript, err := db.resolveRefs(parsed.Up, parsed.UpOptions.EnvVars())
+			if err != nil {
+				return err
+			}
+
+			result, err := tx.Exec(upScript)
 			if err != nil {
 				return drv.QueryError(parsed.Up, err)
 			} else if db.Verbose {
@@ -409,6 +415,11 @@ func (db *DB) Migrate() error {
 	}
 
 	return nil
+}
+
+func (db *DB) resolveRefs(snippet string, envVars []string) (string, error) {
+	envMap := internal.GetEnvMap()
+	return internal.ResolveRefs(snippet, envVars, envMap)
 }
 
 func (db *DB) printVerbose(result sql.Result) {
@@ -541,7 +552,13 @@ func (db *DB) Rollback() error {
 
 	execMigration := func(tx dbutil.Transaction) error {
 		// rollback migration
-		result, err := tx.Exec(parsed.Down)
+		downScript, err := db.resolveRefs(parsed.Down, parsed.DownOptions.EnvVars())
+		if err != nil {
+			return err
+		}
+
+		result, err := tx.Exec(downScript)
+
 		if err != nil {
 			return drv.QueryError(parsed.Down, err)
 		} else if db.Verbose {

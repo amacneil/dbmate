@@ -65,9 +65,11 @@ drop table users;
 
 		require.Equal(t, "--migrate:up\ncreate table users (id serial, name text);\n\n", parsed.Up)
 		require.Equal(t, true, parsed.UpOptions.Transaction())
+		require.Equal(t, []string{}, parsed.UpOptions.EnvVars())
 
 		require.Equal(t, "--migrate:down\ndrop table users;\n", parsed.Down)
 		require.Equal(t, true, parsed.DownOptions.Transaction())
+		require.Equal(t, []string{}, parsed.UpOptions.EnvVars())
 	})
 
 	t.Run("require up before down", func(t *testing.T) {
@@ -98,6 +100,56 @@ ALTER TYPE colors ADD VALUE 'orange' AFTER 'red';
 
 		require.Equal(t, "-- migrate:down transaction:false\nALTER TYPE colors ADD VALUE 'orange' AFTER 'red';\n", parsed.Down)
 		require.Equal(t, false, parsed.DownOptions.Transaction())
+	})
+
+	t.Run("support activating env vars", func(t *testing.T) {
+		migration := `-- migrate:up env:THE_ROLE env:THE_PASSWORD
+create role '{{ .THE_ROLE }}' login password '{{ .THE_PASSWORD }}';
+-- migrate:down env:THE_ROLE
+drop role '{{ .THE_ROLE }}';
+`
+
+		parsed, err := parseMigrationContents(migration)
+		require.Nil(t, err)
+
+		// the env variables activated by the migration header
+		// are available for templating
+
+		require.Equal(t, "-- migrate:up env:THE_ROLE env:THE_PASSWORD\ncreate role '{{ .THE_ROLE }}' login password '{{ .THE_PASSWORD }}';\n", parsed.Up)
+		require.Equal(t, []string{"THE_ROLE", "THE_PASSWORD"}, parsed.UpOptions.EnvVars())
+
+		require.Equal(t, "-- migrate:down env:THE_ROLE\ndrop role '{{ .THE_ROLE }}';\n", parsed.Down)
+		require.Equal(t, []string{"THE_ROLE"}, parsed.DownOptions.EnvVars())
+	})
+
+	t.Run("support referring env vars not enabled", func(t *testing.T) {
+		migration := `-- migrate:up env:THE_PASSWORD
+create role '{{ or (index . "THE_ROLE") "Fred" }}' login password '{{ .THE_PASSWORD }}';
+-- migrate:down
+`
+
+		parsed, err := parseMigrationContents(migration)
+		require.Nil(t, err)
+
+		// the env variable "THE_ROLE" not enabled within the header
+		// is not made available for templating
+		require.Equal(t, "-- migrate:up env:THE_PASSWORD\ncreate role '{{ or (index . \"THE_ROLE\") \"Fred\" }}' login password '{{ .THE_PASSWORD }}';\n", parsed.Up)
+		require.Equal(t, []string{"THE_PASSWORD"}, parsed.UpOptions.EnvVars())
+	})
+
+	t.Run("support declaring unused env vars", func(t *testing.T) {
+		migration := `-- migrate:up env:THE_ROLE
+create role 'Fred';
+-- migrate:down
+`
+
+		parsed, err := parseMigrationContents(migration)
+		require.Nil(t, err)
+
+		// declaring an env variable makes it available for templating
+		// regardless it is actually referred within the migration script
+		require.Equal(t, "-- migrate:up env:THE_ROLE\ncreate role 'Fred';\n", parsed.Up)
+		require.Equal(t, []string{"THE_ROLE"}, parsed.UpOptions.EnvVars())
 	})
 
 	t.Run("require migrate blocks", func(t *testing.T) {
