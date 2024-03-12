@@ -95,12 +95,12 @@ func NewApp() *cli.App {
 			Usage:   "timeout for --wait flag",
 			Value:   defaultDB.WaitTimeout,
 		},
-    &cli.StringFlag{
-      Name:    "templates-dir",
-      EnvVars: []string{"DBMATE_TEMPLATES_DIR"},
-      Value:   defaultDB.TemplatesDir,
-      Usage:   "specify the directory containing template files",
-    },
+		&cli.StringFlag{
+			Name:    "templates-dir",
+			EnvVars: []string{"DBMATE_TEMPLATES_DIR"},
+			Value:   defaultDB.TemplatesDir,
+			Usage:   "specify the directory containing template files",
+		},
 	}
 
 	app.Commands = []*cli.Command{
@@ -108,25 +108,25 @@ func NewApp() *cli.App {
 			Name:    "new",
 			Aliases: []string{"n"},
 			Usage:   "Generate a new migration file",
-      Flags: []cli.Flag{
-        &cli.StringFlag{
-          Name:    "template",
-          Aliases: []string{"t"},
-          Usage:   "specify the name of the template file",
-        },
-        &cli.StringSliceFlag{
-          Name: "set",
-          Usage: "set template values using key=value pairs",
-        },
-      },
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:    "template",
+					Aliases: []string{"t"},
+					Usage:   "specify the name of the template file",
+				},
+				&cli.StringSliceFlag{
+					Name:  "set",
+					Usage: "set template values using key=value pairs",
+				},
+			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
 				name := c.Args().First()
-        template := c.String("template")
+				template := c.String("template")
 
-        if template != "" {
-          options := c.StringSlice("set")
-          return db.NewMigrationFromTemplate(name, template, options)
-        }
+				if template != "" {
+					options := c.StringSlice("set")
+					return db.NewMigrationFromTemplate(name, template, options)
+				}
 
 				return db.NewMigration(name)
 			}),
@@ -319,7 +319,7 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 		db.MigrationsDir = c.StringSlice("migrations-dir")
 		db.MigrationsTableName = c.String("migrations-table")
 		db.SchemaFile = c.String("schema-file")
-    db.TemplatesDir = c.String("templates-dir")
+		db.TemplatesDir = c.String("templates-dir")
 		db.WaitBefore = c.Bool("wait")
 		waitTimeout := c.Duration("wait-timeout")
 		if waitTimeout != 0 {

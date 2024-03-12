@@ -30,8 +30,8 @@ var (
 	ErrMigrationDirNotFound  = errors.New("could not find migrations directory")
 	ErrMigrationNotFound     = errors.New("can't find migration file")
 	ErrCreateDirectory       = errors.New("unable to create directory")
-  ErrTemplateNotFound      = errors.New("could not find template file")
-  ErrMalformedParameters   = errors.New("template parameters are malformed, must be key=value pairs")
+	ErrTemplateNotFound      = errors.New("could not find template file")
+	ErrMalformedParameters   = errors.New("template parameters are malformed, must be key=value pairs")
 )
 
 // migrationFileRegexp pattern for valid migration files
@@ -55,8 +55,8 @@ type DB struct {
 	SchemaFile string
 	// Fail if migrations would be applied out of order
 	Strict bool
-  // TemplatesDir specifies the directory to find template files
-  TemplatesDir string
+	// TemplatesDir specifies the directory to find template files
+	TemplatesDir string
 	// Verbose prints the result of each statement execution
 	Verbose bool
 	// WaitBefore will wait for database to become available before running any actions
@@ -84,7 +84,7 @@ func New(databaseURL *url.URL) *DB {
 		MigrationsTableName: "schema_migrations",
 		SchemaFile:          "./db/schema.sql",
 		Strict:              false,
-    TemplatesDir:        "~/.config/dbmate/templates",
+		TemplatesDir:        "~/.config/dbmate/templates",
 		Verbose:             false,
 		WaitBefore:          false,
 		WaitInterval:        time.Second,
@@ -275,7 +275,7 @@ func ensureDir(dir string) error {
 const migrationTemplate = "-- migrate:up\n\n\n-- migrate:down\n\n"
 
 func (db *DB) newMigrationFile(name string) (*os.File, error) {
-  // new migration name
+	// new migration name
 	timestamp := time.Now().UTC().Format("20060102150405")
 	if name == "" {
 		return nil, ErrNoMigrationName
@@ -318,51 +318,50 @@ func (db *DB) NewMigration(name string) error {
 //
 // [Text Template]: https://pkg.go.dev/text/template
 func (db *DB) NewMigrationFromTemplate(name, templateName string, options []string) error {
-  // Convert the input into a map
-  data := make(map[string]string)
-    for _, input := range options {
-      parts := strings.SplitN(input, "=", 2)
-      if len(parts) == 2 {
-        data[parts[0]] = parts[1]
-      } else {
-        return ErrMalformedParameters
-      }
-    }
+	// Convert the input into a map
+	data := make(map[string]string)
+	for _, input := range options {
+		parts := strings.SplitN(input, "=", 2)
+		if len(parts) == 2 {
+			data[parts[0]] = parts[1]
+		} else {
+			return ErrMalformedParameters
+		}
+	}
 
-  // Add the extension
-  templateFile := fmt.Sprintf("%s.tmpl", templateName)
-  path := filepath.Join(db.TemplatesDir, templateFile)
+	// Add the extension
+	templateFile := fmt.Sprintf("%s.tmpl", templateName)
+	path := filepath.Join(db.TemplatesDir, templateFile)
 
-  // Confirm file exists
-  if _, err := os.Stat(path); os.IsNotExist(err) {
-    return ErrTemplateNotFound
-  }
+	// Confirm file exists
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return ErrTemplateNotFound
+	}
 
-  // Parse the templates directory and any subdirectories
-  templates, err := template.ParseGlob(fmt.Sprintf("%s/*.tmpl", db.TemplatesDir))
+	// Parse the templates directory and any subdirectories
+	templates, err := template.ParseGlob(fmt.Sprintf("%s/*.tmpl", db.TemplatesDir))
 
-  if err != nil {
-    return err
-  }
+	if err != nil {
+		return err
+	}
 
-  // Create the migration
+	// Create the migration
 	file, err := db.newMigrationFile(name)
 
-  if err != nil {
+	if err != nil {
 		return err
 	}
 
 	defer dbutil.MustClose(file)
 
-  // Default any missing keys to the default
-  templates.Option("missingkey=zero")
+	// Default any missing keys to the default
+	templates.Option("missingkey=zero")
 
-  // Execute and write out the template
-  err = templates.ExecuteTemplate(file, templateFile, data)
+	// Execute and write out the template
+	err = templates.ExecuteTemplate(file, templateFile, data)
 
 	return err
 }
-
 
 func doTransaction(sqlDB *sql.DB, txFunc func(dbutil.Transaction) error) error {
 	tx, err := sqlDB.Begin()
