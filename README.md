@@ -22,6 +22,7 @@ For a comparison between dbmate and other popular database schema migration tool
     - [MySQL](#mysql)
     - [SQLite](#sqlite)
     - [ClickHouse](#clickhouse)
+    - [BigQuery](#bigquery)
   - [Creating Migrations](#creating-migrations)
   - [Running Migrations](#running-migrations)
   - [Rolling Back Migrations](#rolling-back-migrations)
@@ -286,6 +287,28 @@ DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_clu
 ```
 
 [See other supported connection options](https://github.com/ClickHouse/clickhouse-go#dsn).
+
+#### BigQuery
+Follow the following format for `DATABASE_URL` when connecting to actual BigQuery in GCP:
+
+```
+bigquery://projectid/location/dataset?disable_auth=true
+```
+`projectid` (mandatory) - Project ID
+
+`dataset` (mandatory) - Dataset Name within the Project
+
+`location` (optional) - Where Dataset is created
+
+`disable_auth` (optional) - Pass `true` to skip Authentication, use only for testing or connecting to emulator.
+
+*NOTE: Follow [this doc](https://cloud.google.com/docs/authentication/provide-credentials-adc) on how to set `GOOGLE_APPLICATION_CREDENTIALS` environment variable for proper Authentication*
+
+Follow the following format if trying to connect to a custom endpoint e.g. [BigQuery Emulator](https://github.com/goccy/bigquery-emulator)
+
+```
+bigquery://host:port/projectid/location/dataset
+```
 
 ### Creating Migrations
 
