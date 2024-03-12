@@ -6,51 +6,36 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
+	"sync"
+	"unsafe"
 
 	"cloud.google.com/go/bigquery"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
-	"google.golang.org/api/option"
 	_ "gorm.io/driver/bigquery" // database/sql driver
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
 )
 
-type Driver struct {
-	migrationsTableName string
-	datasetID           string
-	projectID           string
-	log                 io.Writer
-	databaseURL         *url.URL
-	client              *bigquery.Client
-	context             *context.Context
-}
-
-type bigQueryConfig struct {
-	projectID   string
-	location    string
-	dataSet     string
-	scopes      []string
-	endpoint    string
-	disableAuth bool
-}
-
 func init() {
 	dbmate.RegisterDriver(NewDriver, "bigquery")
 }
 
-func NewDriver(config dbmate.DriverConfig) dbmate.Driver {
-	c, _ := configFromURI(config.DatabaseURL)
+type Driver struct {
+	migrationsTableName string
+	databaseURL         *url.URL
+	log                 io.Writer
+}
 
+func NewDriver(config dbmate.DriverConfig) dbmate.Driver {
 	return &Driver{
 		migrationsTableName: config.MigrationsTableName,
-		datasetID:           c.dataSet,
-		projectID:           c.projectID,
-		log:                 config.Log,
 		databaseURL:         config.DatabaseURL,
+		log:                 config.Log,
 	}
 }
 
@@ -66,30 +51,89 @@ func (drv *Driver) CreateDatabase() error {
 		return err
 	}
 
-	if !exists {
-		err := drv.client.Dataset(drv.datasetID).Create(*drv.context, &bigquery.DatasetMetadata{})
+	if exists {
+		return nil
+	}
+
+	ctx := context.Background()
+	con, err := db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer con.Close()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	err = con.Raw(func(driverConn any) error {
+		defer wg.Done()
+
+		client := getClient(driverConn)
+		dataset := getDataset(driverConn)
+		err := client.Dataset(dataset).Create(ctx, &bigquery.DatasetMetadata{})
 		if err != nil {
 			return err
 		}
+		return nil
+	})
+
+	wg.Wait()
+
+	if err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func (drv *Driver) CreateMigrationsTable(*sql.DB) error {
-	err := addBigQueryClientToDriver(drv)
+func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
+	ctx := context.Background()
+
+	con, err := db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer con.Close()
+
+	//check if the table exists
+	var exists bool
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	err = con.Raw(func(driverConn any) error {
+		defer wg.Done()
+
+		client := getClient(driverConn)
+		dataset := getDataset(driverConn)
+		exists, err = tableExists(client, dataset, drv.migrationsTableName)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	wg.Wait()
+
 	if err != nil {
 		return err
 	}
 
-	exists, err := tableExists(*drv.context, drv.client, drv.datasetID, drv.migrationsTableName)
-	if err != nil {
-		return err
+	//if already exists then return early
+	if exists {
+		return nil
 	}
 
-	if !exists {
-		table := drv.client.Dataset(drv.datasetID).Table(drv.migrationsTableName)
-		err := table.Create(*drv.context, &bigquery.TableMetadata{
+	wg.Add(1)
+
+	//if here then does not exist so create table
+	err = con.Raw(func(driverConn any) error {
+		defer wg.Done()
+
+		client := getClient(driverConn)
+		dataset := getDataset(driverConn)
+		table := client.Dataset(dataset).Table(drv.migrationsTableName)
+		err := table.Create(ctx, &bigquery.TableMetadata{
 			Schema: bigquery.Schema{
 				{
 					Name: "version",
@@ -100,8 +144,13 @@ func (drv *Driver) CreateMigrationsTable(*sql.DB) error {
 		if err != nil {
 			return err
 		}
-
 		return nil
+	})
+
+	wg.Wait()
+
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -114,21 +163,47 @@ func (drv *Driver) DatabaseExists() (bool, error) {
 	}
 	defer dbutil.MustClose(db)
 
-	it := drv.client.Datasets(*drv.context)
-	for {
-		dataset, err := it.Next()
-		if err == iterator.Done {
-			break
+	ctx := context.Background()
+
+	con, err := db.Conn(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer con.Close()
+
+	var exists bool
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	err = con.Raw(func(driverConn any) error {
+		defer wg.Done()
+
+		client := getClient(driverConn)
+		datasetID := getDataset(driverConn)
+		it := client.Datasets(ctx)
+		for {
+			dataset, err := it.Next()
+			if err == iterator.Done {
+				exists = false
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			if dataset.DatasetID == datasetID {
+				exists = true
+				return nil
+			}
 		}
-		if err != nil {
-			return false, err
-		}
-		if dataset.DatasetID == drv.datasetID {
-			return true, nil
-		}
+	})
+
+	wg.Wait()
+
+	if err != nil {
+		return exists, err
 	}
 
-	return false, nil
+	return exists, nil
 }
 
 func (drv *Driver) DropDatabase() error {
@@ -143,17 +218,68 @@ func (drv *Driver) DropDatabase() error {
 		return err
 	}
 
-	if exists {
-		err := drv.client.Dataset(drv.datasetID).DeleteWithContents(*drv.context)
+	if !exists {
+		return nil
+	}
+
+	ctx := context.Background()
+
+	con, err := db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer con.Close()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	err = con.Raw(func(driverConn any) error {
+		defer wg.Done()
+
+		client := getClient(driverConn)
+		dataset := getDataset(driverConn)
+		err := client.Dataset(dataset).DeleteWithContents(ctx)
 		if err != nil {
 			return err
 		}
+		return nil
+	})
+
+	wg.Wait()
+
+	if err != nil {
+		return err
 	}
 
 	return nil
 }
 
 func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
+	ctx := context.Background()
+	con, err := db.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer con.Close()
+
+	var projectID, datasetID string
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	err = con.Raw(func(driverConn any) error {
+		defer wg.Done()
+
+		projectID = getProjectID(driverConn)
+		datasetID = getDataset(driverConn)
+		return nil
+	})
+
+	wg.Wait()
+
+	if err != nil {
+		return nil, err
+	}
+
 	var script []byte
 
 	query := fmt.Sprintf(`
@@ -182,7 +308,7 @@ func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
 		FROM
 			`+"`%s.%s.INFORMATION_SCHEMA.ROUTINES`"+`
 		ORDER BY
-			order_type;`, drv.projectID, drv.datasetID, drv.projectID, drv.datasetID, drv.projectID, drv.datasetID)
+			order_type;`, projectID, datasetID, projectID, datasetID, projectID, datasetID)
 
 	// Execute the query
 	rows, err := db.Query(query)
@@ -200,7 +326,7 @@ func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
 		}
 
 		// Generate DDL for the object
-		ddl, err := generateDDL(db, drv.projectID, drv.datasetID, objectName, objectType)
+		ddl, err := generateDDL(db, projectID, datasetID, objectName, objectType)
 		if err != nil {
 			return nil, fmt.Errorf("error generating DDL for %s %s: %v", objectName, objectType, err)
 		}
@@ -217,13 +343,34 @@ func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
 	return script, nil
 }
 
-func (drv *Driver) MigrationsTableExists(*sql.DB) (bool, error) {
-	err := addBigQueryClientToDriver(drv)
-	if err != nil {
-		return false, err
-	}
+func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
+	var exists bool
 
-	exists, err := tableExists(*drv.context, drv.client, drv.datasetID, drv.migrationsTableName)
+	ctx := context.Background()
+
+	con, err := db.Conn(ctx)
+	if err != nil {
+		return exists, err
+	}
+	defer con.Close()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	err = con.Raw(func(driverConn any) error {
+		defer wg.Done()
+
+		client := getClient(driverConn)
+		dataset := getDataset(driverConn)
+		exists, err = tableExists(client, dataset, drv.migrationsTableName)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	wg.Wait()
+
 	if err != nil {
 		return exists, err
 	}
@@ -231,29 +378,94 @@ func (drv *Driver) MigrationsTableExists(*sql.DB) (bool, error) {
 	return exists, nil
 }
 
-func (drv *Driver) DeleteMigration(db dbutil.Transaction, version string) error {
-	query := fmt.Sprintf("DELETE FROM %s.%s WHERE version = '%s';", drv.datasetID, drv.migrationsTableName, version)
-	_, err := db.Exec(query)
+func (drv *Driver) DeleteMigration(util dbutil.Transaction, version string) error {
+	db, err := drv.Open()
+	if err != nil {
+		return err
+	}
+	defer dbutil.MustClose(db)
 
-	return err
+	ctx := context.Background()
+
+	con, err := db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer con.Close()
+
+	var dataset string
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	err = con.Raw(func(driverConn any) error {
+		defer wg.Done()
+
+		dataset = getDataset(driverConn)
+		return nil
+	})
+
+	wg.Wait()
+
+	if err != nil {
+		return err
+	}
+
+	query := fmt.Sprintf("DELETE FROM %s.%s WHERE version = '%s';", dataset, drv.migrationsTableName, version)
+	_, err = util.Exec(query)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (drv *Driver) InsertMigration(db dbutil.Transaction, version string) error {
-	queryTemplate := `INSERT INTO %s.%s (version) VALUES ('%s');`
-	queryString := fmt.Sprintf(queryTemplate, drv.datasetID, drv.migrationsTableName, version)
+func (drv *Driver) InsertMigration(_ dbutil.Transaction, version string) error {
+	db, err := drv.Open()
+	if err != nil {
+		return err
+	}
+	defer dbutil.MustClose(db)
 
-	_, err := db.Exec(queryString, version)
-	return err
+	ctx := context.Background()
+	con, err := db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer con.Close()
+
+	var dataset string
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	err = con.Raw(func(driverConn any) error {
+		defer wg.Done()
+
+		dataset = getDataset(driverConn)
+		return nil
+	})
+
+	wg.Wait()
+
+	if err != nil {
+		return err
+	}
+
+	queryTemplate := `INSERT INTO %s.%s (version) VALUES ('%s');`
+	queryString := fmt.Sprintf(queryTemplate, dataset, drv.migrationsTableName, version)
+
+	_, err = db.Exec(queryString, version)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (drv *Driver) Open() (*sql.DB, error) {
 	connString := connectionString(drv.databaseURL)
 	con, err := sql.Open("bigquery", connString)
-	if err != nil {
-		return nil, err
-	}
-
-	err = addBigQueryClientToDriver(drv)
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +490,31 @@ func (*Driver) QueryError(query string, err error) error {
 }
 
 func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
-	query := fmt.Sprintf("SELECT version FROM %s.%s ORDER BY version DESC", drv.datasetID, drv.migrationsTableName)
+	ctx := context.Background()
+	con, err := db.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer con.Close()
+
+	var dataset string
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	err = con.Raw(func(driverConn any) error {
+		defer wg.Done()
+
+		dataset = getDataset(driverConn)
+		return nil
+	})
+
+	wg.Wait()
+
+	if err != nil {
+		return nil, err
+	}
+
+	query := fmt.Sprintf("SELECT version FROM %s.%s ORDER BY version DESC", dataset, drv.migrationsTableName)
 	if limit >= 0 {
 		query = fmt.Sprintf("%s limit %d", query, limit)
 	}
@@ -304,87 +540,6 @@ func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, err
 	}
 
 	return migrations, nil
-}
-
-func addBigQueryClientToDriver(drv *Driver) error {
-	config, err := configFromURI(drv.databaseURL)
-	if err != nil {
-		return err
-	}
-
-	if drv.client == nil || drv.context == nil {
-		ctx := context.Background()
-		client, err := getClient(ctx, config)
-		if err != nil {
-			return err
-		}
-
-		drv.client = client
-		drv.context = &ctx
-	}
-
-	return nil
-}
-
-func configFromURI(dbURL *url.URL) (*bigQueryConfig, error) {
-	invalidErrorMessage := "invalid connection string: %s"
-
-	uri := dbURL.String()
-
-	u, err := dbURL.Parse(uri)
-	if err != nil {
-		return nil, fmt.Errorf(invalidErrorMessage, uri)
-	}
-
-	if u.Scheme != "bigquery" {
-		return nil, fmt.Errorf("invalid prefix, expected bigquery:// got: %s", uri)
-	}
-
-	if u.Path == "" {
-		return nil, fmt.Errorf(invalidErrorMessage, uri)
-	}
-
-	fields := strings.Split(strings.TrimPrefix(u.Path, "/"), "/")
-	if len(fields) > 3 {
-		return nil, fmt.Errorf(invalidErrorMessage, uri)
-	}
-
-	config := &bigQueryConfig{
-		projectID:   u.Hostname(),
-		dataSet:     fields[len(fields)-1],
-		disableAuth: u.Query().Get("disable_auth") == "true",
-	}
-
-	if u.Port() != "" {
-		config.endpoint = fmt.Sprintf("http://%s:%s", u.Hostname(), u.Port())
-		config.projectID = fields[0]
-		if len(fields) == 3 {
-			config.location = fields[1]
-		}
-	} else {
-		if len(fields) == 2 {
-			config.location = fields[0]
-		}
-	}
-
-	return config, nil
-}
-
-func getClient(ctx context.Context, config *bigQueryConfig) (*bigquery.Client, error) {
-	opts := []option.ClientOption{option.WithScopes(config.scopes...)}
-	if config.endpoint != "" {
-		opts = append(opts, option.WithEndpoint(config.endpoint))
-	}
-	if config.disableAuth {
-		opts = append(opts, option.WithoutAuthentication())
-	}
-
-	client, err := bigquery.NewClient(ctx, config.projectID, opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	return client, nil
 }
 
 func generateDDL(db *sql.DB, projectID, datasetID, objectName, objectType string) (string, error) {
@@ -515,9 +670,9 @@ func generateDDL(db *sql.DB, projectID, datasetID, objectName, objectType string
 }
 
 // Helper function to check whether a table exists or not in a dataset
-func tableExists(ctx context.Context, client *bigquery.Client, datasetID, tableName string) (bool, error) {
+func tableExists(client *bigquery.Client, datasetID, tableName string) (bool, error) {
 	table := client.Dataset(datasetID).Table(tableName)
-	_, err := table.Metadata(ctx)
+	_, err := table.Metadata(context.Background())
 	if err == nil {
 		return true, nil
 	}
@@ -527,18 +682,55 @@ func tableExists(ctx context.Context, client *bigquery.Client, datasetID, tableN
 	return false, err
 }
 
-func connectionString(url *url.URL) string {
-	c, _ := configFromURI(url)
+func connectionString(u *url.URL) string {
+	var params, locationPath string
 
-	params := fmt.Sprintf("disable_auth=%s", strconv.FormatBool(c.disableAuth))
-	if c.endpoint != "" {
-		params += fmt.Sprintf("&endpoint=%s", c.endpoint)
+	fields := strings.Split(strings.TrimPrefix(u.Path, "/"), "/")
+	projectID := u.Hostname()
+	dataset := fields[len(fields)-1]
+	disableAuth := u.Query().Get("disable_auth") == "true"
+
+	if disableAuth {
+		params += fmt.Sprintf("?disable_auth=%s", strconv.FormatBool(disableAuth))
 	}
 
-	var locationParam string
-	if c.location != "" {
-		locationParam = "/" + c.location
+	if u.Port() != "" {
+		if disableAuth {
+			params += "&"
+		} else {
+			params += "?"
+		}
+		params += "endpoint=" + url.QueryEscape(fmt.Sprintf("http://%s:%s", u.Hostname(), u.Port()))
+		projectID = fields[0]
+		if len(fields) == 3 {
+			locationPath = "/" + fields[1]
+		}
+	} else {
+		if len(fields) == 2 {
+			locationPath = "/" + fields[0]
+		}
 	}
 
-	return fmt.Sprintf("bigquery://%s%s/%s?%s", c.projectID, locationParam, c.dataSet, params)
+	return fmt.Sprintf("bigquery://%s%s/%s%s", projectID, locationPath, dataset, params)
+}
+
+func getClient(con any) *bigquery.Client {
+	value := reflect.ValueOf(con).Elem().FieldByName("client")
+	value = reflect.NewAt(value.Type(), unsafe.Pointer(value.UnsafeAddr())).Elem()
+	client := value.Interface().(*bigquery.Client)
+	return client
+}
+
+func getConfigValue(con any, field string) reflect.Value {
+	connValue := reflect.ValueOf(con).Elem()
+	configField := connValue.FieldByName("config")
+	return configField.FieldByName(field)
+}
+
+func getProjectID(con any) string {
+	return getConfigValue(con, "projectID").String()
+}
+
+func getDataset(con any) string {
+	return getConfigValue(con, "dataSet").String()
 }

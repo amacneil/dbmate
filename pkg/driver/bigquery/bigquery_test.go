@@ -1,23 +1,23 @@
 package bigquery
 
 import (
+	"context"
 	"database/sql"
 	"net/url"
 	"os"
+	"reflect"
 	"testing"
+	"unsafe"
 
+	"cloud.google.com/go/bigquery"
 	"github.com/stretchr/testify/require"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
 )
 
-func getURL() string {
-	return os.Getenv("BIGQUERY_TEST_URL")
-}
-
 func testBigQueryDriver(t *testing.T) *Driver {
-	u := dbutil.MustParseURL(getURL())
+	u := dbutil.MustParseURL(os.Getenv("BIGQUERY_TEST_URL"))
 	drv, err := dbmate.New(u).Driver()
 	require.NoError(t, err)
 
@@ -43,7 +43,7 @@ func prepTestBigQueryDB(t *testing.T) *sql.DB {
 }
 
 func TestGetDriver(t *testing.T) {
-	db := dbmate.New(dbutil.MustParseURL("bigquery://test/db_mate"))
+	db := dbmate.New(dbutil.MustParseURL("bigquery://"))
 	drvInterface, err := db.Driver()
 	require.NoError(t, err)
 
@@ -54,17 +54,54 @@ func TestGetDriver(t *testing.T) {
 	require.Equal(t, "schema_migrations", drv.migrationsTableName)
 }
 
+func TestGetClient(t *testing.T) {
+	drv := testBigQueryDriver(t)
+
+	db, err := drv.Open()
+	require.NoError(t, err)
+	defer dbutil.MustClose(db)
+
+	conn, err := db.Conn(context.Background())
+	require.NoError(t, err)
+	defer conn.Close()
+
+	err = conn.Raw(func(driverConn any) error {
+		value := reflect.ValueOf(driverConn).Elem().FieldByName("client")
+		value = reflect.NewAt(value.Type(), unsafe.Pointer(value.UnsafeAddr())).Elem()
+
+		client := value.Interface().(*bigquery.Client)
+		require.Equal(t, "test", client.Project())
+
+		connValue := reflect.ValueOf(driverConn).Elem()
+		configField := connValue.FieldByName("config")
+
+		projectField := configField.FieldByName("projectID")
+		require.True(t, projectField.IsValid())
+		require.Equal(t, "test", projectField.String())
+
+		datasetField := configField.FieldByName("dataSet")
+		require.True(t, datasetField.IsValid())
+		require.Equal(t, "dbmate_test", datasetField.String())
+
+		return nil
+	})
+	require.NoError(t, err)
+}
+
 func TestConnectionString(t *testing.T) {
 	cases := []struct {
 		input    string
 		expected string
 	}{
-		{"bigquery://projectid/dataset", "bigquery://projectid/dataset?disable_auth=false"},
-		{"bigquery://projectid/location/dataset", "bigquery://projectid/location/dataset?disable_auth=false"},
-		{"bigquery://projectid/dataset?endpoint=http%3A%2F%2F0.0.0.0%3A9050", "bigquery://projectid/dataset?disable_auth=false"},
+		{"bigquery://projectid/dataset", "bigquery://projectid/dataset"},
+		{"bigquery://projectid/location/dataset", "bigquery://projectid/location/dataset"},
+		{"bigquery://projectid/location/dataset?disable_auth=false", "bigquery://projectid/location/dataset"},
+		{"bigquery://projectid/dataset?endpoint=http%3A%2F%2F0.0.0.0%3A9050", "bigquery://projectid/dataset"},
 		{"bigquery://projectid/location/dataset?endpoint=http%3A%2F%2F0.0.0.0%3A9050&disable_auth=true", "bigquery://projectid/location/dataset?disable_auth=true"},
-		{"bigquery://bigquery:9050/test/dbmate_test?disable_auth=true", "bigquery://test/dbmate_test?disable_auth=true&endpoint=http://bigquery:9050"},
-		{"bigquery://bigquery:9050/test/location/dbmate_test?disable_auth=true", "bigquery://test/location/dbmate_test?disable_auth=true&endpoint=http://bigquery:9050"},
+		{"bigquery://bigquery:9050/test/dbmate_test?disable_auth=true", "bigquery://test/dbmate_test?disable_auth=true&endpoint=http%3A%2F%2Fbigquery%3A9050"},
+		{"bigquery://0.0.0.0:9050/project/location/dataset?disable_auth=true", "bigquery://project/location/dataset?disable_auth=true&endpoint=http%3A%2F%2F0.0.0.0%3A9050"},
+		{"bigquery://bigquery:9050/test/dbmate_test?disable_auth=false", "bigquery://test/dbmate_test?endpoint=http%3A%2F%2Fbigquery%3A9050"},
+		{"bigquery://0.0.0.0:9050/project/location/dataset", "bigquery://project/location/dataset?endpoint=http%3A%2F%2F0.0.0.0%3A9050"},
 	}
 
 	for _, c := range cases {
