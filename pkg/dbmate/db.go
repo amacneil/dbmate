@@ -26,7 +26,7 @@ var (
 	ErrNoMigrationName       = errors.New("please specify a name for the new migration")
 	ErrMigrationAlreadyExist = errors.New("file already exists")
 	ErrMigrationDirNotFound  = errors.New("could not find migrations directory")
-	ErrMigrationNotFound     = errors.New("can't find migration file")
+	ErrMigrationNotFound     = errors.New("can't find migrations for")
 	ErrCreateDirectory       = errors.New("unable to create directory")
 )
 
@@ -43,6 +43,8 @@ type DB struct {
 	FS fs.FS
 	// Log is the interface to write stdout
 	Log io.Writer
+	// Migration specifies one or more specific migrations to look at
+	Migrations []string
 	// MigrationsDir specifies the directory or directories to find migration files
 	MigrationsDir []string
 	// MigrationsTableName specifies the database table to record migrations in
@@ -74,6 +76,7 @@ func New(databaseURL *url.URL) *DB {
 		DatabaseURL:         databaseURL,
 		FS:                  nil,
 		Log:                 os.Stdout,
+		Migrations:          []string{},
 		MigrationsDir:       []string{"./db/migrations"},
 		MigrationsTableName: "schema_migrations",
 		SchemaFile:          "./db/schema.sql",
@@ -462,7 +465,7 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 		}
 	}
 
-	migrations := []Migration{}
+	foundMigrations := []Migration{}
 	for _, dir := range db.MigrationsDir {
 		// find filesystem migrations
 		files, err := db.readMigrationsDir(dir)
@@ -487,19 +490,20 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 				FS:       db.FS,
 				Version:  matches[1],
 			}
+
 			if ok := appliedMigrations[migration.Version]; ok {
 				migration.Applied = true
 			}
 
-			migrations = append(migrations, migration)
+			foundMigrations = append(foundMigrations, migration)
 		}
 	}
 
-	sort.Slice(migrations, func(i, j int) bool {
-		return migrations[i].FileName < migrations[j].FileName
+	sort.Slice(foundMigrations, func(i, j int) bool {
+		return foundMigrations[i].FileName < foundMigrations[j].FileName
 	})
 
-	return migrations, nil
+	return filterMigrations(db.Migrations, foundMigrations)
 }
 
 // Rollback rolls back the most recent migration
