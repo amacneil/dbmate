@@ -338,7 +338,6 @@ func (drv *Driver) DeleteMigration(util dbutil.Transaction, version string) erro
 	var dataset string
 
 	err = con.Raw(func(driverConn any) error {
-
 		dataset = getDataset(driverConn)
 		return nil
 	})
