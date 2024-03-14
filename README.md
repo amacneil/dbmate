@@ -292,23 +292,23 @@ DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_clu
 Follow the following format for `DATABASE_URL` when connecting to actual BigQuery in GCP:
 
 ```
-bigquery://projectid/location/dataset?disable_auth=true
+bigquery://projectid/location/dataset
 ```
 `projectid` (mandatory) - Project ID
 
-`dataset` (mandatory) - Dataset Name within the Project
+`dataset` (mandatory) - Dataset name within the Project
 
 `location` (optional) - Where Dataset is created
-
-`disable_auth` (optional) - Pass `true` to skip Authentication, use only for testing or connecting to emulator.
 
 *NOTE: Follow [this doc](https://cloud.google.com/docs/authentication/provide-credentials-adc) on how to set `GOOGLE_APPLICATION_CREDENTIALS` environment variable for proper Authentication*
 
 Follow the following format if trying to connect to a custom endpoint e.g. [BigQuery Emulator](https://github.com/goccy/bigquery-emulator)
 
 ```
-bigquery://host:port/projectid/location/dataset
+bigquery://host:port/projectid/location/dataset?disable_auth=true
 ```
+
+`disable_auth` (optional) - Pass `true` to skip Authentication, use only for testing and connecting to emulator.
 
 ### Creating Migrations
 

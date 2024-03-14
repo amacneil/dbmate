@@ -608,43 +608,43 @@ func tableExists(client *bigquery.Client, datasetID, tableName string) (bool, er
 }
 
 func connectionString(u *url.URL) string {
-	params := url.Values{}
-
-	paths := strings.Split(strings.TrimPrefix(u.Path, "/"), "/")
-
-	if u.Query().Get("disable_auth") == "true" {
-		params.Set("disable_auth", "true")
-	}
-
-	formattedURL := &url.URL{}
+	//if connecting to emulator with host:port format
 	if u.Port() != "" {
-		formattedURL, _ = url.Parse(fmt.Sprintf("bigquery://%s", paths[0]))
+		paths := strings.Split(strings.TrimPrefix(u.Path, "/"), "/")
+
+		newURL := &url.URL{
+			Scheme: u.Scheme,
+			Host:   paths[0],
+		}
+
+		params := url.Values{}
+		if u.Query().Get("disable_auth") == "true" {
+			params.Set("disable_auth", "true")
+		}
 		params.Set("endpoint", fmt.Sprintf("http://%s:%s", u.Hostname(), u.Port()))
+
 		if len(paths) == 3 {
 			// bigquery://host:port/project/location/dataset
-			formattedURL.Path += "/" + paths[1]
-			formattedURL.Path += "/" + paths[2]
+			newURL.Path += "/" + paths[1]
+			newURL.Path += "/" + paths[2]
 		} else {
 			// bigquery://host:port/project/dataset
-			formattedURL.Path += "/" + paths[1]
+			newURL.Path += "/" + paths[1]
 		}
-	} else {
-		formattedURL, _ = url.Parse(fmt.Sprintf("bigquery://%s", u.Hostname()))
-		if len(paths) == 2 {
-			// bigquery://project/location/dataset
-			formattedURL.Path += "/" + paths[0]
-			formattedURL.Path += "/" + paths[1]
-		} else {
-			// bigquery://project/dataset
-			formattedURL.Path += "/" + paths[0]
-		}
+
+		newURL.RawQuery = params.Encode()
+
+		return newURL.String()
 	}
 
-	if len(params) != 0 {
-		formattedURL.RawQuery = params.Encode()
+	//connecting to GCP BigQuery, drop all query strings
+	newURL := &url.URL{
+		Scheme: u.Scheme,
+		Host:   u.Host,
+		Path:   u.Path,
 	}
 
-	return formattedURL.String()
+	return newURL.String()
 }
 
 func getClient(con any) *bigquery.Client {
