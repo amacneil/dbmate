@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
-	"sync"
 	"unsafe"
 
 	"cloud.google.com/go/bigquery"
@@ -61,12 +60,7 @@ func (drv *Driver) CreateDatabase() error {
 	}
 	defer con.Close()
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-
 	err = con.Raw(func(driverConn any) error {
-		defer wg.Done()
-
 		client := getClient(driverConn)
 		dataset := getDataset(driverConn)
 		err := client.Dataset(dataset).Create(ctx, &bigquery.DatasetMetadata{})
@@ -75,8 +69,6 @@ func (drv *Driver) CreateDatabase() error {
 		}
 		return nil
 	})
-
-	wg.Wait()
 
 	if err != nil {
 		return err
@@ -96,12 +88,8 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 
 	//check if the table exists
 	var exists bool
-	var wg sync.WaitGroup
-	wg.Add(1)
 
 	err = con.Raw(func(driverConn any) error {
-		defer wg.Done()
-
 		client := getClient(driverConn)
 		dataset := getDataset(driverConn)
 		exists, err = tableExists(client, dataset, drv.migrationsTableName)
@@ -129,8 +117,6 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 		return nil
 	})
 
-	wg.Wait()
-
 	if err != nil {
 		return err
 	}
@@ -154,12 +140,8 @@ func (drv *Driver) DatabaseExists() (bool, error) {
 	defer con.Close()
 
 	var exists bool
-	var wg sync.WaitGroup
-	wg.Add(1)
 
 	err = con.Raw(func(driverConn any) error {
-		defer wg.Done()
-
 		client := getClient(driverConn)
 		datasetID := getDataset(driverConn)
 		it := client.Datasets(ctx)
@@ -178,8 +160,6 @@ func (drv *Driver) DatabaseExists() (bool, error) {
 			}
 		}
 	})
-
-	wg.Wait()
 
 	if err != nil {
 		return exists, err
@@ -212,12 +192,7 @@ func (drv *Driver) DropDatabase() error {
 	}
 	defer con.Close()
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-
 	err = con.Raw(func(driverConn any) error {
-		defer wg.Done()
-
 		client := getClient(driverConn)
 		dataset := getDataset(driverConn)
 		err := client.Dataset(dataset).DeleteWithContents(ctx)
@@ -226,8 +201,6 @@ func (drv *Driver) DropDatabase() error {
 		}
 		return nil
 	})
-
-	wg.Wait()
 
 	if err != nil {
 		return err
@@ -245,18 +218,12 @@ func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
 	defer con.Close()
 
 	var projectID, datasetID string
-	var wg sync.WaitGroup
-	wg.Add(1)
 
 	err = con.Raw(func(driverConn any) error {
-		defer wg.Done()
-
 		projectID = getProjectID(driverConn)
 		datasetID = getDataset(driverConn)
 		return nil
 	})
-
-	wg.Wait()
 
 	if err != nil {
 		return nil, err
@@ -336,12 +303,7 @@ func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
 	}
 	defer con.Close()
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-
 	err = con.Raw(func(driverConn any) error {
-		defer wg.Done()
-
 		client := getClient(driverConn)
 		dataset := getDataset(driverConn)
 		exists, err = tableExists(client, dataset, drv.migrationsTableName)
@@ -350,8 +312,6 @@ func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
 		}
 		return nil
 	})
-
-	wg.Wait()
 
 	if err != nil {
 		return exists, err
@@ -376,17 +336,12 @@ func (drv *Driver) DeleteMigration(util dbutil.Transaction, version string) erro
 	defer con.Close()
 
 	var dataset string
-	var wg sync.WaitGroup
-	wg.Add(1)
 
 	err = con.Raw(func(driverConn any) error {
-		defer wg.Done()
 
 		dataset = getDataset(driverConn)
 		return nil
 	})
-
-	wg.Wait()
 
 	if err != nil {
 		return err
@@ -417,17 +372,11 @@ func (drv *Driver) InsertMigration(_ dbutil.Transaction, version string) error {
 	defer con.Close()
 
 	var dataset string
-	var wg sync.WaitGroup
-	wg.Add(1)
 
 	err = con.Raw(func(driverConn any) error {
-		defer wg.Done()
-
 		dataset = getDataset(driverConn)
 		return nil
 	})
-
-	wg.Wait()
 
 	if err != nil {
 		return err
@@ -480,17 +429,11 @@ func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, err
 	defer con.Close()
 
 	var dataset string
-	var wg sync.WaitGroup
-	wg.Add(1)
 
 	err = con.Raw(func(driverConn any) error {
-		defer wg.Done()
-
 		dataset = getDataset(driverConn)
 		return nil
 	})
-
-	wg.Wait()
 
 	if err != nil {
 		return nil, err
