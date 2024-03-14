@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
+	"text/template"
 	"time"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
@@ -28,6 +30,8 @@ var (
 	ErrMigrationDirNotFound  = errors.New("could not find migrations directory")
 	ErrMigrationNotFound     = errors.New("can't find migration file")
 	ErrCreateDirectory       = errors.New("unable to create directory")
+	ErrTemplateNotFound      = errors.New("could not find template file")
+	ErrMalformedParameters   = errors.New("template parameters are malformed, must be key=value pairs")
 )
 
 // migrationFileRegexp pattern for valid migration files
@@ -51,6 +55,8 @@ type DB struct {
 	SchemaFile string
 	// Fail if migrations would be applied out of order
 	Strict bool
+	// TemplatesDir specifies the directory to find template files
+	TemplatesDir string
 	// Verbose prints the result of each statement execution
 	Verbose bool
 	// WaitBefore will wait for database to become available before running any actions
@@ -78,6 +84,7 @@ func New(databaseURL *url.URL) *DB {
 		MigrationsTableName: "schema_migrations",
 		SchemaFile:          "./db/schema.sql",
 		Strict:              false,
+		TemplatesDir:        "~/.config/dbmate/templates",
 		Verbose:             false,
 		WaitBefore:          false,
 		WaitInterval:        time.Second,
@@ -267,18 +274,17 @@ func ensureDir(dir string) error {
 
 const migrationTemplate = "-- migrate:up\n\n\n-- migrate:down\n\n"
 
-// NewMigration creates a new migration file
-func (db *DB) NewMigration(name string) error {
+func (db *DB) newMigrationFile(name string) (*os.File, error) {
 	// new migration name
 	timestamp := time.Now().UTC().Format("20060102150405")
 	if name == "" {
-		return ErrNoMigrationName
+		return nil, ErrNoMigrationName
 	}
 	name = fmt.Sprintf("%s_%s.sql", timestamp, name)
 
 	// create migrations dir if missing
 	if err := ensureDir(db.MigrationsDir[0]); err != nil {
-		return err
+		return nil, err
 	}
 
 	// check file does not already exist
@@ -286,17 +292,74 @@ func (db *DB) NewMigration(name string) error {
 	fmt.Fprintf(db.Log, "Creating migration: %s\n", path)
 
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		return ErrMigrationAlreadyExist
+		return nil, ErrMigrationAlreadyExist
 	}
 
 	// write new migration
-	file, err := os.Create(path)
+	return os.Create(path)
+}
+
+// NewMigration creates a new migration file
+func (db *DB) NewMigration(name string) error {
+	file, err := db.newMigrationFile(name)
+
 	if err != nil {
 		return err
 	}
 
 	defer dbutil.MustClose(file)
 	_, err = file.WriteString(migrationTemplate)
+	return err
+}
+
+// NewMigrationFromTemplate creates a new migration and uses the content from the template file
+// Valid templates follow the [Text Template] format
+// key=value pair options are used for substitution
+//
+// [Text Template]: https://pkg.go.dev/text/template
+func (db *DB) NewMigrationFromTemplate(name, templateName string, options []string) error {
+	// Convert the input into a map
+	data := make(map[string]string)
+	for _, input := range options {
+		parts := strings.SplitN(input, "=", 2)
+		if len(parts) == 2 {
+			data[parts[0]] = parts[1]
+		} else {
+			return ErrMalformedParameters
+		}
+	}
+
+	// Add the extension
+	templateFile := fmt.Sprintf("%s.tmpl", templateName)
+	path := filepath.Join(db.TemplatesDir, templateFile)
+
+	// Confirm file exists
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return ErrTemplateNotFound
+	}
+
+	// Parse the templates directory and any subdirectories
+	templates, err := template.ParseGlob(fmt.Sprintf("%s/*.tmpl", db.TemplatesDir))
+
+	if err != nil {
+		return err
+	}
+
+	// Create the migration
+	file, err := db.newMigrationFile(name)
+
+	if err != nil {
+		return err
+	}
+
+	defer dbutil.MustClose(file)
+
+	// Default any missing keys to the default
+	templates.Option("missingkey=zero")
+
+	// Execute and write out the template
+	err = templates.ExecuteTemplate(file, templateFile, data)
+
 	return err
 }
 
