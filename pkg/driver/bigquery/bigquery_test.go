@@ -276,7 +276,7 @@ func TestBigQueryDeleteMigration(t *testing.T) {
 	require.Equal(t, 1, count)
 }
 
-func TestBigQueryPing(t *testing.T) {
+func TestBigQueryPingError(t *testing.T) {
 	drv := testBigQueryDriver(t)
 
 	// drop any existing database
@@ -287,4 +287,34 @@ func TestBigQueryPing(t *testing.T) {
 	err = drv.Ping()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "dataset dbmate_test is not found")
+}
+
+func TestBigQueryPingSuccess(t *testing.T) {
+	drv := testBigQueryDriver(t)
+
+	db := prepTestBigQueryDB(t)
+	defer dbutil.MustClose(db)
+
+	// ping database
+	err := drv.Ping()
+	require.NoError(t, err)
+}
+
+func TestPostgresMigrationsTableExists(t *testing.T) {
+	drv := testBigQueryDriver(t)
+	drv.migrationsTableName = "test_migrations"
+
+	db := prepTestBigQueryDB(t)
+	defer dbutil.MustClose(db)
+
+	exists, err := drv.MigrationsTableExists(db)
+	require.NoError(t, err)
+	require.Equal(t, false, exists)
+
+	err = drv.CreateMigrationsTable(db)
+	require.NoError(t, err)
+
+	exists, err = drv.MigrationsTableExists(db)
+	require.NoError(t, err)
+	require.Equal(t, true, exists)
 }
