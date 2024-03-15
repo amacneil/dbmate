@@ -20,7 +20,7 @@ services:
       MYSQL_TEST_URL: mysql://root:root@mysql/dbmate_test
       POSTGRES_TEST_URL: postgres://postgres:postgres@postgres/dbmate_test?sslmode=disable
       SQLITE_TEST_URL: sqlite3:/tmp/dbmate_test.sqlite3
-      BIGQUERY_TEST_URL: bigquery://bigquery:9050/test/dbmate_test?disable_auth=true
+      BIGQUERY_TEST_URL: bigquery://bigquery:9050/test/asia-southeast1/dbmate_test?disable_auth=true
 
   dbmate:
     build:

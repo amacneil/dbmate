@@ -83,6 +83,10 @@ func TestGetClient(t *testing.T) {
 		require.True(t, datasetField.IsValid())
 		require.Equal(t, "dbmate_test", datasetField.String())
 
+		locationField := configField.FieldByName("location")
+		require.True(t, locationField.IsValid())
+		require.Equal(t, "asia-southeast1", locationField.String())
+
 		return nil
 	})
 	require.NoError(t, err)

@@ -63,7 +63,10 @@ func (drv *Driver) CreateDatabase() error {
 	err = con.Raw(func(driverConn any) error {
 		client := getClient(driverConn)
 		dataset := getDataset(driverConn)
-		err := client.Dataset(dataset).Create(ctx, &bigquery.DatasetMetadata{})
+		location := getLocation(driverConn)
+		err := client.Dataset(dataset).Create(ctx, &bigquery.DatasetMetadata{
+			Location: location,
+		})
 		if err != nil {
 			return err
 		}
@@ -665,4 +668,8 @@ func getProjectID(con any) string {
 
 func getDataset(con any) string {
 	return getConfigValue(con, "dataSet").String()
+}
+
+func getLocation(con any) string {
+	return getConfigValue(con, "location").String()
 }
