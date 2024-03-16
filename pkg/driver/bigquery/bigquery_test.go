@@ -304,7 +304,7 @@ func TestBigQueryPingSuccess(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestPostgresMigrationsTableExists(t *testing.T) {
+func TestBigQueryMigrationsTableExists(t *testing.T) {
 	drv := testBigQueryDriver(t)
 	drv.migrationsTableName = "test_migrations"
 
