@@ -1,15 +1,12 @@
 package bigquery
 
 import (
-	"context"
 	"database/sql"
+	"fmt"
 	"net/url"
 	"os"
-	"reflect"
 	"testing"
-	"unsafe"
 
-	"cloud.google.com/go/bigquery"
 	"github.com/stretchr/testify/require"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
@@ -24,8 +21,49 @@ func testBigQueryDriver(t *testing.T) *Driver {
 	return drv.(*Driver)
 }
 
+func testGoogleBigQueryDriver(t *testing.T) *Driver {
+	testURL, ok := os.LookupEnv("GOOGLE_BIGQUERY_TEST_URL")
+	if !ok {
+		t.Skip("skipping test, no GOOGLE_BIGQUERY_TEST_URL provided")
+	}
+	u := dbutil.MustParseURL(testURL)
+
+	endpoint := u.Query().Get("endpoint")
+	if endpoint != "" {
+		endpointURL, err := url.Parse(endpoint)
+		require.NoError(t, err)
+
+		if endpointURL.Hostname() != "bigquery.googleapis.com" {
+			t.Skipf("skipping test, GOOGLE_BIGQUERY_TEST_URL endpoint is %s and not bigquery.googleapis.com", endpointURL.Hostname())
+		}
+	}
+
+	drv, err := dbmate.New(u).Driver()
+	require.NoError(t, err)
+
+	return drv.(*Driver)
+}
+
 func prepTestBigQueryDB(t *testing.T) *sql.DB {
 	drv := testBigQueryDriver(t)
+
+	// drop any existing database
+	err := drv.DropDatabase()
+	require.NoError(t, err)
+
+	// create database
+	err = drv.CreateDatabase()
+	require.NoError(t, err)
+
+	// connect database
+	db, err := drv.Open()
+	require.NoError(t, err)
+
+	return db
+}
+
+func prepTestGoogleBigQueryDB(t *testing.T) *sql.DB {
+	drv := testGoogleBigQueryDriver(t)
 
 	// drop any existing database
 	err := drv.DropDatabase()
@@ -61,35 +99,23 @@ func TestGetClient(t *testing.T) {
 	require.NoError(t, err)
 	defer dbutil.MustClose(db)
 
-	conn, err := db.Conn(context.Background())
+	client, err := drv.getClient(db)
 	require.NoError(t, err)
-	defer conn.Close()
+	require.Equal(t, "test", client.Project())
+}
 
-	err = conn.Raw(func(driverConn any) error {
-		value := reflect.ValueOf(driverConn).Elem().FieldByName("client")
-		value = reflect.NewAt(value.Type(), unsafe.Pointer(value.UnsafeAddr())).Elem()
+func TestGetConfig(t *testing.T) {
+	drv := testBigQueryDriver(t)
 
-		client := value.Interface().(*bigquery.Client)
-		require.Equal(t, "test", client.Project())
-
-		connValue := reflect.ValueOf(driverConn).Elem()
-		configField := connValue.FieldByName("config")
-
-		projectField := configField.FieldByName("projectID")
-		require.True(t, projectField.IsValid())
-		require.Equal(t, "test", projectField.String())
-
-		datasetField := configField.FieldByName("dataSet")
-		require.True(t, datasetField.IsValid())
-		require.Equal(t, "dbmate_test", datasetField.String())
-
-		locationField := configField.FieldByName("location")
-		require.True(t, locationField.IsValid())
-		require.Equal(t, "asia-southeast1", locationField.String())
-
-		return nil
-	})
+	db, err := drv.Open()
 	require.NoError(t, err)
+	defer dbutil.MustClose(db)
+
+	config, err := drv.getConfig(db)
+	require.NoError(t, err)
+	require.Equal(t, "test", config.projectID)
+	require.Equal(t, "us-east5", config.location)
+	require.Equal(t, "dbmate_test", config.dataSet)
 }
 
 func TestConnectionString(t *testing.T) {
@@ -99,14 +125,11 @@ func TestConnectionString(t *testing.T) {
 	}{
 		{"bigquery://projectid/dataset", "bigquery://projectid/dataset"},
 		{"bigquery://projectid/location/dataset", "bigquery://projectid/location/dataset"},
-		{"bigquery://projectid/location/dataset?disable_auth=false", "bigquery://projectid/location/dataset"},
-		{"bigquery://projectid/location/dataset?disable_auth=true", "bigquery://projectid/location/dataset"},
-		{"bigquery://projectid/dataset?endpoint=http%3A%2F%2F0.0.0.0%3A9050", "bigquery://projectid/dataset"},
-		{"bigquery://projectid/location/dataset?endpoint=http%3A%2F%2F0.0.0.0%3A9050&disable_auth=true", "bigquery://projectid/location/dataset"},
-		{"bigquery://bigquery:9050/test/dbmate_test?disable_auth=true", "bigquery://test/dbmate_test?disable_auth=true&endpoint=http%3A%2F%2Fbigquery%3A9050"},
-		{"bigquery://0.0.0.0:9050/project/location/dataset?disable_auth=true", "bigquery://project/location/dataset?disable_auth=true&endpoint=http%3A%2F%2F0.0.0.0%3A9050"},
-		{"bigquery://bigquery:9050/test/dbmate_test?disable_auth=false", "bigquery://test/dbmate_test?endpoint=http%3A%2F%2Fbigquery%3A9050"},
-		{"bigquery://0.0.0.0:9050/project/location/dataset", "bigquery://project/location/dataset?endpoint=http%3A%2F%2F0.0.0.0%3A9050"},
+		{"bigquery://projectid/location/dataset?disable_auth=false", "bigquery://projectid/location/dataset?disable_auth=false"},
+		{"bigquery://projectid/location/dataset?disable_auth=true", "bigquery://projectid/location/dataset?disable_auth=true"},
+		{"bigquery://projectid/location/dataset?endpoint=https%3A%2F%2Fbigquery.googleapis.com", "bigquery://projectid/location/dataset?endpoint=https%3A%2F%2Fbigquery.googleapis.com"},
+		{"bigquery://projectid/location/dataset?endpoint=http%3A%2F%2F0.0.0.0%3A9050", "bigquery://projectid/location/dataset?endpoint=http%3A%2F%2F0.0.0.0%3A9050"},
+		{"bigquery://projectid/location/dataset?endpoint=http%3A%2F%2F0.0.0.0%3A9050&disable_auth=true", "bigquery://projectid/location/dataset?endpoint=http%3A%2F%2F0.0.0.0%3A9050&disable_auth=true"},
 	}
 
 	for _, c := range cases {
@@ -321,4 +344,36 @@ func TestBigQueryMigrationsTableExists(t *testing.T) {
 	exists, err = drv.MigrationsTableExists(db)
 	require.NoError(t, err)
 	require.Equal(t, true, exists)
+}
+
+func TestGoogleBigQueryDumpSchema(t *testing.T) {
+	t.Run("default migrations table", func(t *testing.T) {
+		drv := testGoogleBigQueryDriver(t)
+
+		// prepare database
+		db := prepTestGoogleBigQueryDB(t)
+		defer dbutil.MustClose(db)
+		err := drv.CreateMigrationsTable(db)
+		require.NoError(t, err)
+
+		// insert migration
+		err = drv.InsertMigration(db, "abc1")
+		require.NoError(t, err)
+		err = drv.InsertMigration(db, "abc2")
+		require.NoError(t, err)
+
+		// DumpSchema should return schema
+		config, err := drv.getConfig(db)
+		require.NoError(t, err)
+
+		schema, err := drv.DumpSchema(db)
+		require.NoError(t, err)
+		require.Contains(t, string(schema), fmt.Sprintf("CREATE TABLE `%s.%s.schema_migrations`", config.projectID, config.dataSet))
+		require.Contains(t, string(schema), "\n--\n"+
+			"-- Dbmate schema migrations\n"+
+			"--\n\n"+
+			"INSERT INTO schema_migrations (version) VALUES\n"+
+			"    ('abc1'),\n"+
+			"    ('abc2');\n")
+	})
 }

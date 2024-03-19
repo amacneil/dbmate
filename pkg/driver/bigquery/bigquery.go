@@ -1,6 +1,7 @@
 package bigquery
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
@@ -54,77 +55,51 @@ func (drv *Driver) CreateDatabase() error {
 	}
 
 	ctx := context.Background()
-	con, err := db.Conn(ctx)
+	conn, err := db.Conn(ctx)
 	if err != nil {
 		return err
 	}
-	defer con.Close()
+	defer conn.Close()
 
-	err = con.Raw(func(driverConn any) error {
+	return conn.Raw(func(driverConn any) error {
 		client := getClient(driverConn)
-		dataset := getDataset(driverConn)
-		location := getLocation(driverConn)
-		err := client.Dataset(dataset).Create(ctx, &bigquery.DatasetMetadata{
-			Location: location,
+		config := getConfig(driverConn)
+
+		return client.Dataset(config.dataSet).Create(ctx, &bigquery.DatasetMetadata{
+			Location: config.location,
 		})
-		if err != nil {
-			return err
-		}
-		return nil
 	})
-
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 	ctx := context.Background()
-
-	con, err := db.Conn(ctx)
+	conn, err := db.Conn(ctx)
 	if err != nil {
 		return err
 	}
-	defer con.Close()
+	defer conn.Close()
 
-	//check if the table exists
-	var exists bool
-
-	err = con.Raw(func(driverConn any) error {
+	return conn.Raw(func(driverConn any) error {
 		client := getClient(driverConn)
-		dataset := getDataset(driverConn)
-		exists, err = tableExists(client, dataset, drv.migrationsTableName)
+		config := getConfig(driverConn)
 
+		exists, err := tableExists(client, config.dataSet, drv.migrationsTableName)
 		if err != nil {
 			return err
 		}
-
-		if !exists {
-			table := client.Dataset(dataset).Table(drv.migrationsTableName)
-			err := table.Create(ctx, &bigquery.TableMetadata{
-				Schema: bigquery.Schema{
-					{
-						Name: "version",
-						Type: bigquery.StringFieldType,
-					},
-				},
-			})
-
-			if err != nil {
-				return err
-			}
+		if exists {
+			return nil
 		}
 
-		return nil
+		return client.Dataset(config.dataSet).Table(drv.migrationsTableName).Create(ctx, &bigquery.TableMetadata{
+			Schema: bigquery.Schema{
+				{
+					Name: "version",
+					Type: bigquery.StringFieldType,
+				},
+			},
+		})
 	})
-
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (drv *Driver) DatabaseExists() (bool, error) {
@@ -135,18 +110,17 @@ func (drv *Driver) DatabaseExists() (bool, error) {
 	defer dbutil.MustClose(db)
 
 	ctx := context.Background()
-
-	con, err := db.Conn(ctx)
+	conn, err := db.Conn(ctx)
 	if err != nil {
 		return false, err
 	}
-	defer con.Close()
+	defer conn.Close()
 
 	var exists bool
-
-	err = con.Raw(func(driverConn any) error {
+	err = conn.Raw(func(driverConn any) error {
 		client := getClient(driverConn)
-		datasetID := getDataset(driverConn)
+		config := getConfig(driverConn)
+
 		it := client.Datasets(ctx)
 		for {
 			dataset, err := it.Next()
@@ -157,18 +131,14 @@ func (drv *Driver) DatabaseExists() (bool, error) {
 			if err != nil {
 				return err
 			}
-			if dataset.DatasetID == datasetID {
+			if dataset.DatasetID == config.dataSet {
 				exists = true
 				return nil
 			}
 		}
 	})
 
-	if err != nil {
-		return exists, err
-	}
-
-	return exists, nil
+	return exists, err
 }
 
 func (drv *Driver) DropDatabase() error {
@@ -182,85 +152,49 @@ func (drv *Driver) DropDatabase() error {
 	if err != nil {
 		return err
 	}
-
 	if !exists {
 		return nil
 	}
 
 	ctx := context.Background()
-
-	con, err := db.Conn(ctx)
+	conn, err := db.Conn(ctx)
 	if err != nil {
 		return err
 	}
-	defer con.Close()
+	defer conn.Close()
 
-	err = con.Raw(func(driverConn any) error {
+	return conn.Raw(func(driverConn any) error {
 		client := getClient(driverConn)
-		dataset := getDataset(driverConn)
-		err := client.Dataset(dataset).DeleteWithContents(ctx)
-		if err != nil {
-			return err
-		}
-		return nil
+		config := getConfig(driverConn)
+
+		return client.Dataset(config.dataSet).DeleteWithContents(ctx)
 	})
-
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
-func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
-	ctx := context.Background()
-	con, err := db.Conn(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer con.Close()
+func (drv *Driver) schemaDump(db *sql.DB) ([]byte, error) {
+	// build schema migrations table data
+	var buf bytes.Buffer
+	buf.WriteString("\n--\n-- Database schema\n--\n\n")
 
-	var projectID, datasetID string
-
-	err = con.Raw(func(driverConn any) error {
-		projectID = getProjectID(driverConn)
-		datasetID = getDataset(driverConn)
-		return nil
-	})
-
+	config, err := drv.getConfig(db)
 	if err != nil {
 		return nil, err
 	}
 
-	var script []byte
-
-	query := fmt.Sprintf(`
-		SELECT
-			table_name,
-			table_type,
-			1 AS order_type
-		FROM
-			`+"`%s.%s.INFORMATION_SCHEMA.TABLES`"+`
-		WHERE
-			table_type = 'BASE TABLE'
+	query := fmt.Sprintf(
+		`SELECT table_name AS object_name, 'TABLE' AS object_type, ddl
+		FROM `+"`%s.%s.INFORMATION_SCHEMA.TABLES`"+`
 		UNION ALL
-		SELECT
-			table_name,
-			table_type,
-			2 AS order_type
-		FROM
-			`+"`%s.%s.INFORMATION_SCHEMA.TABLES`"+`
-		WHERE
-			table_type = 'VIEW'
-		UNION ALL
-		SELECT
-			routine_name AS table_name,
-			'FUNCTION' AS table_type,
-			3 AS order_type
-		FROM
-			`+"`%s.%s.INFORMATION_SCHEMA.ROUTINES`"+`
-		ORDER BY
-			order_type;`, projectID, datasetID, projectID, datasetID, projectID, datasetID)
+		SELECT routine_name AS object_name, 'FUNCTION' AS object_type, ddl
+		FROM `+"`%s.%s.INFORMATION_SCHEMA.ROUTINES`"+`
+		ORDER BY CASE object_type
+			WHEN 'TABLE' THEN 1
+			WHEN 'FUNCTION' THEN 2
+			ELSE 3
+		END;`,
+		config.projectID, config.dataSet,
+		config.projectID, config.dataSet,
+	)
 
 	// Execute the query
 	rows, err := db.Query(query)
@@ -271,51 +205,78 @@ func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
 
 	// Iterate over the results and generate DDL for each object
 	for rows.Next() {
-		var objectName, objectType string
-		var orderType int
-		if err := rows.Scan(&objectName, &objectType, &orderType); err != nil {
+		var objectName, objectType, ddl string
+		if err := rows.Scan(&objectName, &objectType, &ddl); err != nil {
 			return nil, fmt.Errorf("error scanning object: %v", err)
 		}
 
-		// Generate DDL for the object
-		ddl, err := generateDDL(db, projectID, datasetID, objectName, objectType)
-		if err != nil {
-			return nil, fmt.Errorf("error generating DDL for %s %s: %v", objectName, objectType, err)
-		}
-
-		// Append the DDL to the script
-		script = append(script, []byte(ddl)...)
-		script = append(script, []byte("\n\n")...)
+		buf.WriteString(ddl + "\n")
 	}
 
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating objects: %v", err)
 	}
 
-	return script, nil
+	return buf.Bytes(), nil
+}
+
+func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
+	migrationsTable := drv.migrationsTableName
+
+	// load applied migrations
+	migrations, err := dbutil.QueryColumn(db,
+		fmt.Sprintf("select version from %s order by version asc", migrationsTable))
+	if err != nil {
+		return nil, err
+	}
+
+	// build schema migrations table data
+	var buf bytes.Buffer
+	buf.WriteString("\n--\n-- Dbmate schema migrations\n--\n\n")
+
+	if len(migrations) > 0 {
+		buf.WriteString(
+			fmt.Sprintf("INSERT INTO %s (version) VALUES\n    ('", migrationsTable) +
+				strings.Join(migrations, "'),\n    ('") +
+				"');\n")
+	}
+
+	return buf.Bytes(), nil
+}
+
+func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
+	schema, err := drv.schemaDump(db)
+	if err != nil {
+		return nil, err
+	}
+
+	migrations, err := drv.schemaMigrationsDump(db)
+	if err != nil {
+		return nil, err
+	}
+
+	return append(schema, migrations...), nil
+
 }
 
 func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
-	var exists bool
-
 	ctx := context.Background()
-
-	con, err := db.Conn(ctx)
+	conn, err := db.Conn(ctx)
 	if err != nil {
-		return exists, err
+		return false, err
 	}
-	defer con.Close()
+	defer conn.Close()
 
-	err = con.Raw(func(driverConn any) error {
+	var exists bool
+	err = conn.Raw(func(driverConn any) error {
 		client := getClient(driverConn)
-		dataset := getDataset(driverConn)
-		exists, err = tableExists(client, dataset, drv.migrationsTableName)
+		config := getConfig(driverConn)
+		exists, err = tableExists(client, config.dataSet, drv.migrationsTableName)
 		if err != nil {
 			return err
 		}
 		return nil
 	})
-
 	if err != nil {
 		return exists, err
 	}
@@ -330,28 +291,13 @@ func (drv *Driver) DeleteMigration(util dbutil.Transaction, version string) erro
 	}
 	defer dbutil.MustClose(db)
 
-	ctx := context.Background()
-
-	con, err := db.Conn(ctx)
-	if err != nil {
-		return err
-	}
-	defer con.Close()
-
-	var dataset string
-
-	err = con.Raw(func(driverConn any) error {
-		dataset = getDataset(driverConn)
-		return nil
-	})
-
+	config, err := drv.getConfig(db)
 	if err != nil {
 		return err
 	}
 
-	query := fmt.Sprintf("DELETE FROM %s.%s WHERE version = '%s';", dataset, drv.migrationsTableName, version)
+	query := fmt.Sprintf("DELETE FROM %s.%s WHERE version = '%s';", config.dataSet, drv.migrationsTableName, version)
 	_, err = util.Exec(query)
-
 	if err != nil {
 		return err
 	}
@@ -366,29 +312,14 @@ func (drv *Driver) InsertMigration(_ dbutil.Transaction, version string) error {
 	}
 	defer dbutil.MustClose(db)
 
-	ctx := context.Background()
-	con, err := db.Conn(ctx)
-	if err != nil {
-		return err
-	}
-	defer con.Close()
-
-	var dataset string
-
-	err = con.Raw(func(driverConn any) error {
-		dataset = getDataset(driverConn)
-		return nil
-	})
-
+	config, err := drv.getConfig(db)
 	if err != nil {
 		return err
 	}
 
 	queryTemplate := `INSERT INTO %s.%s (version) VALUES ('%s');`
-	queryString := fmt.Sprintf(queryTemplate, dataset, drv.migrationsTableName, version)
-
+	queryString := fmt.Sprintf(queryTemplate, config.dataSet, drv.migrationsTableName, version)
 	_, err = db.Exec(queryString, version)
-
 	if err != nil {
 		return err
 	}
@@ -397,13 +328,7 @@ func (drv *Driver) InsertMigration(_ dbutil.Transaction, version string) error {
 }
 
 func (drv *Driver) Open() (*sql.DB, error) {
-	connString := connectionString(drv.databaseURL)
-	con, err := sql.Open("bigquery", connString)
-	if err != nil {
-		return nil, err
-	}
-
-	return con, err
+	return sql.Open("bigquery", connectionString(drv.databaseURL))
 }
 
 func (drv *Driver) Ping() error {
@@ -413,9 +338,7 @@ func (drv *Driver) Ping() error {
 	}
 	defer dbutil.MustClose(db)
 
-	err = db.Ping()
-
-	return err
+	return db.Ping()
 }
 
 func (*Driver) QueryError(query string, err error) error {
@@ -423,25 +346,12 @@ func (*Driver) QueryError(query string, err error) error {
 }
 
 func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
-	ctx := context.Background()
-	con, err := db.Conn(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer con.Close()
-
-	var dataset string
-
-	err = con.Raw(func(driverConn any) error {
-		dataset = getDataset(driverConn)
-		return nil
-	})
-
+	config, err := drv.getConfig(db)
 	if err != nil {
 		return nil, err
 	}
 
-	query := fmt.Sprintf("SELECT version FROM %s.%s ORDER BY version DESC", dataset, drv.migrationsTableName)
+	query := fmt.Sprintf("SELECT version FROM %s.%s ORDER BY version DESC", config.dataSet, drv.migrationsTableName)
 	if limit >= 0 {
 		query = fmt.Sprintf("%s limit %d", query, limit)
 	}
@@ -449,7 +359,6 @@ func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, err
 	if err != nil {
 		return nil, err
 	}
-
 	defer dbutil.MustClose(rows)
 
 	migrations := map[string]bool{}
@@ -610,6 +519,11 @@ func tableExists(client *bigquery.Client, datasetID, tableName string) (bool, er
 }
 
 func connectionString(u *url.URL) string {
+	return u.String()
+}
+
+// nolint:unused
+func connectionStringOld(u *url.URL) string {
 	//if connecting to emulator with host:port format
 	if u.Port() != "" {
 		paths := strings.Split(strings.TrimPrefix(u.Path, "/"), "/")
@@ -649,27 +563,69 @@ func connectionString(u *url.URL) string {
 	return newURL.String()
 }
 
-func getClient(con any) *bigquery.Client {
-	value := reflect.ValueOf(con).Elem().FieldByName("client")
-	value = reflect.NewAt(value.Type(), unsafe.Pointer(value.UnsafeAddr())).Elem()
-	client := value.Interface().(*bigquery.Client)
-	return client
+func (drv *Driver) getClient(db *sql.DB) (*bigquery.Client, error) {
+	conn, err := db.Conn(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	var client *bigquery.Client
+
+	err = conn.Raw(func(driverConn any) error {
+		client = getClient(driverConn)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
 }
 
-func getConfigValue(con any, field string) reflect.Value {
-	connValue := reflect.ValueOf(con).Elem()
-	configField := connValue.FieldByName("config")
-	return configField.FieldByName(field)
+func getClient(driverConn any) *bigquery.Client {
+	value := reflect.ValueOf(driverConn).Elem().FieldByName("client")
+	value = reflect.NewAt(value.Type(), unsafe.Pointer(value.UnsafeAddr()))
+	return value.Elem().Interface().(*bigquery.Client)
 }
 
-func getProjectID(con any) string {
-	return getConfigValue(con, "projectID").String()
+// As the `bigQueryConfig` struct is unexported from `go-gorm/bigquery`,
+// we need to maintain a copy here and access it through reflection.
+//
+// See: https://github.com/go-gorm/bigquery/blob/74582cba0726b82b8a59990fee4064e059e88c9b/driver/driver.go#L18-L27
+type bigQueryConfig struct {
+	projectID      string
+	location       string
+	dataSet        string
+	scopes         []string
+	endpoint       string
+	disableAuth    bool
+	credentialFile string
+	credentialJSON []byte
 }
 
-func getDataset(con any) string {
-	return getConfigValue(con, "dataSet").String()
+func (drv *Driver) getConfig(db *sql.DB) (*bigQueryConfig, error) {
+	conn, err := db.Conn(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	var config *bigQueryConfig
+
+	err = conn.Raw(func(driverConn any) error {
+		config = getConfig(driverConn)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return config, nil
 }
 
-func getLocation(con any) string {
-	return getConfigValue(con, "location").String()
+func getConfig(driverConn any) *bigQueryConfig {
+	value := reflect.ValueOf(driverConn).Elem().FieldByName("config")
+	value = reflect.NewAt(reflect.TypeOf(bigQueryConfig{}), unsafe.Pointer(value.UnsafeAddr()))
+	return value.Interface().(*bigQueryConfig)
 }
