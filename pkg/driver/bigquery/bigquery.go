@@ -256,7 +256,6 @@ func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
 	}
 
 	return append(schema, migrations...), nil
-
 }
 
 func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
@@ -378,133 +377,6 @@ func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, err
 	return migrations, nil
 }
 
-func generateDDL(db *sql.DB, projectID, datasetID, objectName, objectType string) (string, error) {
-	var ddl string
-
-	// Query to retrieve object information
-	switch objectType {
-	case "BASE TABLE":
-		// Query to retrieve column information for tables
-		query := fmt.Sprintf(`
-			SELECT
-				column_name,
-				data_type,
-				is_nullable
-			FROM
-				`+"`%s.%s.INFORMATION_SCHEMA.COLUMNS`"+`
-			WHERE
-				table_name = '%s'`, projectID, datasetID, objectName)
-
-		// Execute the query
-		rows, err := db.Query(query)
-		if err != nil {
-			return "", err
-		}
-		defer dbutil.MustClose(rows)
-
-		// Check for any error that occurred during the query execution
-		if err := rows.Err(); err != nil {
-			return "", err
-		}
-
-		// Generate DDL for tables
-		for rows.Next() {
-			var columnName, dataType, isNullable string
-			if err := rows.Scan(&columnName, &dataType, &isNullable); err != nil {
-				return "", err
-			}
-			if isNullable == "YES" {
-				ddl += fmt.Sprintf("\t%s %s,\n", columnName, dataType)
-			} else {
-				ddl += fmt.Sprintf("\t%s %s %s,\n", columnName, dataType, "NOT NULL")
-			}
-		}
-		if ddl != "" {
-			ddl = fmt.Sprintf("CREATE TABLE `%s.%s.%s` (\n%s);", projectID, datasetID, objectName, ddl)
-		}
-	case "VIEW":
-		// Query to retrieve view definition
-		query := fmt.Sprintf(`
-			SELECT
-				view_definition
-			FROM
-				`+"`%s.%s.INFORMATION_SCHEMA.VIEWS`"+`
-			WHERE
-				table_name = '%s'`, projectID, datasetID, objectName)
-
-		// Execute the query
-		row := db.QueryRow(query)
-		if err := row.Scan(&ddl); err != nil {
-			return "", err
-		}
-		ddl = fmt.Sprintf("CREATE VIEW `%s.%s.%s` AS\n%s;", projectID, datasetID, objectName, ddl)
-		ddl = strings.ReplaceAll(ddl, "\n", "\n\t")
-	case "FUNCTION":
-		// Query to retrieve function definition
-		definitionQuery := fmt.Sprintf(`
-			SELECT
-				routine_definition
-			FROM
-				`+"`%s.%s.INFORMATION_SCHEMA.ROUTINES`"+`
-			WHERE
-				routine_name = '%s'`, projectID, datasetID, objectName)
-
-		// Execute the query to fetch function definition
-		definitionRow := db.QueryRow(definitionQuery)
-		if err := definitionRow.Scan(&ddl); err != nil {
-			return "", err
-		}
-
-		// Query to retrieve function parameters
-		paramQuery := fmt.Sprintf(`
-			SELECT
-				parameter_name,
-				data_type,
-				ordinal_position
-			FROM
-				`+"`%s.%s.INFORMATION_SCHEMA.PARAMETERS`"+`
-			WHERE
-				specific_name = '%s'`, projectID, datasetID, objectName)
-
-		// Execute the query to fetch function parameters
-		paramRows, err := db.Query(paramQuery)
-		if err != nil {
-			return "", err
-		}
-		defer dbutil.MustClose(paramRows)
-
-		// Check for any error that occurred during the query execution
-		if err := paramRows.Err(); err != nil {
-			return "", err
-		}
-
-		// Construct function parameters list
-		var paramList []string
-		var returnType string
-		for paramRows.Next() {
-			var paramName sql.NullString
-			var dataType string
-			var ordinalPosition int
-			if err := paramRows.Scan(&paramName, &dataType, &ordinalPosition); err != nil {
-				return "", err
-			}
-			if ordinalPosition == 0 {
-				returnType = dataType
-			} else {
-				paramList = append(paramList, fmt.Sprintf("%s %s", paramName.String, dataType))
-			}
-		}
-		params := strings.Join(paramList, ", ")
-
-		// Construct the function DDL with parameters
-		ddl = fmt.Sprintf("CREATE FUNCTION `%s.%s.%s` (%s) RETURNS %s AS (\n\t%s\n);", projectID, datasetID, objectName, params, returnType, ddl)
-	default:
-		return "", fmt.Errorf("unsupported object type: %s", objectType)
-	}
-
-	return ddl, nil
-}
-
 // Helper function to check whether a table exists or not in a dataset
 func tableExists(client *bigquery.Client, datasetID, tableName string) (bool, error) {
 	table := client.Dataset(datasetID).Table(tableName)
@@ -593,6 +465,8 @@ func getClient(driverConn any) *bigquery.Client {
 // we need to maintain a copy here and access it through reflection.
 //
 // See: https://github.com/go-gorm/bigquery/blob/74582cba0726b82b8a59990fee4064e059e88c9b/driver/driver.go#L18-L27
+//
+// nolint:unused
 type bigQueryConfig struct {
 	projectID      string
 	location       string
