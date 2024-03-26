@@ -5,6 +5,7 @@ go 1.21
 toolchain go1.21.4
 
 require (
+	cloud.google.com/go/bigquery v1.52.0
 	github.com/ClickHouse/clickhouse-go/v2 v2.21.1
 	github.com/go-sql-driver/mysql v1.8.0
 	github.com/joho/godotenv v1.5.1
@@ -13,11 +14,12 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/urfave/cli/v2 v2.27.1
 	github.com/zenizh/go-capturer v0.0.0-20211219060012-52ea6c8fed04
+	google.golang.org/api v0.126.0
+	gorm.io/driver/bigquery v1.2.0
 )
 
 require (
 	cloud.google.com/go v0.110.4 // indirect
-	cloud.google.com/go/bigquery v1.52.0 // indirect
 	cloud.google.com/go/compute v1.21.0 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	cloud.google.com/go/iam v1.1.1 // indirect
@@ -69,14 +71,12 @@ require (
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/tools v0.14.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
-	google.golang.org/api v0.126.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20230711160842-782d3b101e98 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20230711160842-782d3b101e98 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230711160842-782d3b101e98 // indirect
 	google.golang.org/grpc v1.58.3 // indirect
-	google.golang.org/protobuf v1.31.0 // indirect
+	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	gorm.io/driver/bigquery v1.2.0 // indirect
 	gorm.io/gorm v1.24.0 // indirect
 )
