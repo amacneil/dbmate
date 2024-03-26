@@ -12,6 +12,7 @@ services:
       - clickhouse
       - clickhouse-cluster-01
       - clickhouse-cluster-02
+      - bigquery
     environment:
       CLICKHOUSE_TEST_URL: clickhouse://clickhouse:9000/dbmate_test
       CLICKHOUSE_CLUSTER_01_TEST_URL: clickhouse://ch-cluster-01:9000/dbmate_test
@@ -19,6 +20,7 @@ services:
       MYSQL_TEST_URL: mysql://root:root@mysql/dbmate_test
       POSTGRES_TEST_URL: postgres://postgres:postgres@postgres/dbmate_test?sslmode=disable
       SQLITE_TEST_URL: sqlite3:/tmp/dbmate_test.sqlite3
+      BIGQUERY_TEST_URL: bigquery://test/us-east5/dbmate_test?disable_auth=true&endpoint=http%3A%2F%2Fbigquery%3A9050
 
   dbmate:
     build:
@@ -63,3 +65,8 @@ services:
       - zookeeper
     volumes:
       - ./pkg/driver/clickhouse/testdata/cluster_config/ch-cluster-02:/etc/clickhouse-server
+
+  bigquery:
+    image: ghcr.io/goccy/bigquery-emulator:0.4.4
+    command: |
+      --project=test --dataset=dbmate_test
