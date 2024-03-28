@@ -61,7 +61,10 @@ update-deps:
 	go get -u ./...
 	go mod tidy
 	go mod verify
-	cd typescript && ./node_modules/.bin/npm-check-updates --upgrade && npm install
+	cd typescript && \
+		rm -f package-lock.json && \
+		./node_modules/.bin/npm-check-updates --upgrade && \
+		npm install
 
 .PHONY: docker-all
 docker-all:
