@@ -152,7 +152,7 @@ async function main() {
   await cp("../README.md", "dist/dbmate/README.md");
 }
 
-main().catch((e) => {
+main().catch((e: unknown) => {
   console.error(e);
   process.exit(1);
 });
