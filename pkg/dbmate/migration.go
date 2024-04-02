@@ -2,9 +2,11 @@ package dbmate
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -205,4 +207,177 @@ func substring(s string, begin, end int) string {
 		return ""
 	}
 	return s[begin:end]
+}
+
+type migrationRange struct {
+	start *string
+	end   *string
+}
+
+type migrationTracking struct {
+	lengthOfMigrations          int
+	currentMigration            int
+	singleMigrationsLookup      map[string]migrationRange
+	activeMigrationsLookup      map[string]migrationRange
+	inactiveMigrationsLookup    map[string]migrationRange
+	inactiveEndMigrationsLookup map[string]migrationRange
+}
+
+func filterMigrations(givenMigrations []string, migrations []Migration) ([]Migration, error) {
+	tracking := newMigrationTracking(givenMigrations, len(migrations))
+	if tracking == nil {
+		return migrations, nil
+	}
+	filteredMigrations := make([]Migration, 0, len(migrations))
+	for _, migration := range migrations {
+		if !tracking.addNext(migration) {
+			continue
+		}
+		filteredMigrations = append(filteredMigrations, migration)
+	}
+	notFound, err := tracking.givenMigrationsNotFound()
+	if err != nil {
+		return nil, err
+	}
+	if len(notFound) > 0 {
+		return nil, fmt.Errorf("%w `%v` %d", ErrMigrationNotFound, notFound, len(notFound))
+	}
+	return filteredMigrations, nil
+}
+
+// given migrations is a list of migrations
+// a migration can be either the migration version or the migration file name
+// Ranges are supported as well.
+//
+// dbmate -m ...version # everything before and including version
+// dbmate -m version... # everything starting at version and after
+// dbmate -m version...version2 # everything starting at version and ending at version2
+func newMigrationTracking(givenMigrations []string, lengthOfMigrations int) *migrationTracking {
+	if len(givenMigrations) == 0 {
+		return nil
+	}
+
+	singleMigrationsLookup := make(map[string]migrationRange)
+	inactiveMigrationsLookup := make(map[string]migrationRange)
+	inactiveEndMigrationsLookup := make(map[string]migrationRange)
+	activeMigrationsLookup := make(map[string]migrationRange)
+
+	for _, given := range givenMigrations {
+		if !strings.Contains(given, "...") {
+			singleMigrationsLookup[given] = migrationRange{}
+			continue
+		}
+
+		mr := migrationRange{}
+		split := strings.Split(given, "...")
+		start := split[0]
+		if start == "" {
+			mr.start = nil
+		} else {
+			mr.start = &start
+		}
+		if len(split) > 1 {
+			mr.end = &split[1]
+		}
+		// Empty range means all migrations
+		if mr.start == nil && mr.end == nil {
+			return nil
+		}
+		if mr.start == nil {
+			activeMigrationsLookup[*mr.end] = mr
+		} else {
+			inactiveMigrationsLookup[*mr.start] = mr
+			if mr.end != nil {
+				inactiveEndMigrationsLookup[*mr.end] = mr
+			}
+		}
+	}
+
+	return &migrationTracking{
+		currentMigration:            0,
+		lengthOfMigrations:          lengthOfMigrations,
+		singleMigrationsLookup:      singleMigrationsLookup,
+		activeMigrationsLookup:      activeMigrationsLookup,
+		inactiveMigrationsLookup:    inactiveMigrationsLookup,
+		inactiveEndMigrationsLookup: inactiveEndMigrationsLookup,
+	}
+}
+
+func (ar *migrationTracking) givenMigrationsNotFound() ([]string, error) {
+	notFound := make([]string, 0)
+	for m := range ar.singleMigrationsLookup {
+		notFound = append(notFound, m)
+	}
+	for _, mr := range ar.inactiveMigrationsLookup {
+		notFound = append(notFound, *mr.start)
+	}
+	for key, mr := range ar.activeMigrationsLookup {
+		if key != "" && mr.end != nil {
+			if _, ok := ar.inactiveEndMigrationsLookup[*mr.end]; !ok {
+				return notFound, fmt.Errorf("%w %v...%v because end comes before start- their order should be reversed", ErrMigrationNotFound, *mr.start, *mr.end)
+			}
+			notFound = append(notFound, *mr.end)
+		}
+	}
+	return notFound, nil
+}
+
+func (ar *migrationTracking) retrieveMigration(mapping map[string]migrationRange, migration Migration) (migrationRange, bool) {
+	if m, ok := mapping[migration.Version]; ok {
+		delete(mapping, migration.Version)
+		return m, true
+	}
+	if m, ok := mapping[migration.FileName]; ok {
+		delete(mapping, migration.FileName)
+		return m, true
+	}
+
+	// support using a numeric index with a leading plus
+	positiveStr := "+" + strconv.FormatInt(int64(ar.currentMigration), 10)
+	if m, ok := mapping[positiveStr]; ok {
+		delete(mapping, positiveStr)
+		return m, true
+	}
+	// the numeric index can be negative (this is more useful than positive)
+	negative := ar.currentMigration - ar.lengthOfMigrations
+	negativeStr := strconv.FormatInt(int64(negative), 10)
+	if m, ok := mapping[negativeStr]; ok {
+		delete(mapping, negativeStr)
+		return m, true
+	}
+
+	return migrationRange{}, false
+}
+
+// addNext returns true if the migration is selected
+func (ar *migrationTracking) addNext(migration Migration) bool {
+	ar.currentMigration++
+	selected := false
+	if _, ok := ar.retrieveMigration(ar.singleMigrationsLookup, migration); ok {
+		selected = true
+	}
+	if _, ok := ar.retrieveMigration(ar.activeMigrationsLookup, migration); ok {
+		selected = true
+	}
+	// Tracking just for error handling purposes
+	_, _ = ar.retrieveMigration(ar.inactiveEndMigrationsLookup, migration)
+
+	// transfer from inactive to active
+	if mr, ok := ar.retrieveMigration(ar.inactiveMigrationsLookup, migration); ok {
+		if mr.end == nil {
+			// active for all the rest of the migrations
+			ar.activeMigrationsLookup[""] = mr
+		} else {
+			// check to see if start and end are the same
+			if *mr.end != migration.Version && *mr.end != migration.FileName {
+				ar.activeMigrationsLookup[*mr.end] = mr
+			}
+		}
+	}
+
+	if len(ar.activeMigrationsLookup) > 0 {
+		return true
+	}
+
+	return selected
 }
