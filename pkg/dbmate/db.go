@@ -361,7 +361,11 @@ func (db *DB) Migrate() error {
 	}
 
 	if len(pendingMigrations) > 0 && db.Strict && pendingMigrations[0].Version <= highestAppliedMigrationVersion {
-		return fmt.Errorf("migration `%s` is out of order with already applied migrations, the version number has to be higher than the applied migration `%s` in --strict mode", pendingMigrations[0].Version, highestAppliedMigrationVersion)
+		return fmt.Errorf(
+			"migration `%s` is out of order with already applied migrations, the version number has to be higher than the applied migration `%s` in --strict mode",
+			pendingMigrations[0].Version,
+			highestAppliedMigrationVersion,
+		)
 	}
 
 	sqlDB, err := db.openDatabaseForMigration(drv)
@@ -484,7 +488,7 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 			migration := Migration{
 				Applied:  false,
 				FileName: matches[0],
-				FilePath: filepath.Join(dir, matches[0]),
+				FilePath: path.Join(dir, matches[0]),
 				FS:       db.FS,
 				Version:  matches[1],
 			}
@@ -496,9 +500,11 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 		}
 	}
 
-	sort.Slice(migrations, func(i, j int) bool {
-		return migrations[i].FileName < migrations[j].FileName
-	})
+	sort.Slice(
+		migrations, func(i, j int) bool {
+			return migrations[i].FileName < migrations[j].FileName
+		},
+	)
 
 	return migrations, nil
 }
