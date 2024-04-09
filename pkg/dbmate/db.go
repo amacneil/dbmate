@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -423,7 +424,7 @@ func (db *DB) printVerbose(result sql.Result) {
 }
 
 func (db *DB) readMigrationsDir(dir string) ([]fs.DirEntry, error) {
-	path := filepath.Clean(dir)
+	path := path.Clean(dir)
 
 	// We use nil instead of os.DirFS() because DirFS cannot support both relative and absolute
 	// directory paths - it must be anchored at either "." or "/", which we do not know in advance.
