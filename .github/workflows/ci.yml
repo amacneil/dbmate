@@ -72,6 +72,10 @@ jobs:
           GOARCH: ${{ matrix.arch }}
           OUTPUT: dbmate-${{ matrix.os }}-${{ matrix.arch }}
 
+      - run: make test
+        env:
+          GOARCH: ${{ matrix.arch }}
+
       - run: dist/dbmate-${{ matrix.os }}-${{ matrix.arch }} --help
         if: ${{ matrix.arch == 'amd64' }}
 
