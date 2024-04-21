@@ -49,6 +49,7 @@ jobs:
           - os: windows
             image: windows-latest
             arch: amd64
+            setup: winget install -e --id SQLite.SQLite
             env: {}
 
     name: Build (${{ matrix.os }}/${{ matrix.arch }})
