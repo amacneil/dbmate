@@ -49,6 +49,7 @@ jobs:
           - os: windows
             image: windows-latest
             arch: amd64
+            setup: choco install sqlite
             env: {}
 
     name: Build (${{ matrix.os }}/${{ matrix.arch }})
@@ -71,6 +72,11 @@ jobs:
         env:
           GOARCH: ${{ matrix.arch }}
           OUTPUT: dbmate-${{ matrix.os }}-${{ matrix.arch }}
+
+      - run: make test
+        if: ${{ matrix.arch == 'amd64' }}
+        env:
+          GOARCH: ${{ matrix.arch }}
 
       - run: dist/dbmate-${{ matrix.os }}-${{ matrix.arch }} --help
         if: ${{ matrix.arch == 'amd64' }}

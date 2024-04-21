@@ -15,7 +15,7 @@ import (
 )
 
 func testSQLiteDriver(t *testing.T) *Driver {
-	u := dbutil.MustParseURL(os.Getenv("SQLITE_TEST_URL"))
+	u := dbutil.MustParseURL("sqlite:dbmate_test.sqlite3")
 	drv, err := dbmate.New(u).Driver()
 	require.NoError(t, err)
 
@@ -385,7 +385,8 @@ func TestSQLitePing(t *testing.T) {
 
 	// ping database should fail
 	err = drv.Ping()
-	require.EqualError(t, err, "unable to open database file: is a directory")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unable to open database file")
 }
 
 func TestSQLiteQuotedMigrationsTableName(t *testing.T) {

@@ -20,7 +20,12 @@ func testClickHouseDriverURL(t *testing.T, url string) *Driver {
 }
 
 func testClickHouseDriver(t *testing.T) *Driver {
-	return testClickHouseDriverURL(t, os.Getenv("CLICKHOUSE_TEST_URL"))
+	url := os.Getenv("CLICKHOUSE_TEST_URL")
+	if url == "" {
+		t.Skip("no CLICKHOUSE_TEST_URL provided")
+	}
+
+	return testClickHouseDriverURL(t, url)
 }
 
 func prepTestClickHouseDB(t *testing.T, drv *Driver) *sql.DB {
