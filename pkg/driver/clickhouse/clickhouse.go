@@ -40,7 +40,7 @@ func NewDriver(config dbmate.DriverConfig) dbmate.Driver {
 
 func connectionString(initialURL *url.URL) string {
 	// clone url
-	u := dbutil.MustParseURL(initialURL.String())
+	u, _ := url.Parse(initialURL.String())
 
 	host := u.Host
 	if u.Port() == "" {
@@ -109,7 +109,12 @@ func (drv *Driver) onClusterClause() string {
 }
 
 func (drv *Driver) databaseName() string {
-	name := strings.TrimLeft(dbutil.MustParseURL(connectionString(drv.databaseURL)).Path, "/")
+	u, err := url.Parse(connectionString(drv.databaseURL))
+	if err != nil {
+		panic(err)
+	}
+
+	name := strings.TrimLeft(u.Path, "/")
 	if name == "" {
 		name = "default"
 	}

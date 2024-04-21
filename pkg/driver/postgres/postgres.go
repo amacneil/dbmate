@@ -91,8 +91,11 @@ func connectionString(u *url.URL) string {
 	return out.String()
 }
 
-func connectionArgsForDump(u *url.URL) []string {
-	u = dbutil.MustParseURL(connectionString(u))
+func connectionArgsForDump(conn *url.URL) []string {
+	u, err := url.Parse(connectionString(conn))
+	if err != nil {
+		panic(err)
+	}
 
 	// find schemas from search_path
 	query := u.Query()

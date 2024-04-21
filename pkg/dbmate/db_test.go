@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
+	"github.com/amacneil/dbmate/v2/pkg/dbtest"
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
 	_ "github.com/amacneil/dbmate/v2/pkg/driver/mysql"
 	_ "github.com/amacneil/dbmate/v2/pkg/driver/postgres"
@@ -21,12 +22,12 @@ import (
 
 var rootDir string
 
-func sqliteTestURL() *url.URL {
-	return dbutil.MustParseURL("sqlite:dbmate_test.sqlite3")
+func sqliteTestURL(t *testing.T) *url.URL {
+	return dbtest.MustParseURL(t, "sqlite:dbmate_test.sqlite3")
 }
 
-func sqliteBrokenTestURL() *url.URL {
-	return dbutil.MustParseURL("sqlite:/doesnotexist/dbmate_test.sqlite3")
+func sqliteBrokenTestURL(t *testing.T) *url.URL {
+	return dbtest.MustParseURL(t, "sqlite:/doesnotexist/dbmate_test.sqlite3")
 }
 
 func newTestDB(t *testing.T, u *url.URL) *dbmate.DB {
@@ -48,7 +49,7 @@ func newTestDB(t *testing.T, u *url.URL) *dbmate.DB {
 }
 
 func TestNew(t *testing.T) {
-	db := dbmate.New(dbutil.MustParseURL("foo:test"))
+	db := dbmate.New(dbtest.MustParseURL(t, "foo:test"))
 	require.True(t, db.AutoDumpSchema)
 	require.Equal(t, "foo:test", db.DatabaseURL.String())
 	require.Equal(t, []string{"./db/migrations"}, db.MigrationsDir)
@@ -68,14 +69,14 @@ func TestGetDriver(t *testing.T) {
 	})
 
 	t.Run("missing schema", func(t *testing.T) {
-		db := dbmate.New(dbutil.MustParseURL("//hi"))
+		db := dbmate.New(dbtest.MustParseURL(t, "//hi"))
 		drv, err := db.Driver()
 		require.Nil(t, drv)
 		require.EqualError(t, err, "invalid url, have you set your --url flag or DATABASE_URL environment variable?")
 	})
 
 	t.Run("invalid driver", func(t *testing.T) {
-		db := dbmate.New(dbutil.MustParseURL("foo://bar"))
+		db := dbmate.New(dbtest.MustParseURL(t, "foo://bar"))
 		drv, err := db.Driver()
 		require.EqualError(t, err, "unsupported driver: foo")
 		require.Nil(t, drv)
@@ -83,7 +84,7 @@ func TestGetDriver(t *testing.T) {
 }
 
 func TestWait(t *testing.T) {
-	db := newTestDB(t, sqliteTestURL())
+	db := newTestDB(t, sqliteTestURL(t))
 
 	// speed up retry loop for testing
 	db.WaitInterval = time.Millisecond
@@ -95,7 +96,7 @@ func TestWait(t *testing.T) {
 	})
 
 	t.Run("invalid connection", func(t *testing.T) {
-		db.DatabaseURL = sqliteBrokenTestURL()
+		db.DatabaseURL = sqliteBrokenTestURL(t)
 
 		err := db.Wait()
 		require.Error(t, err)
@@ -104,7 +105,7 @@ func TestWait(t *testing.T) {
 }
 
 func TestDumpSchema(t *testing.T) {
-	db := newTestDB(t, sqliteTestURL())
+	db := newTestDB(t, sqliteTestURL(t))
 
 	// create custom schema file directory
 	dir, err := os.MkdirTemp("", "dbmate")
@@ -137,7 +138,7 @@ func TestDumpSchema(t *testing.T) {
 }
 
 func TestAutoDumpSchema(t *testing.T) {
-	db := newTestDB(t, sqliteTestURL())
+	db := newTestDB(t, sqliteTestURL(t))
 	db.AutoDumpSchema = true
 
 	// create custom schema file directory
@@ -180,7 +181,7 @@ func TestAutoDumpSchema(t *testing.T) {
 }
 
 func TestLoadSchema(t *testing.T) {
-	db := newTestDB(t, sqliteTestURL())
+	db := newTestDB(t, sqliteTestURL(t))
 	drv, err := db.Driver()
 	require.NoError(t, err)
 
@@ -245,7 +246,7 @@ func TestLoadSchema(t *testing.T) {
 
 func checkWaitCalled(t *testing.T, db *dbmate.DB, command func() error) {
 	oldDatabaseURL := db.DatabaseURL
-	db.DatabaseURL = sqliteBrokenTestURL()
+	db.DatabaseURL = sqliteBrokenTestURL(t)
 
 	err := command()
 	require.Error(t, err)
@@ -255,7 +256,7 @@ func checkWaitCalled(t *testing.T, db *dbmate.DB, command func() error) {
 }
 
 func testWaitBefore(t *testing.T, verbose bool) {
-	u := sqliteTestURL()
+	u := sqliteTestURL(t)
 	db := newTestDB(t, u)
 	db.Verbose = verbose
 	db.WaitBefore = true
@@ -329,7 +330,7 @@ Rows affected: 0`)
 
 func testEachURL(t *testing.T, fn func(*testing.T, *url.URL)) {
 	t.Run("sqlite", func(t *testing.T) {
-		fn(t, sqliteTestURL())
+		fn(t, sqliteTestURL(t))
 	})
 
 	optionalTestURLs := []string{"MYSQL_TEST_URL", "POSTGRES_TEST_URL"}
@@ -337,12 +338,8 @@ func testEachURL(t *testing.T, fn func(*testing.T, *url.URL)) {
 		// split on underscore and take first part
 		testname := strings.ToLower(strings.Split(varname, "_")[0])
 		t.Run(testname, func(t *testing.T) {
-			val := os.Getenv(varname)
-			if val == "" {
-				t.Skipf("no %s url provided", varname)
-			} else {
-				fn(t, dbutil.MustParseURL(val))
-			}
+			u := dbtest.GetenvURLOrSkip(t, varname)
+			fn(t, u)
 		})
 	}
 }
@@ -543,7 +540,7 @@ func TestFindMigrations(t *testing.T) {
 
 func TestFindMigrationsAbsolute(t *testing.T) {
 	t.Run("relative path", func(t *testing.T) {
-		db := newTestDB(t, sqliteTestURL())
+		db := newTestDB(t, sqliteTestURL(t))
 		db.MigrationsDir = []string{"db/migrations"}
 
 		migrations, err := db.FindMigrations()
@@ -562,7 +559,7 @@ func TestFindMigrationsAbsolute(t *testing.T) {
 		require.NoError(t, err)
 		defer file.Close()
 
-		db := newTestDB(t, sqliteTestURL())
+		db := newTestDB(t, sqliteTestURL(t))
 		db.MigrationsDir = []string{dir}
 		require.Nil(t, db.FS)
 
@@ -594,7 +591,7 @@ drop table users;
 		"db/not_migrations/20151129054053_test_migration.sql": {},
 	}
 
-	db := newTestDB(t, sqliteTestURL())
+	db := newTestDB(t, sqliteTestURL(t))
 	db.FS = mapFS
 
 	// drop and recreate database
@@ -641,7 +638,7 @@ func TestFindMigrationsFSMultipleDirs(t *testing.T) {
 		"db/migrations_c/006_test_migration_c.sql": {},
 	}
 
-	db := newTestDB(t, sqliteTestURL())
+	db := newTestDB(t, sqliteTestURL(t))
 	db.FS = mapFS
 	db.MigrationsDir = []string{"./db/migrations_a", "./db/migrations_b", "./db/migrations_c"}
 
@@ -667,7 +664,7 @@ func TestMigrateUnrestrictedOrder(t *testing.T) {
 	emptyMigration := []byte("-- migrate:up\n-- migrate:down")
 
 	// initialize database
-	db := newTestDB(t, sqliteTestURL())
+	db := newTestDB(t, sqliteTestURL(t))
 
 	err := db.Drop()
 	require.NoError(t, err)
@@ -698,7 +695,7 @@ func TestMigrateStrictOrder(t *testing.T) {
 	emptyMigration := []byte("-- migrate:up\n-- migrate:down")
 
 	// initialize database
-	db := newTestDB(t, sqliteTestURL())
+	db := newTestDB(t, sqliteTestURL(t))
 	db.Strict = true
 
 	err := db.Drop()
@@ -738,7 +735,7 @@ func TestMigrateStrictOrder(t *testing.T) {
 }
 
 func TestMigrateQueryErrorMessage(t *testing.T) {
-	db := newTestDB(t, sqliteTestURL())
+	db := newTestDB(t, sqliteTestURL(t))
 
 	err := db.Drop()
 	require.NoError(t, err)

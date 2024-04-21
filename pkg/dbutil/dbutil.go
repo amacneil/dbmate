@@ -137,21 +137,6 @@ func QueryValue(db Transaction, query string, args ...interface{}) (string, erro
 	return result.String, nil
 }
 
-// MustParseURL parses a URL from string, and panics if it fails.
-// It is used during testing and in cases where we are parsing a generated URL.
-func MustParseURL(s string) *url.URL {
-	if s == "" {
-		panic("missing url")
-	}
-
-	u, err := url.Parse(s)
-	if err != nil {
-		panic(err)
-	}
-
-	return u
-}
-
 // MustUnescapePath unescapes a URL path, and panics if it fails.
 // It is used during in cases where we are parsing a generated path.
 func MustUnescapePath(s string) string {
