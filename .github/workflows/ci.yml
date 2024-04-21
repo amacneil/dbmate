@@ -49,7 +49,7 @@ jobs:
           - os: windows
             image: windows-latest
             arch: amd64
-            setup: winget install -e --id SQLite.SQLite
+            setup: choco install sqlite
             env: {}
 
     name: Build (${{ matrix.os }}/${{ matrix.arch }})
