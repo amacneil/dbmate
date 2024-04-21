@@ -40,7 +40,7 @@ ls:
 
 .PHONY: test
 test:
-	go test -p 1 $(FLAGS) ./...
+	go test -v -p 1 $(FLAGS) ./...
 
 .PHONY: lint
 lint:
