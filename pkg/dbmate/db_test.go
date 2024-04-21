@@ -205,7 +205,7 @@ func TestLoadSchema(t *testing.T) {
 	// load schema should return error
 	err = db.LoadSchema()
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "no such file or directory")
+	require.Regexp(t, "(no such file or directory|system cannot find the path specified)", err.Error())
 
 	// create schema file
 	err = db.DumpSchema()
