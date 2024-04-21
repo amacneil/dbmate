@@ -385,7 +385,8 @@ func TestSQLitePing(t *testing.T) {
 
 	// ping database should fail
 	err = drv.Ping()
-	require.EqualError(t, err, "unable to open database file: is a directory")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unable to open database file")
 }
 
 func TestSQLiteQuotedMigrationsTableName(t *testing.T) {

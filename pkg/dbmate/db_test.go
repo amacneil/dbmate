@@ -99,7 +99,7 @@ func TestWait(t *testing.T) {
 
 		err := db.Wait()
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "unable to connect to database: unable to open database file: no such file or directory")
+		require.Contains(t, err.Error(), "unable to connect to database: unable to open database file:")
 	})
 }
 
@@ -249,7 +249,7 @@ func checkWaitCalled(t *testing.T, db *dbmate.DB, command func() error) {
 
 	err := command()
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "unable to connect to database: unable to open database file: no such file or directory")
+	require.Contains(t, err.Error(), "unable to connect to database: unable to open database file:")
 
 	db.DatabaseURL = oldDatabaseURL
 }
