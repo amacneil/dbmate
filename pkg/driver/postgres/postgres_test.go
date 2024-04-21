@@ -15,7 +15,12 @@ import (
 )
 
 func testPostgresDriver(t *testing.T) *Driver {
-	u := dbutil.MustParseURL(os.Getenv("POSTGRES_TEST_URL"))
+	url := os.Getenv("POSTGRES_TEST_URL")
+	if url == "" {
+		t.Skip("no POSTGRES_TEST_URL provided")
+	}
+
+	u := dbutil.MustParseURL(url)
 	drv, err := dbmate.New(u).Driver()
 	require.NoError(t, err)
 
@@ -23,10 +28,11 @@ func testPostgresDriver(t *testing.T) *Driver {
 }
 
 func testRedshiftDriver(t *testing.T) *Driver {
-	url, ok := os.LookupEnv("REDSHIFT_TEST_URL")
-	if !ok {
-		t.Skip("skipping test, no REDSHIFT_TEST_URL provided")
+	url := os.Getenv("REDSHIFT_TEST_URL")
+	if url == "" {
+		t.Skip("no REDSHIFT_TEST_URL provided")
 	}
+
 	u := dbutil.MustParseURL(url)
 	drv, err := dbmate.New(u).Driver()
 	require.NoError(t, err)
@@ -399,10 +405,6 @@ func TestPostgresCreateMigrationsTable(t *testing.T) {
 }
 
 func TestRedshiftCreateMigrationsTable(t *testing.T) {
-	if _, ok := os.LookupEnv("REDSHIFT_TEST_URL"); !ok {
-		t.Skip("skipping test, no REDSHIFT_TEST_URL provided")
-	}
-
 	t.Run("default schema", func(t *testing.T) {
 		drv := testRedshiftDriver(t)
 		db := prepRedshiftTestDB(t, drv)

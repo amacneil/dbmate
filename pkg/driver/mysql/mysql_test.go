@@ -13,7 +13,12 @@ import (
 )
 
 func testMySQLDriver(t *testing.T) *Driver {
-	u := dbutil.MustParseURL(os.Getenv("MYSQL_TEST_URL"))
+	url := os.Getenv("MYSQL_TEST_URL")
+	if url == "" {
+		t.Skip("no MYSQL_TEST_URL provided")
+	}
+
+	u := dbutil.MustParseURL(url)
 	drv, err := dbmate.New(u).Driver()
 	require.NoError(t, err)
 

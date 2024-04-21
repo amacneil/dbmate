@@ -2,6 +2,7 @@
 .env
 .idea
 *.log
+*.sqlite3
 /.cache
 /db
 /dbmate

@@ -13,12 +13,22 @@ import (
 )
 
 func testClickHouseDriverCluster01(t *testing.T) *Driver {
-	u := fmt.Sprintf("%s?on_cluster", os.Getenv("CLICKHOUSE_CLUSTER_01_TEST_URL"))
+	url := os.Getenv("CLICKHOUSE_CLUSTER_01_TEST_URL")
+	if url == "" {
+		t.Skip("no CLICKHOUSE_CLUSTER_01_TEST_URL provided")
+	}
+
+	u := fmt.Sprintf("%s?on_cluster", url)
 	return testClickHouseDriverURL(t, u)
 }
 
 func testClickHouseDriverCluster02(t *testing.T) *Driver {
-	u := fmt.Sprintf("%s?on_cluster", os.Getenv("CLICKHOUSE_CLUSTER_02_TEST_URL"))
+	url := os.Getenv("CLICKHOUSE_CLUSTER_02_TEST_URL")
+	if url == "" {
+		t.Skip("no CLICKHOUSE_CLUSTER_02_TEST_URL provided")
+	}
+
+	u := fmt.Sprintf("%s?on_cluster", url)
 	return testClickHouseDriverURL(t, u)
 }
 
@@ -37,6 +47,10 @@ func assertDatabaseExists(t *testing.T, drv *Driver, shouldExist bool) {
 
 // Makes sure driver creatinon is atomic
 func TestDriverCreationSanity(t *testing.T) {
+	if os.Getenv("CLICKHOUSE_CLUSTER_01_TEST_URL") == "" {
+		t.Skip("no CLICKHOUSE_CLUSTER_01_TEST_URL provided")
+	}
+
 	url := fmt.Sprintf("%s?on_cluster", os.Getenv("CLICKHOUSE_CLUSTER_01_TEST_URL"))
 	u := dbutil.MustParseURL(url)
 	dbm := dbmate.New(u)

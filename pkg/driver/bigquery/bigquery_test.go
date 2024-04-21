@@ -14,7 +14,12 @@ import (
 )
 
 func testBigQueryDriver(t *testing.T) *Driver {
-	u := dbutil.MustParseURL(os.Getenv("BIGQUERY_TEST_URL"))
+	url := os.Getenv("BIGQUERY_TEST_URL")
+	if url == "" {
+		t.Skip("no BIGQUERY_TEST_URL provided")
+	}
+
+	u := dbutil.MustParseURL(url)
 	drv, err := dbmate.New(u).Driver()
 	require.NoError(t, err)
 
@@ -22,9 +27,9 @@ func testBigQueryDriver(t *testing.T) *Driver {
 }
 
 func testGoogleBigQueryDriver(t *testing.T) *Driver {
-	testURL, ok := os.LookupEnv("GOOGLE_BIGQUERY_TEST_URL")
-	if !ok {
-		t.Skip("skipping test, no GOOGLE_BIGQUERY_TEST_URL provided")
+	testURL := os.Getenv("GOOGLE_BIGQUERY_TEST_URL")
+	if testURL == "" {
+		t.Skip("no GOOGLE_BIGQUERY_TEST_URL provided")
 	}
 	u := dbutil.MustParseURL(testURL)
 
