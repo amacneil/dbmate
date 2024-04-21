@@ -2,35 +2,14 @@ package clickhouse
 
 import (
 	"database/sql"
-	"fmt"
-	"os"
 	"testing"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
+	"github.com/amacneil/dbmate/v2/pkg/dbtest"
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
 
 	"github.com/stretchr/testify/require"
 )
-
-func testClickHouseDriverCluster01(t *testing.T) *Driver {
-	url := os.Getenv("CLICKHOUSE_CLUSTER_01_TEST_URL")
-	if url == "" {
-		t.Skip("no CLICKHOUSE_CLUSTER_01_TEST_URL provided")
-	}
-
-	u := fmt.Sprintf("%s?on_cluster", url)
-	return testClickHouseDriverURL(t, u)
-}
-
-func testClickHouseDriverCluster02(t *testing.T) *Driver {
-	url := os.Getenv("CLICKHOUSE_CLUSTER_02_TEST_URL")
-	if url == "" {
-		t.Skip("no CLICKHOUSE_CLUSTER_02_TEST_URL provided")
-	}
-
-	u := fmt.Sprintf("%s?on_cluster", url)
-	return testClickHouseDriverURL(t, u)
-}
 
 func assertDatabaseExists(t *testing.T, drv *Driver, shouldExist bool) {
 	db, err := sql.Open("clickhouse", drv.databaseURL.String())
@@ -47,15 +26,13 @@ func assertDatabaseExists(t *testing.T, drv *Driver, shouldExist bool) {
 
 // Makes sure driver creatinon is atomic
 func TestDriverCreationSanity(t *testing.T) {
-	if os.Getenv("CLICKHOUSE_CLUSTER_01_TEST_URL") == "" {
-		t.Skip("no CLICKHOUSE_CLUSTER_01_TEST_URL provided")
-	}
-
-	url := fmt.Sprintf("%s?on_cluster", os.Getenv("CLICKHOUSE_CLUSTER_01_TEST_URL"))
-	u := dbutil.MustParseURL(url)
+	u := dbtest.GetenvURLOrSkip(t, "CLICKHOUSE_CLUSTER_01_TEST_URL")
+	u.RawQuery = "on_cluster"
 	dbm := dbmate.New(u)
+
 	drv, err := dbm.Driver()
 	require.NoError(t, err)
+
 	drvAgain, err := dbm.Driver()
 	require.NoError(t, err)
 
@@ -77,8 +54,7 @@ func TestOnClusterClause(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.input, func(t *testing.T) {
-			drv := testClickHouseDriverURL(t, c.input)
-
+			drv := testClickHouseDriverURL(t, dbtest.MustParseURL(t, c.input))
 			actual := drv.onClusterClause()
 			require.Equal(t, c.expected, actual)
 		})

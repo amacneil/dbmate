@@ -3,9 +3,9 @@ package clickhouse
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/amacneil/dbmate/v2/pkg/dbtest"
 
-	"github.com/amacneil/dbmate/v2/pkg/dbutil"
+	"github.com/stretchr/testify/require"
 )
 
 func TestOnCluster(t *testing.T) {
@@ -25,7 +25,7 @@ func TestOnCluster(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.input, func(t *testing.T) {
-			u := dbutil.MustParseURL(c.input)
+			u := dbtest.MustParseURL(t, c.input)
 
 			actual := extractOnCluster(u)
 			require.Equal(t, c.expected, actual)
@@ -46,7 +46,7 @@ func TestClusterMacro(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.input, func(t *testing.T) {
-			u := dbutil.MustParseURL(c.input)
+			u := dbtest.MustParseURL(t, c.input)
 
 			actual := extractClusterMacro(u)
 			require.Equal(t, c.expected, actual)
@@ -67,7 +67,7 @@ func TestReplicaMacro(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.input, func(t *testing.T) {
-			u := dbutil.MustParseURL(c.input)
+			u := dbtest.MustParseURL(t, c.input)
 
 			actual := extractReplicaMacro(u)
 			require.Equal(t, c.expected, actual)
@@ -88,7 +88,7 @@ func TestZookeeperPath(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.input, func(t *testing.T) {
-			u := dbutil.MustParseURL(c.input)
+			u := dbtest.MustParseURL(t, c.input)
 
 			actual := extractZookeeperPath(u)
 			require.Equal(t, c.expected, actual)

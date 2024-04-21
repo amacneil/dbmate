@@ -6,13 +6,14 @@ import (
 	"testing"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
+	"github.com/amacneil/dbmate/v2/pkg/dbtest"
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
 
 	"github.com/stretchr/testify/require"
 )
 
 func TestGetDriver(t *testing.T) {
-	db := dbmate.New(dbutil.MustParseURL("clickhouse://"))
+	db := dbmate.New(dbtest.MustParseURL(t, "clickhouse://"))
 	drvInterface, err := db.Driver()
 	require.NoError(t, err)
 

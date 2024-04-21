@@ -4,23 +4,18 @@ import (
 	"database/sql"
 	"fmt"
 	"net/url"
-	"os"
 	"runtime"
 	"testing"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
+	"github.com/amacneil/dbmate/v2/pkg/dbtest"
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
 
 	"github.com/stretchr/testify/require"
 )
 
 func testPostgresDriver(t *testing.T) *Driver {
-	url := os.Getenv("POSTGRES_TEST_URL")
-	if url == "" {
-		t.Skip("no POSTGRES_TEST_URL provided")
-	}
-
-	u := dbutil.MustParseURL(url)
+	u := dbtest.GetenvURLOrSkip(t, "POSTGRES_TEST_URL")
 	drv, err := dbmate.New(u).Driver()
 	require.NoError(t, err)
 
@@ -28,12 +23,7 @@ func testPostgresDriver(t *testing.T) *Driver {
 }
 
 func testRedshiftDriver(t *testing.T) *Driver {
-	url := os.Getenv("REDSHIFT_TEST_URL")
-	if url == "" {
-		t.Skip("no REDSHIFT_TEST_URL provided")
-	}
-
-	u := dbutil.MustParseURL(url)
+	u := dbtest.GetenvURLOrSkip(t, "REDSHIFT_TEST_URL")
 	drv, err := dbmate.New(u).Driver()
 	require.NoError(t, err)
 
@@ -75,7 +65,7 @@ func prepRedshiftTestDB(t *testing.T, drv *Driver) *sql.DB {
 }
 
 func TestGetDriver(t *testing.T) {
-	db := dbmate.New(dbutil.MustParseURL("postgres://"))
+	db := dbmate.New(dbtest.MustParseURL(t, "postgres://"))
 	drvInterface, err := db.Driver()
 	require.NoError(t, err)
 

@@ -3,22 +3,17 @@ package mysql
 import (
 	"database/sql"
 	"net/url"
-	"os"
 	"testing"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
+	"github.com/amacneil/dbmate/v2/pkg/dbtest"
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
 
 	"github.com/stretchr/testify/require"
 )
 
 func testMySQLDriver(t *testing.T) *Driver {
-	url := os.Getenv("MYSQL_TEST_URL")
-	if url == "" {
-		t.Skip("no MYSQL_TEST_URL provided")
-	}
-
-	u := dbutil.MustParseURL(url)
+	u := dbtest.GetenvURLOrSkip(t, "MYSQL_TEST_URL")
 	drv, err := dbmate.New(u).Driver()
 	require.NoError(t, err)
 
@@ -44,7 +39,7 @@ func prepTestMySQLDB(t *testing.T) *sql.DB {
 }
 
 func TestGetDriver(t *testing.T) {
-	db := dbmate.New(dbutil.MustParseURL("mysql://"))
+	db := dbmate.New(dbtest.MustParseURL(t, "mysql://"))
 	drvInterface, err := db.Driver()
 	require.NoError(t, err)
 
@@ -152,7 +147,7 @@ func TestMySQLCreateDropDatabase(t *testing.T) {
 
 func TestMySQLDumpArgs(t *testing.T) {
 	drv := testMySQLDriver(t)
-	drv.databaseURL = dbutil.MustParseURL("mysql://bob/mydb")
+	drv.databaseURL = dbtest.MustParseURL(t, "mysql://bob/mydb")
 
 	require.Equal(t, []string{"--opt",
 		"--routines",
@@ -162,7 +157,7 @@ func TestMySQLDumpArgs(t *testing.T) {
 		"--host=bob",
 		"mydb"}, drv.mysqldumpArgs())
 
-	drv.databaseURL = dbutil.MustParseURL("mysql://alice:pw@bob:5678/mydb")
+	drv.databaseURL = dbtest.MustParseURL(t, "mysql://alice:pw@bob:5678/mydb")
 	require.Equal(t, []string{"--opt",
 		"--routines",
 		"--no-data",
@@ -174,7 +169,7 @@ func TestMySQLDumpArgs(t *testing.T) {
 		"--password=pw",
 		"mydb"}, drv.mysqldumpArgs())
 
-	drv.databaseURL = dbutil.MustParseURL("mysql://alice:pw@bob:5678/mydb?socket=/var/run/mysqld/mysqld.sock")
+	drv.databaseURL = dbtest.MustParseURL(t, "mysql://alice:pw@bob:5678/mydb?socket=/var/run/mysqld/mysqld.sock")
 	require.Equal(t, []string{"--opt",
 		"--routines",
 		"--no-data",
