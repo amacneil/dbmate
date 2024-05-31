@@ -377,6 +377,8 @@ func (db *DB) Migrate() error {
 	for _, migration := range pendingMigrations {
 		fmt.Fprintf(db.Log, "Applying: %s\n", migration.FileName)
 
+		start := time.Now()
+
 		parsed, err := migration.Parse()
 		if err != nil {
 			return err
@@ -402,6 +404,9 @@ func (db *DB) Migrate() error {
 			// run outside of transaction
 			err = execMigration(sqlDB)
 		}
+
+		elapsed := time.Since(start)
+		fmt.Fprintf(db.Log, "Applied: %s in %s\n", migration.FileName, elapsed)
 
 		if err != nil {
 			return err
@@ -541,6 +546,8 @@ func (db *DB) Rollback() error {
 
 	fmt.Fprintf(db.Log, "Rolling back: %s\n", latest.FileName)
 
+	start := time.Now()
+
 	parsed, err := latest.Parse()
 	if err != nil {
 		return err
@@ -566,6 +573,9 @@ func (db *DB) Rollback() error {
 		// run outside of transaction
 		err = execMigration(sqlDB)
 	}
+
+	elapsed := time.Since(start)
+	fmt.Fprintf(db.Log, "Rolled back: %s in %s\n", latest.FileName, elapsed)
 
 	if err != nil {
 		return err

@@ -191,6 +191,7 @@ Dropping: myapp_test
 $ dbmate -e TEST_DATABASE_URL --no-dump-schema up
 Creating: myapp_test
 Applying: 20151127184807_create_users_table.sql
+Applied: 20151127184807_create_users_table.sql in 123us
 ```
 
 Alternatively, you can specify the url directly on the command line:
@@ -343,6 +344,7 @@ Run `dbmate up` to run any pending migrations.
 $ dbmate up
 Creating: myapp_development
 Applying: 20151127184807_create_users_table.sql
+Applied: 20151127184807_create_users_table.sql in 123us
 Writing: ./db/schema.sql
 ```
 
@@ -371,6 +373,7 @@ Run `dbmate rollback` to roll back the most recent migration:
 ```sh
 $ dbmate rollback
 Rolling back: 20151127184807_create_users_table.sql
+Rolled back: 20151127184807_create_users_table.sql in 123us
 Writing: ./db/schema.sql
 ```
 

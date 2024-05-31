@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -315,17 +316,13 @@ func TestWaitBeforeVerbose(t *testing.T) {
 	output := capturer.CaptureOutput(func() {
 		testWaitBefore(t, true)
 	})
-	require.Contains(t, output,
-		`Applying: 20151129054053_test_migration.sql
-Last insert ID: 1
-Rows affected: 1
-Applying: 20200227231541_test_posts.sql
-Last insert ID: 1
-Rows affected: 1`)
-	require.Contains(t, output,
-		`Rolling back: 20200227231541_test_posts.sql
-Last insert ID: 0
-Rows affected: 0`)
+	matched, err := regexp.MatchString(`Applying: 20151129054053_test_migration\.sql\nLast insert ID: 1\nRows affected: 1\nApplied: 20151129054053_test_migration\.sql in ([\w.,µ]+)\nApplying: 20200227231541_test_posts\.sql\nLast insert ID: 1\nRows affected: 1\nApplied: 20200227231541_test_posts\.sql in ([\w.,µ]+)`, output)
+	require.NoError(t, err)
+	require.True(t, matched)
+
+	matched, err = regexp.MatchString(`Rolling back: 20200227231541_test_posts\.sql\nLast insert ID: 0\nRows affected: 0\nRolled back: 20200227231541_test_posts\.sql in ([\w.,µ]+)`, output)
+	require.NoError(t, err)
+	require.True(t, matched)
 }
 
 func testEachURL(t *testing.T, fn func(*testing.T, *url.URL)) {
