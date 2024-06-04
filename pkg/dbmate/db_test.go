@@ -316,13 +316,22 @@ func TestWaitBeforeVerbose(t *testing.T) {
 	output := capturer.CaptureOutput(func() {
 		testWaitBefore(t, true)
 	})
-	matched, err := regexp.MatchString(`Applying: 20151129054053_test_migration\.sql\nLast insert ID: 1\nRows affected: 1\nApplied: 20151129054053_test_migration\.sql in ([\w.,µ]+)\nApplying: 20200227231541_test_posts\.sql\nLast insert ID: 1\nRows affected: 1\nApplied: 20200227231541_test_posts\.sql in ([\w.,µ]+)`, output)
-	require.NoError(t, err)
-	require.True(t, matched)
-
-	matched, err = regexp.MatchString(`Rolling back: 20200227231541_test_posts\.sql\nLast insert ID: 0\nRows affected: 0\nRolled back: 20200227231541_test_posts\.sql in ([\w.,µ]+)`, output)
-	require.NoError(t, err)
-	require.True(t, matched)
+	re := regexp.MustCompile(`((Applied|Rolled back): .* in) ([\w.,µ]+)`)
+	maskedOutput := re.ReplaceAllString(output, "$1 ELAPSED")
+	require.Contains(t, maskedOutput,
+		`Applying: 20151129054053_test_migration.sql
+Last insert ID: 1
+Rows affected: 1
+Applied: 20151129054053_test_migration.sql in ELAPSED
+Applying: 20200227231541_test_posts.sql
+Last insert ID: 1
+Rows affected: 1
+Applied: 20200227231541_test_posts.sql in ELAPSED`)
+	require.Contains(t, maskedOutput,
+		`Rolling back: 20200227231541_test_posts.sql
+Last insert ID: 0
+Rows affected: 0
+Rolled back: 20200227231541_test_posts.sql in ELAPSED`)
 }
 
 func testEachURL(t *testing.T, fn func(*testing.T, *url.URL)) {
