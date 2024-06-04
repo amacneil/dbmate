@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -315,17 +316,22 @@ func TestWaitBeforeVerbose(t *testing.T) {
 	output := capturer.CaptureOutput(func() {
 		testWaitBefore(t, true)
 	})
-	require.Contains(t, output,
+	re := regexp.MustCompile(`((Applied|Rolled back): .* in) ([\w.,µ]+)`)
+	maskedOutput := re.ReplaceAllString(output, "$1 ELAPSED")
+	require.Contains(t, maskedOutput,
 		`Applying: 20151129054053_test_migration.sql
 Last insert ID: 1
 Rows affected: 1
+Applied: 20151129054053_test_migration.sql in ELAPSED
 Applying: 20200227231541_test_posts.sql
 Last insert ID: 1
-Rows affected: 1`)
-	require.Contains(t, output,
+Rows affected: 1
+Applied: 20200227231541_test_posts.sql in ELAPSED`)
+	require.Contains(t, maskedOutput,
 		`Rolling back: 20200227231541_test_posts.sql
 Last insert ID: 0
-Rows affected: 0`)
+Rows affected: 0
+Rolled back: 20200227231541_test_posts.sql in ELAPSED`)
 }
 
 func testEachURL(t *testing.T, fn func(*testing.T, *url.URL)) {
