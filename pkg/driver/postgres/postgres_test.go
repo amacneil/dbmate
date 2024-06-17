@@ -30,6 +30,15 @@ func testRedshiftDriver(t *testing.T) *Driver {
 	return drv.(*Driver)
 }
 
+func testSpannerPostgresDriver(t *testing.T) *Driver {
+	// URL to the spanner pgadapter, or a locally-running spanner emulator with the pgadapter
+	u := dbtest.GetenvURLOrSkip(t, "SPANNER_POSTGRES_TEST_URL")
+	drv, err := dbmate.New(u).Driver()
+	require.NoError(t, err)
+
+	return drv.(*Driver)
+}
+
 func prepTestPostgresDB(t *testing.T) *sql.DB {
 	drv := testPostgresDriver(t)
 
@@ -57,6 +66,21 @@ func prepRedshiftTestDB(t *testing.T, drv *Driver) *sql.DB {
 	if err != nil {
 		t.Error(err)
 	}
+
+	_, err = db.Exec(fmt.Sprintf("drop table if exists %s", migrationsTable))
+	require.NoError(t, err)
+
+	return db
+}
+
+func prepTestSpannerPostgresDB(t *testing.T, drv *Driver) *sql.DB {
+	// Spanner doesn't allow running `drop database`, so we just drop the migrations
+	// table instead
+	db, err := sql.Open("postgres", connectionString(drv.databaseURL))
+	require.NoError(t, err)
+
+	_, migrationsTable, err := drv.quotedMigrationsTableNameParts(db)
+	require.NoError(t, err)
 
 	_, err = db.Exec(fmt.Sprintf("drop table if exists %s", migrationsTable))
 	require.NoError(t, err)
@@ -107,6 +131,7 @@ func TestConnectionString(t *testing.T) {
 		{"postgres://bob:secret@/foo?host=/var/run/postgresql", "postgres://bob:secret@:5432/foo?host=%2Fvar%2Frun%2Fpostgresql"},
 		// redshift default port is 5439, not 5432
 		{"redshift://myhost/foo", "postgres://myhost:5439/foo"},
+		{"spanner-postgres://myhost/foo", "postgres://myhost:5432/foo"},
 	}
 
 	for _, c := range cases {
@@ -416,6 +441,28 @@ func TestRedshiftCreateMigrationsTable(t *testing.T) {
 
 		// create table should be idempotent
 		err = drv.CreateMigrationsTable(db)
+		require.NoError(t, err)
+	})
+}
+
+func TestSpannerPostgresCreateMigrationsTable(t *testing.T) {
+	t.Run("default schema", func(t *testing.T) {
+		drv := testSpannerPostgresDriver(t)
+		db := prepTestSpannerPostgresDB(t, drv)
+		defer dbutil.MustClose(db)
+
+		// migrations table should not exist
+		count := 0
+		err := db.QueryRow("select count(*) from public.schema_migrations").Scan(&count)
+		require.Error(t, err, "migrations table exists when it shouldn't")
+		require.Contains(t, err.Error(), "pq: relation \"public.schema_migrations\" does not exist")
+
+		// create table
+		err = drv.CreateMigrationsTable(db)
+		require.NoError(t, err)
+
+		// migrations table should exist
+		err = db.QueryRow("select count(*) from public.schema_migrations").Scan(&count)
 		require.NoError(t, err)
 	})
 }

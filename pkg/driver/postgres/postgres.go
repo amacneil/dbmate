@@ -20,6 +20,7 @@ func init() {
 	dbmate.RegisterDriver(NewDriver, "postgres")
 	dbmate.RegisterDriver(NewDriver, "postgresql")
 	dbmate.RegisterDriver(NewDriver, "redshift")
+	dbmate.RegisterDriver(NewDriver, "spanner-postgres")
 }
 
 // Driver provides top level database functions
@@ -73,17 +74,16 @@ func connectionString(u *url.URL) string {
 	}
 	if port == "" {
 		switch u.Scheme {
-		case "postgresql":
-			fallthrough
-		case "postgres":
-			port = "5432"
 		case "redshift":
 			port = "5439"
+		default:
+			port = "5432"
 		}
 	}
 
 	// generate output URL
 	out, _ := url.Parse(u.String())
+	// force scheme back to postgres if there was another postgres-compatible scheme
 	out.Scheme = "postgres"
 	out.Host = fmt.Sprintf("%s:%s", hostname, port)
 	out.RawQuery = query.Encode()
@@ -439,8 +439,8 @@ func (drv *Driver) quotedMigrationsTableNameParts(db dbutil.Transaction) (string
 		return "", "", err
 	}
 
-	// Quote identifiers for Redshift
-	if drv.databaseURL.Scheme == "redshift" {
+	// Quote identifiers for Redshift and Spanner
+	if drv.databaseURL.Scheme == "redshift" || drv.databaseURL.Scheme == "spanner-postgres" {
 		return pq.QuoteIdentifier(schema), pq.QuoteIdentifier(strings.Join(tableNameParts, ".")), nil
 	}
 

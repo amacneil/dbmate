@@ -311,6 +311,32 @@ bigquery://host:port/projectid/location/dataset?disable_auth=true
 
 `disable_auth` (optional) - Pass `true` to skip Authentication, use only for testing and connecting to emulator.
 
+#### Spanner (PostgreSQL Interface)
+
+Spanner support is currently limited to databases using the [PostgreSQL Dialect](https://cloud.google.com/spanner/docs/postgresql-interface), which must be chosen during database creation. For future Spanner with GoogleSQL support, see [this discussion](https://github.com/amacneil/dbmate/discussions/369).
+
+Spanner with the Postgres interface requires that the [PGAdapter](https://cloud.google.com/spanner/docs/pgadapter) is running. Use the following format for `DATABASE_URL`, with the host and port set to where the PGAdapter is running:
+
+```shell
+DATABASE_URL="spanner-postgres://127.0.0.1:5432/database_name?sslmode=disable"
+```
+
+Note that specifying a username and password is not necessary, as authentication is handled by the PGAdapter (they will be ignored by the PGAdapter if specified).
+
+Other options of the [postgres driver](#postgresql) are supported.
+
+Spanner also doesn't allow DDL to be executed inside explicit transactions. You must therefore specify `transaction:false` on migrations that include DDL:
+
+```sql
+-- migrate:up transaction:false
+CREATE TABLE ...
+
+-- migrate:down transaction:false
+DROP TABLE ...
+```
+
+Schema dumps are not currently supported, as `pg_dump` uses functions that are not provided by Spanner.
+
 ### Creating Migrations
 
 To create a new migration, run `dbmate new create_users_table`. You can name the migration anything you like. This will create a file `db/migrations/20151127184807_create_users_table.sql` in the current directory:
