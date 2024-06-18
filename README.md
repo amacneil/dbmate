@@ -41,15 +41,16 @@ For a comparison between dbmate and other popular database schema migration tool
 
 ## Features
 
-- Supports MySQL, PostgreSQL, SQLite, and ClickHouse.
-- Uses plain SQL for writing schema migrations.
-- Migrations are timestamp-versioned, to avoid version number conflicts with multiple developers.
-- Migrations are run atomically inside a transaction.
-- Supports creating and dropping databases (handy in development/test).
-- Supports saving a `schema.sql` file to easily diff schema changes in git.
-- Database connection URL is defined using an environment variable (`DATABASE_URL` by default), or specified on the command line.
-- Built-in support for reading environment variables from your `.env` file.
-- Easy to distribute, single self-contained binary.
+- Supports MySQL, PostgreSQL, SQLite, and ClickHouse
+- Uses plain SQL for writing schema migrations
+- Migrations are timestamp-versioned, to avoid version number conflicts with multiple developers
+- Migrations are run atomically inside a transaction
+- Supports creating and dropping databases (handy in development/test)
+- Supports saving a `schema.sql` file to easily diff schema changes in git
+- Database connection URL is defined using an environment variable (`DATABASE_URL` by default), or specified on the command line
+- Built-in support for reading environment variables from your `.env` file
+- Easy to distribute, single self-contained binary
+- Does not try to upsell you on a SaaS service
 
 ## Installation
 
