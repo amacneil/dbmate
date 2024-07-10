@@ -6,7 +6,7 @@
 
 Dbmate is a database migration tool that will keep your database schema in sync across multiple developers and your production servers.
 
-It is a standalone command line tool that can be used with Go, Node.js, Python, Ruby, PHP, or any other language or framework you are using to write database-backed applications. This is especially helpful if you are writing multiple services in different languages, and want to maintain some sanity with consistent development tools.
+It is a standalone command line tool that can be used with Go, Node.js, Python, Ruby, PHP, Rust, C++, or any other language or framework you are using to write database-backed applications. This is especially helpful if you are writing multiple services in different languages, and want to maintain some sanity with consistent development tools.
 
 For a comparison between dbmate and other popular database schema migration tools, please see [Alternatives](#alternatives).
 
@@ -23,6 +23,7 @@ For a comparison between dbmate and other popular database schema migration tool
     - [SQLite](#sqlite)
     - [ClickHouse](#clickhouse)
     - [BigQuery](#bigquery)
+    - [Spanner](#spanner)
   - [Creating Migrations](#creating-migrations)
   - [Running Migrations](#running-migrations)
   - [Rolling Back Migrations](#rolling-back-migrations)
@@ -50,7 +51,7 @@ For a comparison between dbmate and other popular database schema migration tool
 - Database connection URL is defined using an environment variable (`DATABASE_URL` by default), or specified on the command line
 - Built-in support for reading environment variables from your `.env` file
 - Easy to distribute, single self-contained binary
-- Does not try to upsell you on a SaaS service
+- Doesn't try to upsell you on a SaaS service
 
 ## Installation
 
@@ -85,7 +86,7 @@ $ sudo chmod +x /usr/local/bin/dbmate
 Install using [Scoop](https://scoop.sh)
 
 ```pwsh
-scoop install dbmate
+$ scoop install dbmate
 ```
 
 **Docker**
@@ -102,20 +103,6 @@ If you wish to create or apply migrations, you will need to use Docker's [bind m
 
 ```sh
 $ docker run --rm -it --network=host -v "$(pwd)/db:/db" ghcr.io/amacneil/dbmate new create_users_table
-```
-
-**Heroku**
-
-To use dbmate on Heroku, either use the NPM method, or store the linux binary in your git repository:
-
-```sh
-$ mkdir -p bin
-$ curl -fsSL -o bin/dbmate https://github.com/amacneil/dbmate/releases/latest/download/dbmate-linux-amd64
-$ chmod +x bin/dbmate
-$ git add bin/dbmate
-$ git commit -m "Add dbmate binary"
-$ git push heroku master
-$ heroku run bin/dbmate --help
 ```
 
 ## Commands
@@ -291,18 +278,20 @@ DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_clu
 [See other supported connection options](https://github.com/ClickHouse/clickhouse-go#dsn).
 
 #### BigQuery
+
 Follow the following format for `DATABASE_URL` when connecting to actual BigQuery in GCP:
 
 ```
 bigquery://projectid/location/dataset
 ```
+
 `projectid` (mandatory) - Project ID
 
 `dataset` (mandatory) - Dataset name within the Project
 
 `location` (optional) - Where Dataset is created
 
-*NOTE: Follow [this doc](https://cloud.google.com/docs/authentication/provide-credentials-adc) on how to set `GOOGLE_APPLICATION_CREDENTIALS` environment variable for proper Authentication*
+_NOTE: Follow [this doc](https://cloud.google.com/docs/authentication/provide-credentials-adc) on how to set `GOOGLE_APPLICATION_CREDENTIALS` environment variable for proper Authentication_
 
 Follow the following format if trying to connect to a custom endpoint e.g. [BigQuery Emulator](https://github.com/goccy/bigquery-emulator)
 
@@ -312,7 +301,7 @@ bigquery://host:port/projectid/location/dataset?disable_auth=true
 
 `disable_auth` (optional) - Pass `true` to skip Authentication, use only for testing and connecting to emulator.
 
-#### Spanner (PostgreSQL Interface)
+#### Spanner
 
 Spanner support is currently limited to databases using the [PostgreSQL Dialect](https://cloud.google.com/spanner/docs/postgresql-interface), which must be chosen during database creation. For future Spanner with GoogleSQL support, see [this discussion](https://github.com/amacneil/dbmate/discussions/369).
 
