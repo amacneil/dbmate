@@ -1,4 +1,4 @@
-# development image
+# development stage
 FROM golang:1.22.5 as dev
 WORKDIR /src
 ENV PATH="/src/typescript/node_modules/.bin:${PATH}"
