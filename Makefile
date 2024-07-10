@@ -66,12 +66,15 @@ update-deps:
 		./node_modules/.bin/npm-check-updates --upgrade && \
 		npm install
 
-.PHONY: docker-all
-docker-all:
+.PHONY: docker-build
+docker-build:
 	docker-compose pull --ignore-buildable
 	docker-compose build
+
+.PHONY: docker-all
+docker-all: docker-build
 	docker-compose run --rm dev make all
 
-.PHONY: docker-sh
-docker-sh:
+.PHONY: docker-dev
+docker-dev:
 	-docker-compose run --rm dev
