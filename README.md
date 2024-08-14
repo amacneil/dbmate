@@ -609,7 +609,7 @@ _If you notice any inaccuracies in this table, please [propose a change](https:/
 
 Dbmate is written in Go, pull requests are welcome.
 
-Tests are run against a real database using docker-compose. To build a docker image and run the tests:
+Tests are run against a real database using docker compose. To build a docker image and run the tests:
 
 ```sh
 $ make docker-all
