@@ -113,29 +113,29 @@ jobs:
           set -x
           docker version
           docker buildx version
-          docker-compose version
+          docker compose version
 
       - name: Build Docker image
         run: |
           set -x
-          docker-compose build
-          docker-compose run --rm --no-deps dbmate --version
+          docker compose build
+          docker compose run --rm --no-deps dbmate --version
 
       - name: Run make build
-        run: docker-compose run --rm --no-deps dev make build ls
+        run: docker compose run --rm --no-deps dev make build ls
 
       - name: Run make lint
-        run: docker-compose run --rm --no-deps dev make lint
+        run: docker compose run --rm --no-deps dev make lint
 
       - name: Start test dependencies
         run: |
           set -x
-          docker-compose pull --ignore-buildable --quiet
-          docker-compose up --detach
-          docker-compose run --rm dev make wait
+          docker compose pull --ignore-buildable --quiet
+          docker compose up --detach
+          docker compose run --rm dev make wait
 
       - name: Run make test
-        run: docker-compose run --rm dev make test
+        run: docker compose run --rm dev make test
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3

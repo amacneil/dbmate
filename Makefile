@@ -68,13 +68,13 @@ update-deps:
 
 .PHONY: docker-build
 docker-build:
-	docker-compose pull --ignore-buildable
-	docker-compose build
+	docker compose pull --ignore-buildable
+	docker compose build
 
 .PHONY: docker-all
 docker-all: docker-build
-	docker-compose run --rm dev make all
+	docker compose run --rm dev make all
 
 .PHONY: docker-dev
 docker-dev:
-	-docker-compose run --rm dev
+	-docker compose run --rm dev
