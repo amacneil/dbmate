@@ -89,6 +89,14 @@ Install using [Scoop](https://scoop.sh)
 $ scoop install dbmate
 ```
 
+**GO Install**
+
+Remember to add `~/go/bin` into your `$PATH` if you decide to install dbmate this way.
+
+```sh
+go install github.com/amacneil/dbmate/v2
+```
+
 **Docker**
 
 Docker images are published to GitHub Container Registry ([`ghcr.io/amacneil/dbmate`](https://ghcr.io/amacneil/dbmate)).
