@@ -4,8 +4,8 @@
     "clean": "rimraf dist packages/dbmate/dist",
     "lint": "eslint --report-unused-disable-directives --fix .",
     "lint:ci": "eslint --report-unused-disable-directives .",
-    "generate": "node --loader ts-node/esm generate.ts",
-    "publish": "node --loader ts-node/esm publish.ts"
+    "generate": "ts-node generate.ts",
+    "publish": "ts-node publish.ts"
   },
   "devDependencies": {
     "@actions/exec": "1.1.1",
