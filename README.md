@@ -91,7 +91,7 @@ $ scoop install dbmate
 
 **GO Install**
 
-Remember to add `~/go/bin` into your `$PATH` if you decide to install dbmate this way.
+Remember to add `"$(go env GOPATH)/bin"` into your `$PATH` if you decide to install dbmate this way.
 
 ```sh
 go install github.com/amacneil/dbmate/v2
