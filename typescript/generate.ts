@@ -43,7 +43,7 @@ const ARCH_MAP: Record<string, string> = {
 // fetch version number
 async function getVersion(): Promise<string> {
   const versionFile = await readFile("../pkg/dbmate/version.go", "utf8");
-  const matches = versionFile.match(/Version = "([^"]+)"/);
+  const matches = /Version = "([^"]+)"/.exec(versionFile);
 
   if (matches?.[1]) {
     return matches[1];
