@@ -64,7 +64,8 @@ update-deps:
 	cd typescript && \
 		rm -f package-lock.json && \
 		./node_modules/.bin/npm-check-updates --upgrade && \
-		npm install
+		npm install && \
+		npm dedupe
 
 .PHONY: docker-build
 docker-build:
@@ -76,5 +77,5 @@ docker-all: docker-build
 	docker compose run --rm dev make all
 
 .PHONY: docker-dev
-docker-dev:
+docker-sh:
 	-docker compose run --rm dev
