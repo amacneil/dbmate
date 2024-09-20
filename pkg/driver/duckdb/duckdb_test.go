@@ -367,15 +367,6 @@ func TestDuckDBDeleteMigration(t *testing.T) {
 	require.Equal(t, 1, count)
 }
 
-// TODO:
-// === RUN   TestDuckDBPing
-// Dropping: dbmate_test.duckdb
-// Dropping: dbmate_test.duckdb
-//     duckdb_test.go:390:
-//                 Error Trace:    /Users/zpaden/workspace/dbmate/pkg/driver/duckdb/duckdb_test.go:390
-//                 Error:          "database/sql/driver: could not open database: duckdb error: IO Error: Could not read from file \"dbmate_test.duckdb\": Is a directory" does not contain "unable to open database file"
-//                 Test:           TestDuckDBPing
-// --- FAIL: TestDuckDBPing (0.01s)
 func TestDuckDBPing(t *testing.T) {
 	drv := testDuckDBDriver(t)
 	path := ConnectionString(drv.databaseURL)
