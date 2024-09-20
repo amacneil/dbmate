@@ -75,9 +75,6 @@ func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
 	exists := false
 	query := "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?"
 	err := db.QueryRow(query, drv.migrationsTableName).Scan(&exists)
-	if err != nil {
-		fmt.Println("Error on checking if table exists", err)
-	}
 	if err == sql.ErrNoRows {
 		return false, nil
 	}
@@ -85,15 +82,11 @@ func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
 }
 
 func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
-	fmt.Println("Creating migration table", drv.migrationsTableName)
 	query := fmt.Sprintf(
 		"CREATE TABLE IF NOT EXISTS %s (version TEXT PRIMARY KEY)",
 		drv.migrationsTableName,
 	)
 	_, err := db.Exec(query)
-	if err != nil {
-		fmt.Println("Failed to crete migration table", err)
-	}
 	return err
 }
 
@@ -142,13 +135,11 @@ func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
 	path := connectionString(drv.databaseURL)
 	schema, err := dbutil.RunCommand("turso", "db", "shell", path, ".schema")
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 
 	migrations, err := drv.schemaMigrationsDump(db)
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 
@@ -157,7 +148,6 @@ func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
 }
 
 func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
-	fmt.Println("schema migrations dump")
 	// load applied migrations
 	query := fmt.Sprintf(
 		"SELECT quote(version) FROM %s order by version asc",
