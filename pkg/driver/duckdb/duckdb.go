@@ -13,13 +13,13 @@ package duckdb
 
 import (
 	"bytes"
+	"database/sql"
 	"fmt"
 	"io"
 	"net/url"
 	"os"
 	"regexp"
 	"strings"
-	"database/sql"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
@@ -29,21 +29,20 @@ import (
 )
 
 func init() {
-	fmt.Println("Registering duckdb driver")
 	dbmate.RegisterDriver(NewDriver, "duckdb")
 }
 
 type Driver struct {
 	migrationsTableName string
-	databaseURL		 *url.URL
-	log				 io.Writer
+	databaseURL         *url.URL
+	log                 io.Writer
 }
 
 func NewDriver(config dbmate.DriverConfig) dbmate.Driver {
 	return &Driver{
 		migrationsTableName: config.MigrationsTableName,
-		databaseURL:		 config.DatabaseURL,
-		log:				 config.Log,
+		databaseURL:         config.DatabaseURL,
+		log:                 config.Log,
 	}
 }
 
@@ -134,7 +133,7 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 
 // DumpSchema returns the current database schema
 func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
-	query_string := `SELECT sql FROM (
+	queryString := `SELECT sql FROM (
 	SELECT COALESCE(sql, format('CREATE SCHEMA {}', schema_name)) AS sql from duckdb_schemas() where internal=false
 	UNION ALL
 	SELECT sql from duckdb_sequences()
@@ -148,7 +147,7 @@ func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
 	SELECT macro_definition from duckdb_functions() WHERE internal=false and macro_definition is not null
 	) WHERE sql IS NOT NULL;
 	`
-	rows, err := db.Query(query_string)
+	rows, err := db.Query(queryString)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +182,6 @@ func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
 	// Trim leading comments or unnecessary lines from the schema
 	return dbutil.TrimLeadingSQLComments(schema)
 }
-
 
 // DatabaseExists determines whether the database exists
 func (drv *Driver) DatabaseExists() (bool, error) {

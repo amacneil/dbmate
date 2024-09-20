@@ -6,9 +6,8 @@ package duckdb
 import (
 	"database/sql"
 	"os"
-	"testing"
 	"strings"
-	"fmt"
+	"testing"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
 	"github.com/amacneil/dbmate/v2/pkg/dbtest"
@@ -171,11 +170,13 @@ func TestDuckDBCreateDropDatabase(t *testing.T) {
 // === RUN   TestDuckDBDumpSchema
 // Dropping: dbmate_test.duckdb
 // Creating: dbmate_test.duckdb
-//     duckdb_test.go:186:
-//                 Error Trace:    /Users/zpaden/workspace/dbmate/pkg/driver/duckdb/duckdb_test.go:186
-//                 Error:          Received unexpected error:
-//                                 Parser Error: syntax error at or near "AUTOINCREMENT"
-//                 Test:           TestDuckDBDumpSchema
+//
+//	duckdb_test.go:186:
+//	            Error Trace:    /Users/zpaden/workspace/dbmate/pkg/driver/duckdb/duckdb_test.go:186
+//	            Error:          Received unexpected error:
+//	                            Parser Error: syntax error at or near "AUTOINCREMENT"
+//	            Test:           TestDuckDBDumpSchema
+//
 // --- FAIL: TestDuckDBDumpSchema (0.02s)
 func TestDuckDBDumpSchema(t *testing.T) {
 	drv := testDuckDBDriver(t)
