@@ -133,23 +133,57 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 }
 
 // DumpSchema returns the current database schema
-// TODO: Need to change this to use a different command.
-// Will probably need to call export database or something.
 func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
-	path := ConnectionString(drv.databaseURL)
-	schema, err := dbutil.RunCommand("sqlite3", path, ".schema --nosys")
+	query_string := `SELECT sql FROM (
+	SELECT COALESCE(sql, format('CREATE SCHEMA {}', schema_name)) AS sql from duckdb_schemas() where internal=false
+	UNION ALL
+	SELECT sql from duckdb_sequences()
+	UNION ALL
+	SELECT sql from duckdb_tables() where internal=false
+	UNION ALL
+	SELECT sql from duckdb_indexes()
+	UNION ALL
+	SELECT sql from duckdb_views() WHERE internal=false AND sql is not null
+	UNION ALL
+	SELECT macro_definition from duckdb_functions() WHERE internal=false and macro_definition is not null
+	) WHERE sql IS NOT NULL;
+	`
+	rows, err := db.Query(query_string)
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
+	var schema []byte
+
+	// Iterate over the rows and build the schema
+	for rows.Next() {
+		var sqlStmt string
+		if err := rows.Scan(&sqlStmt); err != nil {
+			return nil, err
+		}
+		// Append each SQL statement to the schema slice
+		schema = append(schema, []byte(sqlStmt+"\n")...)
+	}
+
+	// Check for any errors encountered during iteration
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Add any migrations to the schema
 	migrations, err := drv.schemaMigrationsDump(db)
 	if err != nil {
 		return nil, err
 	}
 
+	// Append the migrations to the schema
 	schema = append(schema, migrations...)
+
+	// Trim leading comments or unnecessary lines from the schema
 	return dbutil.TrimLeadingSQLComments(schema)
 }
+
 
 // DatabaseExists determines whether the database exists
 func (drv *Driver) DatabaseExists() (bool, error) {

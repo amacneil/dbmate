@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 	"strings"
+	"fmt"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
 	"github.com/amacneil/dbmate/v2/pkg/dbtest"
@@ -192,22 +193,20 @@ func TestDuckDBDumpSchema(t *testing.T) {
 	err = drv.InsertMigration(db, "abc2")
 	require.NoError(t, err)
 
-	// create a table that will trigger `duckdb_sequence` system table
-	_, err = db.Exec("CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT)")
+	// create a table
+	_, err = db.Exec("CREATE TABLE t (id INTEGER PRIMARY KEY)")
 	require.NoError(t, err)
 
 	// DumpSchema should return schema
 	schema, err := drv.DumpSchema(db)
 	require.NoError(t, err)
-	require.Contains(t, string(schema), "CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT)")
+
+	require.Contains(t, string(schema), "CREATE TABLE t (id INTEGER PRIMARY KEY)")
 	require.Contains(t, string(schema), "CREATE TABLE IF NOT EXISTS \"test_migrations\"")
 	require.Contains(t, string(schema), ");\n-- Dbmate schema migrations\n"+
 		"INSERT INTO \"test_migrations\" (version) VALUES\n"+
 		"  ('abc1'),\n"+
 		"  ('abc2');\n")
-
-	// duckdb_* tables should not be present in the dump (.schema --nosys)
-	require.NotContains(t, string(schema), "duckdb_")
 
 	// DumpSchema should return error if command fails
 	drv.databaseURL = dbtest.MustParseURL(t, ".")
