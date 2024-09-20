@@ -47,7 +47,11 @@ func (drv *Driver) DropDatabase() error {
 }
 
 func (drv *Driver) DatabaseExists() (bool, error) {
-	err := drv.Ping()
+	db, err := drv.Open()
+	if err != nil {
+		return false, err
+	}
+	_, err = db.Exec("SELECT 1")
 	if err != nil {
 		return false, err
 	}
