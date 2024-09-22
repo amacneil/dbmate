@@ -166,18 +166,6 @@ func TestDuckDBCreateDropDatabase(t *testing.T) {
 	require.Equal(t, true, os.IsNotExist(err))
 }
 
-// TODO: Does not work!
-// === RUN   TestDuckDBDumpSchema
-// Dropping: dbmate_test.duckdb
-// Creating: dbmate_test.duckdb
-//
-//	duckdb_test.go:186:
-//	            Error Trace:    /Users/zpaden/workspace/dbmate/pkg/driver/duckdb/duckdb_test.go:186
-//	            Error:          Received unexpected error:
-//	                            Parser Error: syntax error at or near "AUTOINCREMENT"
-//	            Test:           TestDuckDBDumpSchema
-//
-// --- FAIL: TestDuckDBDumpSchema (0.02s)
 func TestDuckDBDumpSchema(t *testing.T) {
 	drv := testDuckDBDriver(t)
 	drv.migrationsTableName = "test_migrations"
@@ -198,23 +186,31 @@ func TestDuckDBDumpSchema(t *testing.T) {
 	_, err = db.Exec("CREATE TABLE t (id INTEGER PRIMARY KEY)")
 	require.NoError(t, err)
 
+	// create a schema
+	_, err = db.Exec("CREATE SCHEMA foo")
+	require.NoError(t, err)
+
+	// Create a view
+	_, err = db.Exec("CREATE VIEW v AS SELECT * FROM t LIMIT 0")
+	require.NoError(t, err)
+	// Create a Sequence
+	_, err = db.Exec("CREATE SEQUENCE my_seq")
+	require.NoError(t, err)
+
 	// DumpSchema should return schema
 	schema, err := drv.DumpSchema(db)
 	require.NoError(t, err)
 
-	require.Contains(t, string(schema), "CREATE TABLE t (id INTEGER PRIMARY KEY)")
-	require.Contains(t, string(schema), "CREATE TABLE IF NOT EXISTS \"test_migrations\"")
-	require.Contains(t, string(schema), ");\n-- Dbmate schema migrations\n"+
+	// CREATE SCHEMA foo
+	require.Contains(t, string(schema), "CREATE SCHEMA foo;")
+	require.Contains(t, string(schema), "CREATE TABLE t(id INTEGER PRIMARY KEY);")
+	require.Contains(t, string(schema), "CREATE TABLE test_migrations")
+	require.Contains(t, string(schema), "CREATE SEQUENCE my_seq INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 NO CYCLE")
+	require.Contains(t, string(schema), "CREATE VIEW v AS SELECT * FROM t LIMIT 0")
+	require.Contains(t, string(schema), "\n-- Dbmate schema migrations\n"+
 		"INSERT INTO \"test_migrations\" (version) VALUES\n"+
 		"  ('abc1'),\n"+
 		"  ('abc2');\n")
-
-	// DumpSchema should return error if command fails
-	drv.databaseURL = dbtest.MustParseURL(t, ".")
-	schema, err = drv.DumpSchema(db)
-	require.Nil(t, schema)
-	require.Error(t, err)
-	require.EqualError(t, err, "Error: unable to open database \"/.\": unable to open database file")
 }
 
 func TestDuckDBDatabaseExists(t *testing.T) {

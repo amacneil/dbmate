@@ -108,11 +108,10 @@ func (drv *Driver) DropDatabase() error {
 }
 
 func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
-	migrationsTable := drv.quotedMigrationsTableName()
-
+	migrationsTable := drv.quotedMigrationsTableName() // Use the quoted table name
 	// load applied migrations
 	migrations, err := dbutil.QueryColumn(db,
-		fmt.Sprintf("select format('\"{}\"', version) from %s order by version asc", migrationsTable))
+		fmt.Sprintf("select format('{}', version) from %s order by version asc", migrationsTable))
 	if err != nil {
 		return nil, err
 	}
@@ -123,9 +122,11 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 
 	if len(migrations) > 0 {
 		buf.WriteString(
-			fmt.Sprintf("INSERT INTO %s (version) VALUES\n  (", migrationsTable) +
-				strings.Join(migrations, "),\n  (") +
-				");\n")
+			fmt.Sprintf("INSERT INTO %s (version) VALUES\n  ('", migrationsTable) +
+				strings.Join(migrations, "'),\n  ('") +
+				"');\n")
+	} else {
+		return nil, nil
 	}
 
 	return buf.Bytes(), nil
@@ -134,7 +135,7 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 // DumpSchema returns the current database schema
 func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
 	queryString := `SELECT sql FROM (
-	SELECT COALESCE(sql, format('CREATE SCHEMA {}', schema_name)) AS sql from duckdb_schemas() where internal=false
+	SELECT COALESCE(sql, format('CREATE SCHEMA {};', schema_name)) AS sql from duckdb_schemas() where internal=false
 	UNION ALL
 	SELECT sql from duckdb_sequences()
 	UNION ALL
