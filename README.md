@@ -60,8 +60,8 @@ For a comparison between dbmate and other popular database schema migration tool
 Install using [NPM](https://www.npmjs.com/):
 
 ```sh
-$ npm install --save-dev dbmate
-$ npx dbmate --help
+npm install --save-dev dbmate
+npx dbmate --help
 ```
 
 **macOS**
@@ -69,7 +69,7 @@ $ npx dbmate --help
 Install using [Homebrew](https://brew.sh/):
 
 ```sh
-$ brew install dbmate
+brew install dbmate
 ```
 
 **Linux**
@@ -77,8 +77,8 @@ $ brew install dbmate
 Install the binary directly:
 
 ```sh
-$ sudo curl -fsSL -o /usr/local/bin/dbmate https://github.com/amacneil/dbmate/releases/latest/download/dbmate-linux-amd64
-$ sudo chmod +x /usr/local/bin/dbmate
+sudo curl -fsSL -o /usr/local/bin/dbmate https://github.com/amacneil/dbmate/releases/latest/download/dbmate-linux-amd64
+sudo chmod +x /usr/local/bin/dbmate
 ```
 
 **Windows**
@@ -86,7 +86,7 @@ $ sudo chmod +x /usr/local/bin/dbmate
 Install using [Scoop](https://scoop.sh)
 
 ```pwsh
-$ scoop install dbmate
+scoop install dbmate
 ```
 
 **Docker**
@@ -96,13 +96,13 @@ Docker images are published to GitHub Container Registry ([`ghcr.io/amacneil/dbm
 Remember to set `--network=host` or see [this comment](https://github.com/amacneil/dbmate/issues/128#issuecomment-615924611) for more tips on using dbmate with docker networking):
 
 ```sh
-$ docker run --rm -it --network=host ghcr.io/amacneil/dbmate --help
+docker run --rm -it --network=host ghcr.io/amacneil/dbmate --help
 ```
 
 If you wish to create or apply migrations, you will need to use Docker's [bind mount](https://docs.docker.com/storage/bind-mounts/) feature to make your local working directory (`pwd`) available inside the dbmate container:
 
 ```sh
-$ docker run --rm -it --network=host -v "$(pwd)/db:/db" ghcr.io/amacneil/dbmate new create_users_table
+docker run --rm -it --network=host -v "$(pwd)/db:/db" ghcr.io/amacneil/dbmate new create_users_table
 ```
 
 ## Commands
@@ -148,7 +148,7 @@ To make this easy in development, dbmate looks for a `.env` file in the current 
 If you do not already have a `.env` file, create one and add your database connection URL:
 
 ```sh
-$ cat .env
+cat .env
 DATABASE_URL="postgres://postgres@127.0.0.1:5432/myapp_development?sslmode=disable"
 ```
 
@@ -166,7 +166,7 @@ protocol://username:password@host:port/database_name?options
 Dbmate can also load the connection URL from a different environment variable. For example, before running your test suite, you may wish to drop and recreate the test database. One easy way to do this is to store your test database connection URL in the `TEST_DATABASE_URL` environment variable:
 
 ```sh
-$ cat .env
+cat .env
 DATABASE_URL="postgres://postgres@127.0.0.1:5432/myapp_dev?sslmode=disable"
 TEST_DATABASE_URL="postgres://postgres@127.0.0.1:5432/myapp_test?sslmode=disable"
 ```
@@ -174,9 +174,9 @@ TEST_DATABASE_URL="postgres://postgres@127.0.0.1:5432/myapp_test?sslmode=disable
 You can then specify this environment variable in your test script (Makefile or similar):
 
 ```sh
-$ dbmate -e TEST_DATABASE_URL drop
+dbmate -e TEST_DATABASE_URL drop
 Dropping: myapp_test
-$ dbmate -e TEST_DATABASE_URL --no-dump-schema up
+dbmate -e TEST_DATABASE_URL --no-dump-schema up
 Creating: myapp_test
 Applying: 20151127184807_create_users_table.sql
 Applied: 20151127184807_create_users_table.sql in 123µs
@@ -185,7 +185,7 @@ Applied: 20151127184807_create_users_table.sql in 123µs
 Alternatively, you can specify the url directly on the command line:
 
 ```sh
-$ dbmate -u "postgres://postgres@127.0.0.1:5432/myapp_test?sslmode=disable" up
+dbmate -u "postgres://postgres@127.0.0.1:5432/myapp_test?sslmode=disable" up
 ```
 
 The only advantage of using `dbmate -e TEST_DATABASE_URL` over `dbmate -u $TEST_DATABASE_URL` is that the former takes advantage of dbmate's automatic `.env` file loading.
@@ -357,7 +357,7 @@ create table users (
 Run `dbmate up` to run any pending migrations.
 
 ```sh
-$ dbmate up
+dbmate up
 Creating: myapp_development
 Applying: 20151127184807_create_users_table.sql
 Applied: 20151127184807_create_users_table.sql in 123µs
@@ -387,7 +387,7 @@ drop table users;
 Run `dbmate rollback` to roll back the most recent migration:
 
 ```sh
-$ dbmate rollback
+dbmate rollback
 Rolling back: 20151127184807_create_users_table.sql
 Rolled back: 20151127184807_create_users_table.sql in 123µs
 Writing: ./db/schema.sql
@@ -419,20 +419,20 @@ In general, your application should be resilient to not having a working databas
 If the database is available, `wait` will return no output:
 
 ```sh
-$ dbmate wait
+dbmate wait
 ```
 
 If the database is unavailable, `wait` will block until the database becomes available:
 
 ```sh
-$ dbmate wait
+dbmate wait
 Waiting for database....
 ```
 
 You can also use the `--wait` flag with other commands if you sometimes see failures caused by the database not yet being ready:
 
 ```sh
-$ dbmate --wait up
+dbmate --wait up
 Waiting for database....
 Creating: myapp_development
 ```
@@ -440,7 +440,7 @@ Creating: myapp_development
 You can customize the timeout using `--wait-timeout` (default 60s). If the database is still not available, the command will return an error:
 
 ```sh
-$ dbmate --wait-timeout=5s wait
+dbmate --wait-timeout=5s wait
 Waiting for database.....
 Error: unable to connect to database: dial tcp 127.0.0.1:5432: connect: connection refused
 ```
@@ -456,7 +456,7 @@ It is recommended to check this file into source control, so that you can easily
 To dump the `schema.sql` file without performing any other actions, run `dbmate dump`. Unlike other dbmate actions, this command relies on the respective `pg_dump`, `mysqldump`, or `sqlite3` commands being available in your PATH. If these tools are not available, dbmate will silently skip the schema dump step during `up`, `migrate`, or `rollback` actions. You can diagnose the issue by running `dbmate dump` and looking at the output:
 
 ```sh
-$ dbmate dump
+dbmate dump
 exec: "pg_dump": executable file not found in $PATH
 ```
 
@@ -612,11 +612,11 @@ Dbmate is written in Go, pull requests are welcome.
 Tests are run against a real database using docker compose. To build a docker image and run the tests:
 
 ```sh
-$ make docker-all
+make docker-all
 ```
 
 To start a development shell:
 
 ```sh
-$ make docker-sh
+make docker-sh
 ```
