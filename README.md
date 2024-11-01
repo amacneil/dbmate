@@ -401,7 +401,7 @@ dbmate supports options passed to a migration block in the form of `key:value` p
 
 **transaction**
 
-`transaction` is useful if you need to run some SQL which cannot be executed from within a transaction. For example, in Postgres, you would need to disable transactions for migrations that alter an enum type to add a value:
+`transaction` is useful if you do not want to run SQL inside a transaction:
 
 ```sql
 -- migrate:up transaction:false
