@@ -60,8 +60,8 @@ For a comparison between dbmate and other popular database schema migration tool
 Install using [NPM](https://www.npmjs.com/):
 
 ```sh
-$ npm install --save-dev dbmate
-$ npx dbmate --help
+npm install --save-dev dbmate
+npx dbmate --help
 ```
 
 **macOS**
@@ -69,7 +69,8 @@ $ npx dbmate --help
 Install using [Homebrew](https://brew.sh/):
 
 ```sh
-$ brew install dbmate
+brew install dbmate
+dbmate --help
 ```
 
 **Linux**
@@ -77,8 +78,9 @@ $ brew install dbmate
 Install the binary directly:
 
 ```sh
-$ sudo curl -fsSL -o /usr/local/bin/dbmate https://github.com/amacneil/dbmate/releases/latest/download/dbmate-linux-amd64
-$ sudo chmod +x /usr/local/bin/dbmate
+sudo curl -fsSL -o /usr/local/bin/dbmate https://github.com/amacneil/dbmate/releases/latest/download/dbmate-linux-amd64
+sudo chmod +x /usr/local/bin/dbmate
+/usr/local/bin/dbmate --help
 ```
 
 **Windows**
@@ -86,7 +88,8 @@ $ sudo chmod +x /usr/local/bin/dbmate
 Install using [Scoop](https://scoop.sh)
 
 ```pwsh
-$ scoop install dbmate
+scoop install dbmate
+dbmate --help
 ```
 
 **Docker**
@@ -96,13 +99,13 @@ Docker images are published to GitHub Container Registry ([`ghcr.io/amacneil/dbm
 Remember to set `--network=host` or see [this comment](https://github.com/amacneil/dbmate/issues/128#issuecomment-615924611) for more tips on using dbmate with docker networking):
 
 ```sh
-$ docker run --rm -it --network=host ghcr.io/amacneil/dbmate --help
+docker run --rm -it --network=host ghcr.io/amacneil/dbmate --help
 ```
 
 If you wish to create or apply migrations, you will need to use Docker's [bind mount](https://docs.docker.com/storage/bind-mounts/) feature to make your local working directory (`pwd`) available inside the dbmate container:
 
 ```sh
-$ docker run --rm -it --network=host -v "$(pwd)/db:/db" ghcr.io/amacneil/dbmate new create_users_table
+docker run --rm -it --network=host -v "$(pwd)/db:/db" ghcr.io/amacneil/dbmate new create_users_table
 ```
 
 ## Commands
