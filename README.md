@@ -70,6 +70,7 @@ Install using [Homebrew](https://brew.sh/):
 
 ```sh
 brew install dbmate
+dbmate --help
 ```
 
 **Linux**
@@ -79,6 +80,7 @@ Install the binary directly:
 ```sh
 sudo curl -fsSL -o /usr/local/bin/dbmate https://github.com/amacneil/dbmate/releases/latest/download/dbmate-linux-amd64
 sudo chmod +x /usr/local/bin/dbmate
+/usr/local/bin/dbmate --help
 ```
 
 **Windows**
@@ -87,6 +89,7 @@ Install using [Scoop](https://scoop.sh)
 
 ```pwsh
 scoop install dbmate
+dbmate --help
 ```
 
 **Docker**
