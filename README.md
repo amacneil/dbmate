@@ -24,6 +24,7 @@ For a comparison between dbmate and other popular database schema migration tool
     - [ClickHouse](#clickhouse)
     - [BigQuery](#bigquery)
     - [Spanner](#spanner)
+    - [Turso](#turso)
   - [Creating Migrations](#creating-migrations)
   - [Running Migrations](#running-migrations)
   - [Rolling Back Migrations](#rolling-back-migrations)
@@ -329,6 +330,18 @@ DROP TABLE ...
 ```
 
 Schema dumps are not currently supported, as `pg_dump` uses functions that are not provided by Spanner.
+
+#### Turso
+
+Turso implementation currently supports migrations but not database creation and drop.
+
+[Turso cli](https://docs.turso.tech/cli/installation) is requred for everything to work as expected.
+
+Follow format below for `DATABASE_URL`:
+
+```shell
+DATABASE_URL="turso://[databaseName]-[organizationName].turso.io?authToken=[token]
+```
 
 ### Creating Migrations
 
