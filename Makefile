@@ -76,6 +76,6 @@ docker-build:
 docker-all: docker-build
 	docker compose run --rm dev make all
 
-.PHONY: docker-dev
+.PHONY: docker-sh
 docker-sh:
 	-docker compose run --rm dev
