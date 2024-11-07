@@ -199,4 +199,40 @@ DROP COLUMN status;
 			require.Equal(t, true, parsed.DownOptions.Transaction())
 		})
 	})
+
+	t.Run("support up and down sections", func(t *testing.T) {
+		migration := `-- migrate:up
+-- migrate:up-section
+create table users (id serial, name text);
+-- migrate:up-section
+select * from users;
+-- migrate:down
+-- migrate:down-section
+drop table users;`
+
+		parsed, err := parseMigrationContents(migration)
+		require.Nil(t, err)
+
+		require.Equal(t, len(parsed.UpSections), 2)
+		require.Equal(t, "create table users (id serial, name text);", parsed.UpSections[0])
+		require.Equal(t, "select * from users;", parsed.UpSections[1])
+
+		require.Equal(t, len(parsed.DownSections), 1)
+		require.Equal(t, "drop table users;", parsed.DownSections[0])
+	})
+
+	t.Run("ignore empty up and down sections", func(t *testing.T) {
+		migration := `-- migrate:up
+-- migrate:up-section
+-- migrate:up-section
+-- migrate:down
+-- migrate:down-section
+`
+
+		parsed, err := parseMigrationContents(migration)
+		require.Nil(t, err)
+
+		require.Equal(t, len(parsed.UpSections), 0)
+		require.Equal(t, len(parsed.DownSections), 0)
+	})
 }

@@ -38,11 +38,17 @@ func (m *Migration) Parse() (*ParsedMigration, error) {
 }
 
 // ParsedMigration contains the migration contents and options
+// It should be only one query pro up- or down-section provided,
+// but it might have multiple sections.
+// If the `UpSections` or `DownSections` are not empty,
+// they are applied instead of `Up` or `Down`.
 type ParsedMigration struct {
-	Up          string
-	UpOptions   ParsedMigrationOptions
-	Down        string
-	DownOptions ParsedMigrationOptions
+	Up           string
+	UpSections   []string
+	UpOptions    ParsedMigrationOptions
+	Down         string
+	DownSections []string
+	DownOptions  ParsedMigrationOptions
 }
 
 // ParsedMigrationOptions is an interface for accessing migration options
@@ -60,7 +66,9 @@ func (m migrationOptions) Transaction() bool {
 
 var (
 	upRegExp              = regexp.MustCompile(`(?m)^--\s*migrate:up(\s*$|\s+\S+)`)
+	upSectionRegExp       = regexp.MustCompile(`(?m)^--\s*migrate:up-section(\s*$|\s+\S+)`)
 	downRegExp            = regexp.MustCompile(`(?m)^--\s*migrate:down(\s*$|\s+\S+)`)
+	downSectionRegExp     = regexp.MustCompile(`(?m)^--\s*migrate:down-section(\s*$|\s+\S+)`)
 	emptyLineRegExp       = regexp.MustCompile(`^\s*$`)
 	commentLineRegExp     = regexp.MustCompile(`^\s*--`)
 	whitespaceRegExp      = regexp.MustCompile(`\s+`)
@@ -80,7 +88,9 @@ var (
 // It will return two Migration objects, the first representing the "up"
 // block and the second representing the "down" block. This function
 // requires that at least an up block was defined and will otherwise
-// return an error.
+// return an error. It returns also UpSections or DownSections (default: empty arrays).
+// If UpSections or DownSections are not empty, they will be executed instead of
+// "up" or "down" blocks.
 func parseMigrationContents(contents string) (*ParsedMigration, error) {
 	upDirectiveStart, hasDefinedUpBlock := getMatchPosition(contents, upRegExp)
 	downDirectiveStart, hasDefinedDownBlock := getMatchPosition(contents, downRegExp)
@@ -101,13 +111,38 @@ func parseMigrationContents(contents string) (*ParsedMigration, error) {
 	upBlock := substring(contents, upDirectiveStart, downDirectiveStart)
 	downBlock := substring(contents, downDirectiveStart, len(contents))
 
+	upSections := parseMigrationSections(upBlock, downDirectiveStart, upSectionRegExp)
+	downSections := parseMigrationSections(downBlock, len(downBlock), downSectionRegExp)
+
 	parsed := ParsedMigration{
-		Up:          upBlock,
-		UpOptions:   parseMigrationOptions(upBlock),
-		Down:        downBlock,
-		DownOptions: parseMigrationOptions(downBlock),
+		Up:           upBlock,
+		UpSections:   upSections,
+		UpOptions:    parseMigrationOptions(upBlock),
+		Down:         downBlock,
+		DownSections: downSections,
+		DownOptions:  parseMigrationOptions(downBlock),
 	}
 	return &parsed, nil
+}
+
+func parseMigrationSections(block string, blockDirectiveEnds int, sectionRegExp *regexp.Regexp) []string {
+	sectionDirectiveStart, hasDefinedSectionBlocks := getMatchPosition(block, sectionRegExp)
+	if !hasDefinedSectionBlocks {
+		return []string{}
+	}
+
+	sectionBlocks := substring(block, sectionDirectiveStart, blockDirectiveEnds)
+
+	sectionIdx := sectionRegExp.FindStringIndex(sectionBlocks)[1]
+	sections := sectionRegExp.Split(sectionBlocks[sectionIdx:], -1)
+	cleanSections := make([]string, 0)
+	for _, section := range sections {
+		section = strings.ReplaceAll(strings.TrimSpace(section), "\n", "")
+		if section != "" {
+			cleanSections = append(cleanSections, section)
+		}
+	}
+	return cleanSections
 }
 
 // parseMigrationOptions parses the migration options out of a block

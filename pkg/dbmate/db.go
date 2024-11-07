@@ -385,12 +385,17 @@ func (db *DB) Migrate() error {
 		}
 
 		execMigration := func(tx dbutil.Transaction) error {
-			// run actual migration
-			result, err := tx.Exec(parsed.Up)
-			if err != nil {
-				return drv.QueryError(parsed.Up, err)
-			} else if db.Verbose {
-				db.printVerbose(result)
+			if len(parsed.UpSections) != 0 {
+				for _, section := range parsed.UpSections {
+					if err = db.execQuery(drv, tx, section); err != nil {
+						return err
+					}
+				}
+			} else {
+				// run actual migration
+				if err = db.execQuery(drv, tx, parsed.Up); err != nil {
+					return err
+				}
 			}
 
 			// record migration
@@ -554,12 +559,17 @@ func (db *DB) Rollback() error {
 	}
 
 	execMigration := func(tx dbutil.Transaction) error {
-		// rollback migration
-		result, err := tx.Exec(parsed.Down)
-		if err != nil {
-			return drv.QueryError(parsed.Down, err)
-		} else if db.Verbose {
-			db.printVerbose(result)
+		if len(parsed.DownSections) != 0 {
+			for _, section := range parsed.DownSections {
+				if err = db.execQuery(drv, tx, section); err != nil {
+					return err
+				}
+			}
+		} else {
+			// rollback migration
+			if err = db.execQuery(drv, tx, parsed.Down); err != nil {
+				return err
+			}
 		}
 
 		// remove migration record
@@ -586,6 +596,15 @@ func (db *DB) Rollback() error {
 		_ = db.DumpSchema()
 	}
 
+	return nil
+}
+
+func (db *DB) execQuery(drv Driver, tx dbutil.Transaction, query string) error {
+	if result, err := tx.Exec(query); err != nil {
+		return drv.QueryError(query, err)
+	} else if db.Verbose {
+		db.printVerbose(result)
+	}
 	return nil
 }
 
