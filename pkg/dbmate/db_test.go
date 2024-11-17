@@ -59,6 +59,7 @@ func TestNew(t *testing.T) {
 	require.False(t, db.WaitBefore)
 	require.Equal(t, time.Second, db.WaitInterval)
 	require.Equal(t, 60*time.Second, db.WaitTimeout)
+	require.Equal(t, false, db.UseMigrationLock)
 }
 
 func TestGetDriver(t *testing.T) {
