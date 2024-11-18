@@ -107,6 +107,10 @@ func NewApp() *cli.App {
 			Usage:   "time to wait between connection attempts for --wait flag",
 			Value:   defaultDB.WaitInterval,
 		},
+		&cli.BoolFlag{
+			Name:  "migration-lock",
+			Usage: "use a lock during the migration so other dbmate instances can not run migrations at the same time",
+		},
 	}
 
 	app.Commands = []*cli.Command{
@@ -138,6 +142,7 @@ func NewApp() *cli.App {
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
 				db.Strict = c.Bool("strict")
 				db.Verbose = c.Bool("verbose")
+				db.UseMigrationLock = c.Bool("migration-lock")
 				return db.CreateAndMigrate()
 			}),
 		},
@@ -174,6 +179,7 @@ func NewApp() *cli.App {
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
 				db.Strict = c.Bool("strict")
 				db.Verbose = c.Bool("verbose")
+				db.UseMigrationLock = c.Bool("migration-lock")
 				return db.Migrate()
 			}),
 		},
