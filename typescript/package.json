@@ -11,14 +11,14 @@
     "@actions/exec": "1.1.1",
     "@foxglove/eslint-plugin": "2.0.0",
     "@foxglove/tsconfig": "2.0.0",
-    "eslint": "9.14.0",
+    "eslint": "9.16.0",
     "handlebars": "4.7.8",
-    "npm-check-updates": "17.1.10",
-    "prettier": "3.3.3",
+    "npm-check-updates": "17.1.11",
+    "prettier": "3.4.2",
     "rimraf": "6.0.1",
     "ts-node": "10.9.2",
-    "typescript-eslint": "8.13.0",
-    "typescript": "5.6.3",
-    "yaml": "2.6.0"
+    "typescript-eslint": "8.17.0",
+    "typescript": "5.7.2",
+    "yaml": "2.6.1"
   }
 }

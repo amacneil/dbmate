@@ -70,7 +70,7 @@ update-deps:
 .PHONY: docker-build
 docker-build:
 	docker compose pull --ignore-buildable
-	docker compose build
+	docker compose build dev
 
 .PHONY: docker-all
 docker-all: docker-build
