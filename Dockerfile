@@ -27,7 +27,7 @@ COPY . /src/
 RUN make build
 
 # release stage
-FROM alpine:3.20.3 as release
+FROM alpine:3.21.0 as release
 RUN apk add --no-cache \
   mariadb-client \
   mariadb-connector-c \
