@@ -25,8 +25,8 @@ type Driver struct {
 }
 
 // NewDriver initializes the driver
-func NewDriver(name string) func(config dbmate.DriverConfig) dbmate.Driver {
-	return func(config dbmate.DriverConfig) dbmate.Driver {
+func NewDriver(name string) func(config dbmate.DriverConfig) *Driver {
+	return func(config dbmate.DriverConfig) *Driver {
 		return &Driver{
 			name:                name,
 			MigrationsTableName: config.MigrationsTableName,
@@ -249,7 +249,7 @@ func (drv *Driver) QuotedMigrationsTableName() string {
 
 // quoteIdentifier quotes a table or column name
 // we fall back to lib/pq implementation since both use ansi standard (double quotes)
-// and we don't have a sqlite-specific equivalent
+// and mattn/go-sqlite3 doesn't provide a sqlite-specific equivalent
 func (drv *Driver) quoteIdentifier(s string) string {
 	return pq.QuoteIdentifier(s)
 }

@@ -1,3 +1,6 @@
+//go:build cgo
+// +build cgo
+
 package sqlite
 
 import (
@@ -8,17 +11,16 @@ import (
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
 	"github.com/amacneil/dbmate/v2/pkg/dbtest"
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
-	"github.com/amacneil/dbmate/v2/pkg/driver/sqlite/internal"
 
 	"github.com/stretchr/testify/require"
 )
 
-func testSQLiteDriver(t *testing.T) *internal.Driver {
+func testSQLiteDriver(t *testing.T) *Driver {
 	u := dbtest.MustParseURL(t, "sqlite:dbmate_test.sqlite3")
 	drv, err := dbmate.New(u).Driver()
 	require.NoError(t, err)
 
-	return drv.(*internal.Driver)
+	return drv.(*Driver)
 }
 
 func prepTestSQLiteDB(t *testing.T) *sql.DB {
@@ -45,101 +47,101 @@ func TestGetDriver(t *testing.T) {
 	require.NoError(t, err)
 
 	// driver should have URL and default migrations table set
-	drv, ok := drvInterface.(*internal.Driver)
+	drv, ok := drvInterface.(*Driver)
 	require.True(t, ok)
-	require.Equal(t, db.DatabaseURL.String(), drv.DatabaseURL.String())
-	require.Equal(t, "schema_migrations", drv.MigrationsTableName)
+	require.Equal(t, db.DatabaseURL.String(), drv.internal.DatabaseURL.String())
+	require.Equal(t, "schema_migrations", drv.internal.MigrationsTableName)
 }
 
 func TestConnectionString(t *testing.T) {
 	t.Run("relative", func(t *testing.T) {
 		u := dbtest.MustParseURL(t, "sqlite:foo/bar.sqlite3?mode=ro")
-		require.Equal(t, "foo/bar.sqlite3?mode=ro", internal.ConnectionString(u))
+		require.Equal(t, "foo/bar.sqlite3?mode=ro", ConnectionString(u))
 	})
 
 	t.Run("relative with dot", func(t *testing.T) {
 		u := dbtest.MustParseURL(t, "sqlite:./foo/bar.sqlite3?mode=ro")
-		require.Equal(t, "./foo/bar.sqlite3?mode=ro", internal.ConnectionString(u))
+		require.Equal(t, "./foo/bar.sqlite3?mode=ro", ConnectionString(u))
 	})
 
 	t.Run("relative with double dot", func(t *testing.T) {
 		u := dbtest.MustParseURL(t, "sqlite:../foo/bar.sqlite3?mode=ro")
-		require.Equal(t, "../foo/bar.sqlite3?mode=ro", internal.ConnectionString(u))
+		require.Equal(t, "../foo/bar.sqlite3?mode=ro", ConnectionString(u))
 	})
 
 	t.Run("absolute", func(t *testing.T) {
 		u := dbtest.MustParseURL(t, "sqlite:/tmp/foo.sqlite3?mode=ro")
-		require.Equal(t, "/tmp/foo.sqlite3?mode=ro", internal.ConnectionString(u))
+		require.Equal(t, "/tmp/foo.sqlite3?mode=ro", ConnectionString(u))
 	})
 
 	t.Run("two slashes", func(t *testing.T) {
 		// interpreted as absolute path
 		u := dbtest.MustParseURL(t, "sqlite://tmp/foo.sqlite3?mode=ro")
-		require.Equal(t, "/tmp/foo.sqlite3?mode=ro", internal.ConnectionString(u))
+		require.Equal(t, "/tmp/foo.sqlite3?mode=ro", ConnectionString(u))
 	})
 
 	t.Run("three slashes", func(t *testing.T) {
 		// interpreted as absolute path
 		u := dbtest.MustParseURL(t, "sqlite:///tmp/foo.sqlite3?mode=ro")
-		require.Equal(t, "/tmp/foo.sqlite3?mode=ro", internal.ConnectionString(u))
+		require.Equal(t, "/tmp/foo.sqlite3?mode=ro", ConnectionString(u))
 	})
 
 	t.Run("four slashes", func(t *testing.T) {
 		// interpreted as absolute path
 		// supported for backwards compatibility
 		u := dbtest.MustParseURL(t, "sqlite:////tmp/foo.sqlite3?mode=ro")
-		require.Equal(t, "/tmp/foo.sqlite3?mode=ro", internal.ConnectionString(u))
+		require.Equal(t, "/tmp/foo.sqlite3?mode=ro", ConnectionString(u))
 	})
 
 	t.Run("relative with space", func(t *testing.T) {
 		u := dbtest.MustParseURL(t, "sqlite:foo bar.sqlite3?mode=ro")
-		require.Equal(t, "foo bar.sqlite3?mode=ro", internal.ConnectionString(u))
+		require.Equal(t, "foo bar.sqlite3?mode=ro", ConnectionString(u))
 	})
 
 	t.Run("relative with space and dot", func(t *testing.T) {
 		u := dbtest.MustParseURL(t, "sqlite:./foo bar.sqlite3?mode=ro")
-		require.Equal(t, "./foo bar.sqlite3?mode=ro", internal.ConnectionString(u))
+		require.Equal(t, "./foo bar.sqlite3?mode=ro", ConnectionString(u))
 	})
 
 	t.Run("relative with space and double dot", func(t *testing.T) {
 		u := dbtest.MustParseURL(t, "sqlite:../foo bar.sqlite3?mode=ro")
-		require.Equal(t, "../foo bar.sqlite3?mode=ro", internal.ConnectionString(u))
+		require.Equal(t, "../foo bar.sqlite3?mode=ro", ConnectionString(u))
 	})
 
 	t.Run("absolute with space", func(t *testing.T) {
 		u := dbtest.MustParseURL(t, "sqlite:/foo bar.sqlite3?mode=ro")
-		require.Equal(t, "/foo bar.sqlite3?mode=ro", internal.ConnectionString(u))
+		require.Equal(t, "/foo bar.sqlite3?mode=ro", ConnectionString(u))
 	})
 
 	t.Run("two slashes with space in path", func(t *testing.T) {
 		// interpreted as absolute path
 		u := dbtest.MustParseURL(t, "sqlite://tmp/foo bar.sqlite3?mode=ro")
-		require.Equal(t, "/tmp/foo bar.sqlite3?mode=ro", internal.ConnectionString(u))
+		require.Equal(t, "/tmp/foo bar.sqlite3?mode=ro", ConnectionString(u))
 	})
 
 	t.Run("three slashes with space in path", func(t *testing.T) {
 		// interpreted as absolute path
 		u := dbtest.MustParseURL(t, "sqlite:///tmp/foo bar.sqlite3?mode=ro")
-		require.Equal(t, "/tmp/foo bar.sqlite3?mode=ro", internal.ConnectionString(u))
+		require.Equal(t, "/tmp/foo bar.sqlite3?mode=ro", ConnectionString(u))
 	})
 
 	t.Run("three slashes with space in path (1st dir)", func(t *testing.T) {
 		// interpreted as absolute path
 		u := dbtest.MustParseURL(t, "sqlite:///tm p/foo bar.sqlite3?mode=ro")
-		require.Equal(t, "/tm p/foo bar.sqlite3?mode=ro", internal.ConnectionString(u))
+		require.Equal(t, "/tm p/foo bar.sqlite3?mode=ro", ConnectionString(u))
 	})
 
 	t.Run("four slashes with space", func(t *testing.T) {
 		// interpreted as absolute path
 		// supported for backwards compatibility
 		u := dbtest.MustParseURL(t, "sqlite:////tmp/foo bar.sqlite3?mode=ro")
-		require.Equal(t, "/tmp/foo bar.sqlite3?mode=ro", internal.ConnectionString(u))
+		require.Equal(t, "/tmp/foo bar.sqlite3?mode=ro", ConnectionString(u))
 	})
 }
 
 func TestSQLiteCreateDropDatabase(t *testing.T) {
 	drv := testSQLiteDriver(t)
-	path := internal.ConnectionString(drv.DatabaseURL)
+	path := ConnectionString(drv.internal.DatabaseURL)
 
 	// drop any existing database
 	err := drv.DropDatabase()
@@ -165,7 +167,7 @@ func TestSQLiteCreateDropDatabase(t *testing.T) {
 
 func TestSQLiteDumpSchema(t *testing.T) {
 	drv := testSQLiteDriver(t)
-	drv.MigrationsTableName = "test_migrations"
+	drv.internal.MigrationsTableName = "test_migrations"
 
 	// prepare database
 	db := prepTestSQLiteDB(t)
@@ -197,7 +199,7 @@ func TestSQLiteDumpSchema(t *testing.T) {
 	require.NotContains(t, string(schema), "sqlite_")
 
 	// DumpSchema should return error if command fails
-	drv.DatabaseURL = dbtest.MustParseURL(t, ".")
+	drv.internal.DatabaseURL = dbtest.MustParseURL(t, ".")
 	schema, err = drv.DumpSchema(db)
 	require.Nil(t, schema)
 	require.Error(t, err)
@@ -253,7 +255,7 @@ func TestSQLiteCreateMigrationsTable(t *testing.T) {
 
 	t.Run("custom table", func(t *testing.T) {
 		drv := testSQLiteDriver(t)
-		drv.MigrationsTableName = "test_migrations"
+		drv.internal.MigrationsTableName = "test_migrations"
 
 		db := prepTestSQLiteDB(t)
 		defer dbutil.MustClose(db)
@@ -280,7 +282,7 @@ func TestSQLiteCreateMigrationsTable(t *testing.T) {
 
 func TestSQLiteSelectMigrations(t *testing.T) {
 	drv := testSQLiteDriver(t)
-	drv.MigrationsTableName = "test_migrations"
+	drv.internal.MigrationsTableName = "test_migrations"
 
 	db := prepTestSQLiteDB(t)
 	defer dbutil.MustClose(db)
@@ -308,7 +310,7 @@ func TestSQLiteSelectMigrations(t *testing.T) {
 
 func TestSQLiteInsertMigration(t *testing.T) {
 	drv := testSQLiteDriver(t)
-	drv.MigrationsTableName = "test_migrations"
+	drv.internal.MigrationsTableName = "test_migrations"
 
 	db := prepTestSQLiteDB(t)
 	defer dbutil.MustClose(db)
@@ -333,7 +335,7 @@ func TestSQLiteInsertMigration(t *testing.T) {
 
 func TestSQLiteDeleteMigration(t *testing.T) {
 	drv := testSQLiteDriver(t)
-	drv.MigrationsTableName = "test_migrations"
+	drv.internal.MigrationsTableName = "test_migrations"
 
 	db := prepTestSQLiteDB(t)
 	defer dbutil.MustClose(db)
@@ -356,7 +358,7 @@ func TestSQLiteDeleteMigration(t *testing.T) {
 
 func TestSQLitePing(t *testing.T) {
 	drv := testSQLiteDriver(t)
-	path := internal.ConnectionString(drv.DatabaseURL)
+	path := ConnectionString(drv.internal.DatabaseURL)
 
 	// drop any existing database
 	err := drv.DropDatabase()
@@ -391,15 +393,15 @@ func TestSQLitePing(t *testing.T) {
 func TestSQLiteQuotedMigrationsTableName(t *testing.T) {
 	t.Run("default name", func(t *testing.T) {
 		drv := testSQLiteDriver(t)
-		name := drv.QuotedMigrationsTableName()
+		name := drv.internal.QuotedMigrationsTableName()
 		require.Equal(t, `"schema_migrations"`, name)
 	})
 
 	t.Run("custom name", func(t *testing.T) {
 		drv := testSQLiteDriver(t)
-		drv.MigrationsTableName = "fooMigrations"
+		drv.internal.MigrationsTableName = "fooMigrations"
 
-		name := drv.QuotedMigrationsTableName()
+		name := drv.internal.QuotedMigrationsTableName()
 		require.Equal(t, `"fooMigrations"`, name)
 	})
 }
