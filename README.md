@@ -482,7 +482,12 @@ import (
 	"net/url"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
-	_ "github.com/amacneil/dbmate/v2/pkg/driver/sqlite"
+	_ "github.com/amacneil/dbmate/v2/pkg/driver/sqlite" // uses github.com/mattn/go-sqlite3
+	// _ "github.com/amacneil/dbmate/v2/pkg/driver/sqlite/modernc" // use modernc.org/sqlite
+	// _ "github.com/amacneil/dbmate/v2/pkg/driver/mysql" // use github.com/go-sql-driver/mysql
+	// _ "github.com/amacneil/dbmate/v2/pkg/driver/postgres" // use github.com/lib/pq
+	// _ "github.com/amacneil/dbmate/v2/pkg/driver/clickhouse" // use github.com/ClickHouse/clickhouse-go/v2
+	// _ "github.com/amacneil/dbmate/v2/pkg/driver/bigquery" // use cloud.google.com/go/bigquery
 )
 
 func main() {
