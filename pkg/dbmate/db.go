@@ -386,11 +386,13 @@ func (db *DB) Migrate() error {
 
 		execMigration := func(tx dbutil.Transaction) error {
 			// run actual migration
-			result, err := tx.Exec(parsed.Up)
-			if err != nil {
-				return drv.QueryError(parsed.Up, err)
-			} else if db.Verbose {
-				db.printVerbose(result)
+			for _, stmt := range parsed.Up {
+				result, err := tx.Exec(stmt)
+				if err != nil {
+					return drv.QueryError(stmt, err)
+				} else if db.Verbose {
+					db.printVerbose(result)
+				}
 			}
 
 			// record migration
@@ -555,11 +557,13 @@ func (db *DB) Rollback() error {
 
 	execMigration := func(tx dbutil.Transaction) error {
 		// rollback migration
-		result, err := tx.Exec(parsed.Down)
-		if err != nil {
-			return drv.QueryError(parsed.Down, err)
-		} else if db.Verbose {
-			db.printVerbose(result)
+		for _, stmt := range parsed.Down {
+			result, err := tx.Exec(stmt)
+			if err != nil {
+				return drv.QueryError(stmt, err)
+			} else if db.Verbose {
+				db.printVerbose(result)
+			}
 		}
 
 		// remove migration record
