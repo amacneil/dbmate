@@ -2,6 +2,7 @@ package dbmate
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"regexp"
@@ -39,9 +40,9 @@ func (m *Migration) Parse() (*ParsedMigration, error) {
 
 // ParsedMigration contains the migration contents and options
 type ParsedMigration struct {
-	Up          string
+	Up          []string
 	UpOptions   ParsedMigrationOptions
-	Down        string
+	Down        []string
 	DownOptions ParsedMigrationOptions
 }
 
@@ -66,6 +67,7 @@ var (
 	whitespaceRegExp      = regexp.MustCompile(`\s+`)
 	optionSeparatorRegExp = regexp.MustCompile(`:`)
 	blockDirectiveRegExp  = regexp.MustCompile(`^--\s*migrate:(up|down)`)
+	separatorRegExp       = regexp.MustCompile(`(?m)^\s*--\s*migrate:separator\s*$`)
 )
 
 // Error codes
@@ -102,9 +104,9 @@ func parseMigrationContents(contents string) (*ParsedMigration, error) {
 	downBlock := substring(contents, downDirectiveStart, len(contents))
 
 	parsed := ParsedMigration{
-		Up:          upBlock,
+		Up:          splitSQLStatements(upBlock),
 		UpOptions:   parseMigrationOptions(upBlock),
-		Down:        downBlock,
+		Down:        splitSQLStatements(downBlock),
 		DownOptions: parseMigrationOptions(downBlock),
 	}
 	return &parsed, nil
@@ -205,4 +207,21 @@ func substring(s string, begin, end int) string {
 		return ""
 	}
 	return s[begin:end]
+}
+
+func splitSQLStatements(content string) []string {
+	var stmts []string
+	if separatorRegExp.MatchString(content) {
+		prefix := blockDirectiveRegExp.FindString(content)
+		content = blockDirectiveRegExp.ReplaceAllString(content, "")
+		blocks := separatorRegExp.Split(content, -1)
+		for i, block := range blocks {
+			block = fmt.Sprintf("%s:%d\n%s\n", prefix, i, strings.TrimSpace(block))
+			if block != "" {
+				stmts = append(stmts, block)
+			}
+		}
+		return stmts
+	}
+	return append(stmts, content)
 }
