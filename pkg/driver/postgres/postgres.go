@@ -101,6 +101,7 @@ func connectionArgsForDump(conn *url.URL) []string {
 	query := u.Query()
 	schemas := strings.Split(query.Get("search_path"), ",")
 	query.Del("search_path")
+	query.Del("binary_parameters")
 	u.RawQuery = query.Encode()
 
 	out := []string{}

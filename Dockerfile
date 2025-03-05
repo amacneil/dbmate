@@ -1,5 +1,5 @@
 # development stage
-FROM golang:1.23.1 as dev
+FROM golang:1.24.0 as dev
 WORKDIR /src
 ENV PATH="/src/typescript/node_modules/.bin:${PATH}"
 RUN git config --global --add safe.directory /src
@@ -19,7 +19,7 @@ RUN apt-get update \
 
 # golangci-lint
 RUN curl -fsSL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
-  | sh -s -- -b /usr/local/bin v1.60.1
+  | sh -s -- -b /usr/local/bin v1.64.5
 
 # Download and install DuckDB
 RUN curl -fsSL https://github.com/duckdb/duckdb/releases/download/v1.1.0/duckdb_cli-linux-amd64.zip -o duckdb_cli-linux-amd64.zip \
@@ -33,7 +33,7 @@ COPY . /src/
 RUN make build
 
 # release stage
-FROM alpine:3.20.3 as release
+FROM alpine:3.21.3 as release
 RUN apk add --no-cache \
   mariadb-client \
   mariadb-connector-c \

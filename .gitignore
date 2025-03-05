@@ -3,6 +3,7 @@
 .idea
 *.log
 *.sqlite3
+*.tsbuildinfo
 /.cache
 /db
 /dbmate
