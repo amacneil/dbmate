@@ -123,6 +123,7 @@ func TestConnectionString(t *testing.T) {
 		// support `host` and `port` via url params
 		{"postgres://bob:secret@myhost:1234/foo?host=new&port=9999", "postgres://bob:secret@:9999/foo?host=new"},
 		{"postgres://bob:secret@myhost:1234/foo?port=9999&bar=baz", "postgres://bob:secret@myhost:9999/foo?bar=baz"},
+		{"postgres://bob:secret@myhost,myhost2/foo?port=9999&bar=baz", "postgres://bob:secret@myhost:9999,myhost2:9999/foo?bar=baz"},
 		// support unix sockets via `host` or `socket` param
 		{"postgres://bob:secret@myhost:1234/foo?host=/var/run/postgresql", "postgres://bob:secret@:1234/foo?host=%2Fvar%2Frun%2Fpostgresql"},
 		{"postgres://bob:secret@localhost/foo?socket=/var/run/postgresql", "postgres://bob:secret@:5432/foo?host=%2Fvar%2Frun%2Fpostgresql"},

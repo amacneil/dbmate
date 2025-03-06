@@ -85,7 +85,14 @@ func connectionString(u *url.URL) string {
 	out, _ := url.Parse(u.String())
 	// force scheme back to postgres if there was another postgres-compatible scheme
 	out.Scheme = "postgres"
-	out.Host = fmt.Sprintf("%s:%s", hostname, port)
+
+	hosts := strings.Split(hostname, ",")
+	hostPorts := []string{}
+	for _, h := range hosts {
+		hostPorts = append(hostPorts, fmt.Sprintf("%s:%s", h, port))
+	}
+
+	out.Host = strings.Join(hostPorts, ",")
 	out.RawQuery = query.Encode()
 
 	return out.String()
