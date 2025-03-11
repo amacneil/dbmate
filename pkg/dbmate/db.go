@@ -612,7 +612,7 @@ func (db *DB) Synchronize() error {
 	pendingMigrations := []Migration{}
 	for _, migration := range migrations {
 		if migration.Applied {
-			if db.Strict && highestAppliedMigrationVersion <= migration.Version {
+			if highestAppliedMigrationVersion <= migration.Version {
 				highestAppliedMigrationVersion = migration.Version
 			}
 		} else {
@@ -681,6 +681,8 @@ func (db *DB) Synchronize() error {
 		if err != nil {
 			return err
 		}
+
+		fmt.Fprintf(db.Log, "Latest available migration: %s\n", highestAppliedMigrationVersion)
 
 		migrationsToBeRolledBack := map[string]string{}
 		if migrationsTableExists {
