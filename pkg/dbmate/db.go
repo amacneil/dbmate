@@ -679,17 +679,17 @@ func (db *DB) Synchronize() error {
 		// Otherwise we need to check if we need to rollback some newer migration that the db have.
 		migrationsTableExists, err := drv.MigrationsTableExists(sqlDB)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		migrationsToBeRolledBack := map[string]string{}
 		if migrationsTableExists {
 			migrationsToBeRolledBack, err := drv.SelectMigrationsFromVersion(sqlDB, highestAppliedMigrationVersion)
 			if err != nil {
-				return nil, err
+				return err
 			}
 		}
-		for _, migration := range migrationsToBeRolledBack {
+		for migration := range migrationsToBeRolledBack {
 			fmt.Fprintf(db.Log, "Applying: %s\n", migration.version)
 
 			start := time.Now()
