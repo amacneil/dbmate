@@ -12,8 +12,8 @@ import (
 
 func TestGetDatabaseUrl(t *testing.T) {
 	// set environment variables
-	require.NoError(t, os.Setenv("DATABASE_URL", "foo://example.org/one"))
-	require.NoError(t, os.Setenv("CUSTOM_URL", "foo://example.org/two"))
+	t.Setenv("DATABASE_URL", "foo://example.org/one")
+	t.Setenv("CUSTOM_URL", "foo://example.org/two")
 
 	app := NewApp()
 	flagset := flag.NewFlagSet(app.Name, flag.ContinueOnError)
@@ -85,7 +85,7 @@ func TestLoadEnvFiles(t *testing.T) {
 
 			for _, e := range env {
 				pair := strings.SplitN(e, "=", 2)
-				os.Setenv(pair[0], pair[1])
+				t.Setenv(pair[0], pair[1])
 			}
 		})
 	}
@@ -131,7 +131,7 @@ func TestLoadEnvFiles(t *testing.T) {
 		setup(t)
 
 		// we do not load values over existing values
-		os.Setenv("FIRST", "not one")
+		t.Setenv("FIRST", "not one")
 
 		err := loadEnvFiles([]string{"--env-file", "first.txt"})
 		require.NoError(t, err)

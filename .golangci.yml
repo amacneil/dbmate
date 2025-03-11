@@ -15,6 +15,7 @@ linters:
     - unconvert
     - unparam
     - unused
+    - usetesting
     - whitespace
 
 linters-settings:
