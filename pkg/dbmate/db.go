@@ -603,7 +603,6 @@ func (db *DB) Synchronize() error {
 	defer dbutil.MustClose(sqlDB)
 
 	// find last applied migration
-	var latest *Migration
 	migrations, err := db.FindMigrations()
 	if err != nil {
 		return err
@@ -678,9 +677,14 @@ func (db *DB) Synchronize() error {
 		}
 	} else {
 		// Otherwise we need to check if we need to rollback some newer migration that the db have.
-		appliedMigrations := map[string]string{}
+		migrationsTableExists, err := drv.MigrationsTableExists(sqlDB)
+		if err != nil {
+			return nil, err
+		}
+
+		migrationsToBeRolledBack := map[string]string{}
 		if migrationsTableExists {
-			migrationsToBeRolledBack, err = drv.SelectMigrationsFromVersion(sqlDB, highestAppliedMigrationVersion)
+			migrationsToBeRolledBack, err := drv.SelectMigrationsFromVersion(sqlDB, highestAppliedMigrationVersion)
 			if err != nil {
 				return nil, err
 			}
@@ -691,7 +695,7 @@ func (db *DB) Synchronize() error {
 			start := time.Now()
 
 			// run actual migration dump rollback
-			result, err := tx.Exec(migration.dump)
+			result, err := sqlDB.Exec(migration.dump)
 			if err != nil {
 				return drv.QueryError(migration.dump, err)
 			} else if db.Verbose {
