@@ -689,28 +689,28 @@ func (db *DB) Synchronize() error {
 				return err
 			}
 		}
-		for migration := range migrationsToBeRolledBack {
-			fmt.Fprintf(db.Log, "Applying: %s\n", migration.version)
+		for version, dump := range migrationsToBeRolledBack {
+			fmt.Fprintf(db.Log, "Applying: %s\n", version)
 
 			start := time.Now()
 
 			// run actual migration dump rollback
-			result, err := sqlDB.Exec(migration.dump)
+			result, err := sqlDB.Exec(dump)
 			if err != nil {
-				return drv.QueryError(migration.dump, err)
+				return drv.QueryError(dump, err)
 			} else if db.Verbose {
 				db.printVerbose(result)
 			}
 
 			// record migration
-			err = drv.DeleteMigration(sqlDB, migration.version)
+			err = drv.DeleteMigration(sqlDB, version)
 
 			if err != nil {
 				return err
 			}
 
 			elapsed := time.Since(start)
-			fmt.Fprintf(db.Log, "Applied: %s in %s\n", migration.version, elapsed)
+			fmt.Fprintf(db.Log, "Applied: %s in %s\n", version, elapsed)
 
 			if err != nil {
 				return err
