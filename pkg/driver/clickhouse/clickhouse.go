@@ -292,6 +292,7 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 			applied UInt8 default 1
 		) engine = %s
 		primary key version
+		mediumtext dump
 		order by version
 	`, drv.quotedMigrationsTableName(), drv.onClusterClause(), engineClause))
 

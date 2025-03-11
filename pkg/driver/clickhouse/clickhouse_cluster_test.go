@@ -249,8 +249,8 @@ func TestClickHouseSelectMigrationsOnCluster(t *testing.T) {
 	// test migration from
 	migrations01_dump, err := drv01.SelectMigrationsFromVersion(db01, "abc1")
 	require.NoError(t, err)
-	require.Equal(t, "abc3", migrations_dump["abc3"])
-	require.Equal(t, "abc2", migrations_dump["abc2"])
+	require.Equal(t, "abc3", migrations01_dump["abc3"])
+	require.Equal(t, "abc2", migrations01_dump["abc2"])
 
 	// test limit param on other node
 	migrations02, err = drv02.SelectMigrations(db02, 1)
