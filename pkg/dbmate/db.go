@@ -684,7 +684,7 @@ func (db *DB) Synchronize() error {
 
 		migrationsToBeRolledBack := map[string]string{}
 		if migrationsTableExists {
-			migrationsToBeRolledBack, err := drv.SelectMigrationsFromVersion(sqlDB, highestAppliedMigrationVersion)
+			migrationsToBeRolledBack, err = drv.SelectMigrationsFromVersion(sqlDB, highestAppliedMigrationVersion)
 			if err != nil {
 				return err
 			}
