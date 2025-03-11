@@ -206,9 +206,9 @@ func TestMySQLDumpSchema(t *testing.T) {
 		"-- Dbmate schema migrations\n"+
 		"--\n\n"+
 		"LOCK TABLES `test_migrations` WRITE;\n"+
-		"INSERT INTO `test_migrations` (version) VALUES\n"+
-		"  ('abc1'),\n"+
-		"  ('abc2');\n"+
+		"INSERT INTO `test_migrations` (version, dump) VALUES\n"+
+		"  ('abc1','abc1'),\n"+
+		"  ('abc2','abc2');\n"+
 		"UNLOCK TABLES;\n")
 
 	// DumpSchema should return error if command fails
@@ -315,8 +315,8 @@ func TestMySQLSelectMigrations(t *testing.T) {
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
-	_, err = db.Exec(`insert into test_migrations (version)
-		values ('abc2'), ('abc1'), ('abc3')`)
+	_, err = db.Exec(`insert into test_migrations (version, dump)
+		values ('abc2','abc2'), ('abc1','abc1'), ('abc3','abc3')`)
 	require.NoError(t, err)
 
 	migrations, err := drv.SelectMigrations(db, -1)
@@ -374,8 +374,8 @@ func TestMySQLDeleteMigration(t *testing.T) {
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
-	_, err = db.Exec(`insert into test_migrations (version)
-		values ('abc1'), ('abc2')`)
+	_, err = db.Exec(`insert into test_migrations (version, dump)
+		values ('abc1','abc1'), ('abc2','abc2')`)
 	require.NoError(t, err)
 
 	err = drv.DeleteMigration(db, "abc2")

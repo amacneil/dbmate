@@ -290,8 +290,8 @@ func TestSQLiteSelectMigrations(t *testing.T) {
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
-	_, err = db.Exec(`insert into test_migrations (version)
-		values ('abc2'), ('abc1'), ('abc3')`)
+	_, err = db.Exec(`insert into test_migrations (version, dump)
+		values ('abc2','abc2'), ('abc1','abc1'), ('abc3','abc3')`)
 	require.NoError(t, err)
 
 	migrations, err := drv.SelectMigrations(db, -1)

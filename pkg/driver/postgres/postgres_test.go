@@ -232,9 +232,9 @@ func TestPostgresDumpSchema(t *testing.T) {
 			"--\n"+
 			"-- Dbmate schema migrations\n"+
 			"--\n\n"+
-			"INSERT INTO public.schema_migrations (version) VALUES\n"+
-			"    ('abc1'),\n"+
-			"    ('abc2');\n")
+			"INSERT INTO public.schema_migrations (version, dump) VALUES\n"+
+			"    ('abc1','abc1'),\n"+
+			"    ('abc2','abc2');\n")
 
 		// DumpSchema should return error if command fails
 		drv.databaseURL.Path = "/fakedb"
@@ -270,9 +270,9 @@ func TestPostgresDumpSchema(t *testing.T) {
 			"--\n"+
 			"-- Dbmate schema migrations\n"+
 			"--\n\n"+
-			"INSERT INTO \"camelSchema\".\"testMigrations\" (version) VALUES\n"+
-			"    ('abc1'),\n"+
-			"    ('abc2');\n")
+			"INSERT INTO \"camelSchema\".\"testMigrations\" (version, dump) VALUES\n"+
+			"    ('abc1','abc1'),\n"+
+			"    ('abc2','abc2');\n")
 	})
 }
 
@@ -477,8 +477,8 @@ func TestPostgresSelectMigrations(t *testing.T) {
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
-	_, err = db.Exec(`insert into public.test_migrations (version)
-		values ('abc2'), ('abc1'), ('abc3')`)
+	_, err = db.Exec(`insert into public.test_migrations (version, dump)
+		values ('abc2','abc2'), ('abc1','abc1'), ('abc3','abc3')`)
 	require.NoError(t, err)
 
 	migrations, err := drv.SelectMigrations(db, -1)
@@ -536,8 +536,8 @@ func TestPostgresDeleteMigration(t *testing.T) {
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
-	_, err = db.Exec(`insert into public.test_migrations (version)
-		values ('abc1'), ('abc2')`)
+	_, err = db.Exec(`insert into public.test_migrations (version, dump)
+		values ('abc1','abc1'), ('abc2','abc2')`)
 	require.NoError(t, err)
 
 	err = drv.DeleteMigration(db, "abc2")

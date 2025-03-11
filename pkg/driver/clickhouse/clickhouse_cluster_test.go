@@ -120,9 +120,9 @@ func TestClickHouseDumpSchemaOnCluster(t *testing.T) {
 	require.Contains(t, string(schema), "--\n"+
 		"-- Dbmate schema migrations\n"+
 		"--\n\n"+
-		"INSERT INTO test_migrations (version) VALUES\n"+
-		"    ('abc1'),\n"+
-		"    ('abc2');\n")
+		"INSERT INTO test_migrations (version, dump) VALUES\n"+
+		"    ('abc1','abc1'),\n"+
+		"    ('abc2','abc2');\n")
 
 	// DumpSchema should return error if command fails
 	drv.databaseURL.Path = "/fakedb"
