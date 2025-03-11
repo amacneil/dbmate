@@ -217,9 +217,9 @@ func TestPostgresDumpSchema(t *testing.T) {
 		require.NoError(t, err)
 
 		// insert migration
-		err = drv.InsertMigration(db, "abc1")
+		err = drv.InsertMigration(db, "abc1", "abc1")
 		require.NoError(t, err)
-		err = drv.InsertMigration(db, "abc2")
+		err = drv.InsertMigration(db, "abc2", "abc2")
 		require.NoError(t, err)
 
 		// DumpSchema should return schema
@@ -255,9 +255,9 @@ func TestPostgresDumpSchema(t *testing.T) {
 		require.NoError(t, err)
 
 		// insert migration
-		err = drv.InsertMigration(db, "abc1")
+		err = drv.InsertMigration(db, "abc1", "abc1")
 		require.NoError(t, err)
-		err = drv.InsertMigration(db, "abc2")
+		err = drv.InsertMigration(db, "abc2", "abc2")
 		require.NoError(t, err)
 
 		// DumpSchema should return schema
@@ -511,7 +511,7 @@ func TestPostgresInsertMigration(t *testing.T) {
 	require.Equal(t, 0, count)
 
 	// insert migration
-	err = drv.InsertMigration(db, "abc1")
+	err = drv.InsertMigration(db, "abc1", "abc1")
 	require.NoError(t, err)
 
 	err = db.QueryRow("select count(*) from public.test_migrations where version = 'abc1'").

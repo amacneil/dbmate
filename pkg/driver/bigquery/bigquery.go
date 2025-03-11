@@ -304,7 +304,7 @@ func (drv *Driver) DeleteMigration(util dbutil.Transaction, version string) erro
 	return nil
 }
 
-func (drv *Driver) InsertMigration(_ dbutil.Transaction, version string) error {
+func (drv *Driver) InsertMigration(_ dbutil.Transaction, version string, dump string) error {
 	db, err := drv.Open()
 	if err != nil {
 		return err

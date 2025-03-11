@@ -330,7 +330,7 @@ func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, err
 }
 
 // InsertMigration adds a new migration record
-func (drv *Driver) InsertMigration(db dbutil.Transaction, version string) error {
+func (drv *Driver) InsertMigration(db dbutil.Transaction, version string, dump string) error {
 	migrationsTable, err := drv.quotedMigrationsTableName(db)
 	if err != nil {
 		return err

@@ -324,7 +324,7 @@ func TestSQLiteInsertMigration(t *testing.T) {
 	require.Equal(t, 0, count)
 
 	// insert migration
-	err = drv.InsertMigration(db, "abc1")
+	err = drv.InsertMigration(db, "abc1", "abc1")
 	require.NoError(t, err)
 
 	err = db.QueryRow("select count(*) from test_migrations where version = 'abc1'").
