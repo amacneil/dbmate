@@ -385,7 +385,7 @@ func (drv *Driver) SelectMigrationsFromVersion(db *sql.DB, version_from string) 
 		return nil, err
 	}
 
-	query := fmt.Sprintf("SELECT version FROM %s.%s WHERE version > %s ORDER BY version DESC", config.dataSet, drv.migrationsTableName, version_from)
+	query := fmt.Sprintf("SELECT version FROM %s.%s WHERE version > \"%s\" ORDER BY version DESC", config.dataSet, drv.migrationsTableName, version_from)
 	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
