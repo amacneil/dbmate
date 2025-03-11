@@ -333,11 +333,10 @@ func TestMySQLSelectMigrations(t *testing.T) {
 	require.Equal(t, false, migrations["abc2"])
 
 	// test migration from
-	migrations, err = drv.SelectMigrationsFromVersion(db, "abc1")
+	migrations_dump, err = drv.SelectMigrationsFromVersion(db, "abc1")
 	require.NoError(t, err)
-	require.Equal(t, true, migrations["abc3"])
-	require.Equal(t, true, migrations["abc2"])
-	require.Equal(t, false, migrations["abc1"])
+	require.Equal(t, "abc3", migrations_dump["abc3"])
+	require.Equal(t, "abc2", migrations_dump["abc2"])
 }
 
 func TestMySQLInsertMigration(t *testing.T) {
