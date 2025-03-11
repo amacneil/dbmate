@@ -329,6 +329,40 @@ func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, err
 	return migrations, nil
 }
 
+// SelectMigrationsFromVersion returns a list of applied migrations
+// newer than a specified version
+func (drv *Driver) SelectMigrationsFromVersion(db *sql.DB, version_from string) (map[string]string, error) {
+	migrationsTable, err := drv.quotedMigrationsTableName(db)
+	if err != nil {
+		return nil, err
+	}
+
+	query := "select version from " + migrationsTable + " where version > " + version_from + " order by version desc"
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+
+	defer dbutil.MustClose(rows)
+
+	migrations := map[string]string{}
+	for rows.Next() {
+		var version string
+		var dump string
+		if err := rows.Scan(&version, &dump); err != nil {
+			return nil, err
+		}
+
+		migrations[version] = dump
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return migrations, nil
+}
+
 // InsertMigration adds a new migration record
 func (drv *Driver) InsertMigration(db dbutil.Transaction, version string, dump string) error {
 	migrationsTable, err := drv.quotedMigrationsTableName(db)

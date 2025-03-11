@@ -394,7 +394,7 @@ func (db *DB) Migrate() error {
 			}
 
 			// record migration
-			return drv.InsertMigration(tx, migration.Version, fmt.Sprintf("%s\n\n%s", parsed.Up, parsed.Down))
+			return drv.InsertMigration(tx, migration.Version, parsed.Down)
 		}
 
 		if parsed.UpOptions.Transaction() {
@@ -579,6 +579,139 @@ func (db *DB) Rollback() error {
 
 	if err != nil {
 		return err
+	}
+
+	// automatically update schema file, silence errors
+	if db.AutoDumpSchema {
+		_ = db.DumpSchema()
+	}
+
+	return nil
+}
+
+// Strips eventual later migrations or migrate up in case the database is older.
+func (db *DB) Synchronize() error {
+	drv, err := db.Driver()
+	if err != nil {
+		return err
+	}
+
+	sqlDB, err := db.openDatabaseForMigration(drv)
+	if err != nil {
+		return err
+	}
+	defer dbutil.MustClose(sqlDB)
+
+	// find last applied migration
+	var latest *Migration
+	migrations, err := db.FindMigrations()
+	if err != nil {
+		return err
+	}
+
+	highestAppliedMigrationVersion := ""
+	pendingMigrations := []Migration{}
+	for _, migration := range migrations {
+		if migration.Applied {
+			if db.Strict && highestAppliedMigrationVersion <= migration.Version {
+				highestAppliedMigrationVersion = migration.Version
+			}
+		} else {
+			pendingMigrations = append(pendingMigrations, migration)
+		}
+	}
+
+	if len(pendingMigrations) > 0 && db.Strict && pendingMigrations[0].Version <= highestAppliedMigrationVersion {
+		return fmt.Errorf(
+			"migration `%s` is out of order with already applied migrations, the version number has to be higher than the applied migration `%s` in --strict mode",
+			pendingMigrations[0].Version,
+			highestAppliedMigrationVersion,
+		)
+	}
+
+	// If there is at least one pending up migration we apply them all.
+	if len(pendingMigrations) > 0 {
+
+		sqlDB, err := db.openDatabaseForMigration(drv)
+		if err != nil {
+			return err
+		}
+		defer dbutil.MustClose(sqlDB)
+
+		for _, migration := range pendingMigrations {
+			fmt.Fprintf(db.Log, "Applying: %s\n", migration.FileName)
+
+			start := time.Now()
+
+			parsed, err := migration.Parse()
+			if err != nil {
+				return err
+			}
+
+			execMigration := func(tx dbutil.Transaction) error {
+				// run actual migration
+				result, err := tx.Exec(parsed.Up)
+				if err != nil {
+					return drv.QueryError(parsed.Up, err)
+				} else if db.Verbose {
+					db.printVerbose(result)
+				}
+
+				// record migration
+				return drv.InsertMigration(tx, migration.Version, parsed.Down)
+			}
+
+			if parsed.UpOptions.Transaction() {
+				// begin transaction
+				err = doTransaction(sqlDB, execMigration)
+			} else {
+				// run outside of transaction
+				err = execMigration(sqlDB)
+			}
+
+			elapsed := time.Since(start)
+			fmt.Fprintf(db.Log, "Applied: %s in %s\n", migration.FileName, elapsed)
+
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		// Otherwise we need to check if we need to rollback some newer migration that the db have.
+		appliedMigrations := map[string]string{}
+		if migrationsTableExists {
+			migrationsToBeRolledBack, err = drv.SelectMigrationsFromVersion(sqlDB, highestAppliedMigrationVersion)
+			if err != nil {
+				return nil, err
+			}
+		}
+		for _, migration := range migrationsToBeRolledBack {
+			fmt.Fprintf(db.Log, "Applying: %s\n", migration.version)
+
+			start := time.Now()
+
+			// run actual migration dump rollback
+			result, err := tx.Exec(migration.dump)
+			if err != nil {
+				return drv.QueryError(migration.dump, err)
+			} else if db.Verbose {
+				db.printVerbose(result)
+			}
+
+			// record migration
+			err = drv.DeleteMigration(sqlDB, migration.version)
+
+			if err != nil {
+				return err
+			}
+
+			elapsed := time.Since(start)
+			fmt.Fprintf(db.Log, "Applied: %s in %s\n", migration.version, elapsed)
+
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	// automatically update schema file, silence errors

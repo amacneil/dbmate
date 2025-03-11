@@ -377,6 +377,39 @@ func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, err
 	return migrations, nil
 }
 
+// SelectMigrationsFromVersion returns a list of applied migrations
+// newer than a specified version
+func (drv *Driver) SelectMigrationsFromVersion(db *sql.DB, version_from string) (map[string]string, error) {
+	config, err := drv.getConfig(db)
+	if err != nil {
+		return nil, err
+	}
+
+	query := fmt.Sprintf("SELECT version FROM %s.%s WHERE version > %s ORDER BY version DESC", config.dataSet, drv.migrationsTableName, version_from)
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer dbutil.MustClose(rows)
+
+	migrations := map[string]string{}
+	for rows.Next() {
+		var version string
+		var dump string
+		if err := rows.Scan(&version, &dump); err != nil {
+			return nil, err
+		}
+
+		migrations[version] = dump
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return migrations, nil
+}
+
 // Helper function to check whether a table exists or not in a dataset
 func tableExists(client *bigquery.Client, datasetID, tableName string) (bool, error) {
 	table := client.Dataset(datasetID).Table(tableName)

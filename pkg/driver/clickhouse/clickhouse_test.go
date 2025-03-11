@@ -287,6 +287,13 @@ func TestClickHouseSelectMigrations(t *testing.T) {
 	require.Equal(t, true, migrations["abc3"])
 	require.Equal(t, false, migrations["abc1"])
 	require.Equal(t, false, migrations["abc2"])
+
+	// test migration from
+	migrations, err = drv.SelectMigrationsFromVersion(db, "abc1")
+	require.NoError(t, err)
+	require.Equal(t, true, migrations["abc3"])
+	require.Equal(t, true, migrations["abc2"])
+	require.Equal(t, false, migrations["abc1"])
 }
 
 func TestClickHouseInsertMigration(t *testing.T) {
