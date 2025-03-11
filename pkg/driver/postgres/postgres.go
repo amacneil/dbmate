@@ -337,7 +337,7 @@ func (drv *Driver) SelectMigrationsFromVersion(db *sql.DB, version_from string) 
 		return nil, err
 	}
 
-	query := "select version from " + migrationsTable + " where version > '" + version_from + "' order by version desc"
+	query := "select * from " + migrationsTable + " where version > '" + version_from + "' order by version desc"
 	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
