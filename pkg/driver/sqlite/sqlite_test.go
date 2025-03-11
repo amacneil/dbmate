@@ -176,9 +176,9 @@ func TestSQLiteDumpSchema(t *testing.T) {
 	require.NoError(t, err)
 
 	// insert migration
-	err = drv.InsertMigration(db, "abc1")
+	err = drv.InsertMigration(db, "abc1", "abc1")
 	require.NoError(t, err)
-	err = drv.InsertMigration(db, "abc2")
+	err = drv.InsertMigration(db, "abc2", "abc2")
 	require.NoError(t, err)
 
 	// create a table that will trigger `sqlite_sequence` system table
