@@ -247,7 +247,7 @@ func TestClickHouseSelectMigrationsOnCluster(t *testing.T) {
 	require.Equal(t, false, migrations01["abc2"])
 
 	// test migration from
-	migrations01_dump, err = drv01.SelectMigrationsFromVersion(db01, "abc1")
+	migrations01_dump, err := drv01.SelectMigrationsFromVersion(db01, "abc1")
 	require.NoError(t, err)
 	require.Equal(t, "abc3", migrations_dump["abc3"])
 	require.Equal(t, "abc2", migrations_dump["abc2"])
