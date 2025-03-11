@@ -336,7 +336,7 @@ func (drv *Driver) InsertMigration(db dbutil.Transaction, version string, dump s
 		return err
 	}
 
-	_, err = db.Exec("insert into "+migrationsTable+" (version) values ($1)", version)
+	_, err = db.Exec("insert into "+migrationsTable+" (version, dump) values ($1, $2)", version, dump)
 
 	return err
 }

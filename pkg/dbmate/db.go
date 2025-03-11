@@ -394,7 +394,7 @@ func (db *DB) Migrate() error {
 			}
 
 			// record migration
-			return drv.InsertMigration(tx, migration.Version, parsed.Up)
+			return drv.InsertMigration(tx, migration.Version, fmt.Sprintf("%s\n\n%s", parsed.Up, parsed.Down))
 		}
 
 		if parsed.UpOptions.Transaction() {
