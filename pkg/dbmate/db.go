@@ -578,7 +578,7 @@ func (db *DB) UpdateEmptyDumps() (error) {
 			if ok := appliedMigrations[migration.Version]; ok {
 				// Migration already applied, check if the dump column in db is eventually empty.
 				if dumpMigrations[migration.Version] == "" {
-					fmt.Fprintf(db.Log, "Updating dump column of: %s\n", migration.FileName)
+					fmt.Fprintf(db.Log, "Updating dump column of: %s\n", migration.Version)
 
 					start := time.Now()
 
@@ -593,6 +593,9 @@ func (db *DB) UpdateEmptyDumps() (error) {
 					if err != nil {
 						return err
 					}
+
+					elapsed := time.Since(start)
+					fmt.Fprintf(db.Log, "Updated dump column of: %s in %s\n", migration.Version, elapsed)
 				}
 			}
 		}
