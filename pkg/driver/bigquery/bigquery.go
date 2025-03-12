@@ -97,6 +97,10 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 					Name: "version",
 					Type: bigquery.StringFieldType,
 				},
+				{
+					Name: "dump",
+					Type: bigquery.StringFieldType,
+				},
 			},
 		})
 	})
@@ -283,6 +287,28 @@ func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
 	return exists, nil
 }
 
+func (drv *Driver) InsertMigration(_ dbutil.Transaction, version string, dump string) error {
+	db, err := drv.Open()
+	if err != nil {
+		return err
+	}
+	defer dbutil.MustClose(db)
+
+	config, err := drv.getConfig(db)
+	if err != nil {
+		return err
+	}
+
+	queryTemplate := `INSERT INTO %s.%s (version, dump) VALUES ('%s','%s');`
+	queryString := fmt.Sprintf(queryTemplate, config.dataSet, drv.migrationsTableName, version, dump)
+	_, err = db.Exec(queryString, version)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (drv *Driver) DeleteMigration(util dbutil.Transaction, version string) error {
 	db, err := drv.Open()
 	if err != nil {
@@ -304,7 +330,7 @@ func (drv *Driver) DeleteMigration(util dbutil.Transaction, version string) erro
 	return nil
 }
 
-func (drv *Driver) InsertMigration(_ dbutil.Transaction, version string, dump string) error {
+func (drv *Driver) UpdateMigrationDump(util dbutil.Transaction, version string, dump string) error {
 	db, err := drv.Open()
 	if err != nil {
 		return err
@@ -316,9 +342,8 @@ func (drv *Driver) InsertMigration(_ dbutil.Transaction, version string, dump st
 		return err
 	}
 
-	queryTemplate := `INSERT INTO %s.%s (version, dump) VALUES ('%s','%s');`
-	queryString := fmt.Sprintf(queryTemplate, config.dataSet, drv.migrationsTableName, version, dump)
-	_, err = db.Exec(queryString, version)
+	query := fmt.Sprintf("UPDATE %s.%s SET dump = '%s' WHERE version = '%s';", config.dataSet, drv.migrationsTableName, dump, version)
+	_, err = util.Exec(query)
 	if err != nil {
 		return err
 	}
@@ -385,7 +410,12 @@ func (drv *Driver) SelectMigrationsFromVersion(db *sql.DB, version_from string) 
 		return nil, err
 	}
 
-	query := fmt.Sprintf("SELECT * FROM %s.%s WHERE version > '%s' ORDER BY version DESC", config.dataSet, drv.migrationsTableName, version_from)
+	if isEmpty(version_from){
+		query := fmt.Sprintf("SELECT * FROM %s.%s ORDER BY version DESC", config.dataSet, drv.migrationsTableName)
+	} else {
+		query := fmt.Sprintf("SELECT * FROM %s.%s WHERE version > '%s' ORDER BY version DESC", config.dataSet, drv.migrationsTableName, version_from)
+	}
+
 	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
@@ -395,12 +425,16 @@ func (drv *Driver) SelectMigrationsFromVersion(db *sql.DB, version_from string) 
 	migrations := map[string]string{}
 	for rows.Next() {
 		var version string
-		var dump string
+		var dump sql.NullString
 		if err := rows.Scan(&version, &dump); err != nil {
 			return nil, err
 		}
 
-		migrations[version] = dump
+		if dump.Valid {
+			migrations[version] = dump
+		} else {
+			migrations[version] = ""
+		}
 	}
 
 	if err = rows.Err(); err != nil {

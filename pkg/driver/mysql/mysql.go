@@ -246,7 +246,7 @@ func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
 // CreateMigrationsTable creates the schema_migrations table
 func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 	_, err := db.Exec(fmt.Sprintf(
-		"create table if not exists %s (version varchar(128) primary key, dump mediumtext)",
+		"create table if not exists %s (version varchar(128) primary key, dump mediumtext); alter table %s add column if not exists dump mediumtext;",
 		drv.quotedMigrationsTableName()))
 
 	return err
@@ -286,7 +286,12 @@ func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, err
 // SelectMigrationsFromVersion returns a list of applied migrations
 // newer than a specified version
 func (drv *Driver) SelectMigrationsFromVersion(db *sql.DB, version_from string) (map[string]string, error) {
-	query := fmt.Sprintf("select * from %s where version > '%s' order by version desc", drv.quotedMigrationsTableName(), version_from)
+	if isEmpty(version_from){
+		query := fmt.Sprintf("select * from %s order by version desc", drv.quotedMigrationsTableName())
+	} else {
+		query := fmt.Sprintf("select * from %s where version > '%s' order by version desc", drv.quotedMigrationsTableName(), version_from)
+	}
+
 	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
@@ -297,12 +302,16 @@ func (drv *Driver) SelectMigrationsFromVersion(db *sql.DB, version_from string) 
 	migrations := map[string]string{}
 	for rows.Next() {
 		var version string
-		var dump string
+		var dump sql.NullString
 		if err := rows.Scan(&version, &dump); err != nil {
 			return nil, err
 		}
 
-		migrations[version] = dump
+		if dump.Valid {
+			migrations[version] = dump
+		} else {
+			migrations[version] = ""
+		}
 	}
 
 	if err = rows.Err(); err != nil {
@@ -326,6 +335,15 @@ func (drv *Driver) DeleteMigration(db dbutil.Transaction, version string) error 
 	_, err := db.Exec(
 		fmt.Sprintf("delete from %s where version = ?", drv.quotedMigrationsTableName()),
 		version)
+
+	return err
+}
+
+// UpdateMigrationDump updates the dump column of a specific migration record
+func (drv *Driver) UpdateMigrationDump(db dbutil.Transaction, version string, dump string) error {
+	_, err := db.Exec(
+		fmt.Sprintf("update %s set dump = ? where version = ?", drv.quotedMigrationsTableName()),
+		dump, version)
 
 	return err
 }

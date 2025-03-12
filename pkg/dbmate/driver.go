@@ -22,6 +22,7 @@ type Driver interface {
 	SelectMigrationsFromVersion(*sql.DB, string) (map[string]string, error)
 	InsertMigration(dbutil.Transaction, string, string) error
 	DeleteMigration(dbutil.Transaction, string) error
+	UpdateMigrationDump(dbutil.Transaction, string, string) error
 	Ping() error
 	QueryError(string, error) error
 }

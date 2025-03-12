@@ -335,11 +335,11 @@ func TestClickHouseDeleteMigration(t *testing.T) {
 
 	tx, err := db.Begin()
 	require.NoError(t, err)
-	stmt, err := tx.Prepare("insert into test_migrations (version) values (?)")
+	stmt, err := tx.Prepare("insert into test_migrations (version, dump) values (?, ?)")
 	require.NoError(t, err)
-	_, err = stmt.Exec("abc2")
+	_, err = stmt.Exec("abc2","abc2")
 	require.NoError(t, err)
-	_, err = stmt.Exec("abc1")
+	_, err = stmt.Exec("abc1","abc1")
 	require.NoError(t, err)
 	err = tx.Commit()
 	require.NoError(t, err)
@@ -355,6 +355,40 @@ func TestClickHouseDeleteMigration(t *testing.T) {
 	err = db.QueryRow("select count(*) from test_migrations final where applied").Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
+}
+
+func TestClickHouseUpdateMigrationDump(t *testing.T) {
+	drv := testClickHouseDriver(t)
+	drv.migrationsTableName = "test_migrations"
+
+	db := prepTestClickHouseDB(t)
+	defer dbutil.MustClose(db)
+
+	err := drv.CreateMigrationsTable(db)
+	require.NoError(t, err)
+
+	_, err = db.Exec(`insert into test_migrations (version, dump)
+		values ('abc1','')`)
+	require.NoError(t, err)
+
+	tx, err := db.Begin()
+	require.NoError(t, err)
+	stmt, err := tx.Prepare("insert into test_migrations (version, dump) values (?,?)")
+	require.NoError(t, err)
+	_, err = stmt.Exec("abc1","")
+	require.NoError(t, err)
+	err = tx.Commit()
+	require.NoError(t, err)
+
+	err = drv.UpdateMigrationDump(db, "abc1", "abc1")
+	require.NoError(t, err)
+
+	var version string
+	var dump string
+	err = db.QueryRow("select * from test_migrations").Scan(&version, &dump)
+	require.NoError(t, err)
+	require.Equal(t, "abc1", version)
+	require.Equal(t, "abc1", dump)
 }
 
 func TestClickHousePing(t *testing.T) {

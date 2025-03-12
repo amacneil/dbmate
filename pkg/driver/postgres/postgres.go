@@ -265,7 +265,7 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 
 	// first attempt at creating migrations table
 	createTableStmt := fmt.Sprintf(
-		"create table if not exists %s.%s (version varchar(128) primary key, dump mediumtext)",
+		"create table if not exists %s.%s (version varchar(128) primary key, dump mediumtext); alter table %s add column if not exists dump mediumtext;",
 		schema, migrationsTable)
 	_, err = db.Exec(createTableStmt)
 	if err == nil {
@@ -337,7 +337,12 @@ func (drv *Driver) SelectMigrationsFromVersion(db *sql.DB, version_from string) 
 		return nil, err
 	}
 
-	query := "select * from " + migrationsTable + " where version > '" + version_from + "' order by version desc"
+	if isEmpty(version_from){
+		query := "select * from " + migrationsTable + " order by version desc"
+	} else {
+		query := "select * from " + migrationsTable + " where version > '" + version_from + "' order by version desc"
+	}
+
 	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
@@ -348,12 +353,16 @@ func (drv *Driver) SelectMigrationsFromVersion(db *sql.DB, version_from string) 
 	migrations := map[string]string{}
 	for rows.Next() {
 		var version string
-		var dump string
+		var dump sql.NullString
 		if err := rows.Scan(&version, &dump); err != nil {
 			return nil, err
 		}
 
-		migrations[version] = dump
+		if dump.Valid {
+			migrations[version] = dump
+		} else {
+			migrations[version] = ""
+		}
 	}
 
 	if err = rows.Err(); err != nil {
@@ -383,6 +392,18 @@ func (drv *Driver) DeleteMigration(db dbutil.Transaction, version string) error 
 	}
 
 	_, err = db.Exec("delete from "+migrationsTable+" where version = $1", version)
+
+	return err
+}
+
+// UpdateMigrationDump updates the dump column of a specific migration record
+func (drv *Driver) UpdateMigrationDump(db dbutil.Transaction, version string, dump string) error {
+	migrationsTable, err := drv.quotedMigrationsTableName(db)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("update from "+migrationsTable+" set dump = $1 where version = $2", dump, version)
 
 	return err
 }

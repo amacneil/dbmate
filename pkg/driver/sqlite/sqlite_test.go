@@ -362,6 +362,31 @@ func TestSQLiteDeleteMigration(t *testing.T) {
 	require.Equal(t, 1, count)
 }
 
+func TestSQLLiteUpdateMigrationDump(t *testing.T) {
+	drv := testMySQLDriver(t)
+	drv.migrationsTableName = "test_migrations"
+
+	db := prepTestMySQLDB(t)
+	defer dbutil.MustClose(db)
+
+	err := drv.CreateMigrationsTable(db)
+	require.NoError(t, err)
+
+	_, err = db.Exec(`insert into test_migrations (version, dump)
+		values ('abc1','')`)
+	require.NoError(t, err)
+
+	err = drv.UpdateMigrationDump(db, "abc1", "abc1")
+	require.NoError(t, err)
+
+	var version string
+	var dump string
+	err = db.QueryRow("select * from test_migrations").Scan(&version, &dump)
+	require.NoError(t, err)
+	require.Equal(t, "abc1", version)
+	require.Equal(t, "abc1", dump)
+}
+
 func TestSQLitePing(t *testing.T) {
 	drv := testSQLiteDriver(t)
 	path := ConnectionString(drv.databaseURL)

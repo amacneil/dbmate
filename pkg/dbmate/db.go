@@ -514,6 +514,84 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 	return migrations, nil
 }
 
+// UpdateEmptyDumps lists all available migrations
+func (db *DB) UpdateEmptyDumps() (error) {
+	drv, err := db.Driver()
+	if err != nil {
+		return err
+	}
+
+	sqlDB, err := drv.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer dbutil.MustClose(sqlDB)
+
+	// find applied migrations
+	appliedMigrations := map[string]string{}
+	migrationsTableExists, err := drv.MigrationsTableExists(sqlDB)
+	if err != nil {
+		return err
+	}
+
+	// Get all migrations dump from database.
+	if migrationsTableExists {
+		appliedMigrations, err = drv.SelectMigrationsFromVersion(sqlDB, "")
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, dir := range db.MigrationsDir {
+		// find filesystem migrations
+		files, err := db.readMigrationsDir(dir)
+		if err != nil {
+			return fmt.Errorf("%w `%s`", ErrMigrationDirNotFound, dir)
+		}
+
+		for _, file := range files {
+			if file.IsDir() {
+				continue
+			}
+
+			matches := migrationFileRegexp.FindStringSubmatch(file.Name())
+			if len(matches) < 2 {
+				continue
+			}
+
+			migration := Migration{
+				Applied:  false,
+				FileName: matches[0],
+				FilePath: path.Join(dir, matches[0]),
+				FS:       db.FS,
+				Version:  matches[1],
+			}
+			if ok := appliedMigrations[migration.Version]; ok {
+				// Migration already applied, check if the dump column in db is eventually empty.
+				if isEmpty(appliedMigrations[migration.Version]) {
+					fmt.Fprintf(db.Log, "Updating dump column of: %s\n", migration.FileName)
+
+					start := time.Now()
+
+					parsed, err := migration.Parse()
+					if err != nil {
+						return err
+					}
+
+					appliedMigrations[migration.Version] = parsed.Down
+
+					err = drv.UpdateMigrationDump(tx, migration.Version, parsed.Down)
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 // Rollback rolls back the most recent migration
 func (db *DB) Rollback() error {
 	drv, err := db.Driver()
@@ -608,6 +686,11 @@ func (db *DB) Synchronize() error {
 		return err
 	}
 
+	err := db.UpdateEmptyDumps()
+	if err != nil {
+		return err
+	}
+
 	highestAppliedMigrationVersion := ""
 	pendingMigrations := []Migration{}
 	for _, migration := range migrations {
@@ -630,12 +713,6 @@ func (db *DB) Synchronize() error {
 
 	// If there is at least one pending up migration we apply them all.
 	if len(pendingMigrations) > 0 {
-
-		sqlDB, err := db.openDatabaseForMigration(drv)
-		if err != nil {
-			return err
-		}
-		defer dbutil.MustClose(sqlDB)
 
 		for _, migration := range pendingMigrations {
 			fmt.Fprintf(db.Log, "Applying: %s\n", migration.FileName)
@@ -682,7 +759,7 @@ func (db *DB) Synchronize() error {
 			return err
 		}
 
-		fmt.Fprintf(db.Log, "Latest available migration: %s\n", highestAppliedMigrationVersion)
+		fmt.Fprintf(db.Log, "Latest available migration file: %s.sql\n", highestAppliedMigrationVersion)
 
 		migrationsToBeRolledBack := map[string]string{}
 		if migrationsTableExists {
@@ -692,7 +769,7 @@ func (db *DB) Synchronize() error {
 			}
 		}
 		for version, dump := range migrationsToBeRolledBack {
-			fmt.Fprintf(db.Log, "Applying: %s\n", version)
+			fmt.Fprintf(db.Log, "Rolling back later db migration: %s\n", version)
 
 			start := time.Now()
 
@@ -712,7 +789,7 @@ func (db *DB) Synchronize() error {
 			}
 
 			elapsed := time.Since(start)
-			fmt.Fprintf(db.Log, "Applied: %s in %s\n", version, elapsed)
+			fmt.Fprintf(db.Log, "Rolled back: %s in %s\n", version, elapsed)
 
 			if err != nil {
 				return err
