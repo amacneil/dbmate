@@ -245,7 +245,7 @@ func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
 
 // CreateMigrationsTable creates the schema_migrations table
 func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
-	_, err := db.Exec(fmt.Sprintf("create table if not exists %s (version varchar(128) primary key, dump mediumtext);"), drv.quotedMigrationsTableName())
+	_, err := db.Exec(fmt.Sprintf("create table if not exists %s (version varchar(128) primary key, dump mediumtext);", drv.quotedMigrationsTableName()))
 	if err != nil {
 		return err
 	}
