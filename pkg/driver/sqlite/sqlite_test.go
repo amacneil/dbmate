@@ -362,11 +362,11 @@ func TestSQLiteDeleteMigration(t *testing.T) {
 	require.Equal(t, 1, count)
 }
 
-func TestSQLLiteUpdateMigrationDump(t *testing.T) {
-	drv := testMySQLDriver(t)
+func TestSQLiteUpdateMigrationDump(t *testing.T) {
+	drv := testSQLiteDriver(t)
 	drv.migrationsTableName = "test_migrations"
 
-	db := prepTestMySQLDB(t)
+	db := prepTestSQLiteDB(t)
 	defer dbutil.MustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
