@@ -523,20 +523,29 @@ func (db *DB) UpdateEmptyDumps() (error) {
 
 	sqlDB, err := drv.Open()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer dbutil.MustClose(sqlDB)
 
 	// find applied migrations
-	appliedMigrations := map[string]string{}
 	migrationsTableExists, err := drv.MigrationsTableExists(sqlDB)
 	if err != nil {
 		return err
 	}
 
 	// Get all migrations dump from database.
+	dumpMigrations := map[string]string{}
 	if migrationsTableExists {
 		appliedMigrations, err = drv.SelectMigrationsFromVersion(sqlDB, "")
+		if err != nil {
+			return err
+		}
+	}
+
+	// Get all migrations dump from database.
+	appliedMigrations := map[string]bool{}
+	if migrationsTableExists {
+		appliedMigrations, err = drv.SelectMigrations(sqlDB, -1)
 		if err != nil {
 			return err
 		}
@@ -568,7 +577,7 @@ func (db *DB) UpdateEmptyDumps() (error) {
 			}
 			if ok := appliedMigrations[migration.Version]; ok {
 				// Migration already applied, check if the dump column in db is eventually empty.
-				if appliedMigrations[migration.Version] == "" {
+				if dumpMigrations[migration.Version] == "" {
 					fmt.Fprintf(db.Log, "Updating dump column of: %s\n", migration.FileName)
 
 					start := time.Now()
@@ -580,7 +589,7 @@ func (db *DB) UpdateEmptyDumps() (error) {
 
 					appliedMigrations[migration.Version] = parsed.Down
 
-					err = drv.UpdateMigrationDump(tx, migration.Version, parsed.Down)
+					err = drv.UpdateMigrationDump(sqlDB, migration.Version, parsed.Down)
 					if err != nil {
 						return err
 					}
@@ -686,7 +695,7 @@ func (db *DB) Synchronize() error {
 		return err
 	}
 
-	err := db.UpdateEmptyDumps()
+	err = db.UpdateEmptyDumps()
 	if err != nil {
 		return err
 	}
