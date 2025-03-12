@@ -294,9 +294,9 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 		) engine = %s
 		primary key version
 		order by version;
-		alter table users
+		alter table %s%s
 		add column if not exists dump String;
-	`, drv.quotedMigrationsTableName(), drv.onClusterClause(), engineClause))
+	`, drv.quotedMigrationsTableName(), drv.onClusterClause(), engineClause, drv.quotedMigrationsTableName(), drv.onClusterClause()))
 
 	return err
 }

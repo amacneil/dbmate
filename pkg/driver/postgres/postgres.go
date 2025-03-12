@@ -266,7 +266,7 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 	// first attempt at creating migrations table
 	createTableStmt := fmt.Sprintf(
 		"create table if not exists %s.%s (version varchar(128) primary key, dump mediumtext); alter table %s add column if not exists dump mediumtext;",
-		schema, migrationsTable)
+		schema, migrationsTable, schema, migrationsTable)
 	_, err = db.Exec(createTableStmt)
 	if err == nil {
 		// table exists or created successfully
