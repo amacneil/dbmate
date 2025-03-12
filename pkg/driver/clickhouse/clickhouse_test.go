@@ -361,7 +361,7 @@ func TestClickHouseUpdateMigrationDump(t *testing.T) {
 	drv := testClickHouseDriver(t)
 	drv.migrationsTableName = "test_migrations"
 
-	db := prepTestClickHouseDB(t)
+	db := prepTestClickHouseDB(t, drv)
 	defer dbutil.MustClose(db)
 
 	err := drv.CreateMigrationsTable(db)
