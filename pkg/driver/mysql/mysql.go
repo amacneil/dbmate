@@ -251,7 +251,7 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 	}
 
 	// The add column query can fail because the column could be already there.
-	_, err := db.Exec(fmt.Sprintf("alter table %s add column dump mediumtext;"), drv.quotedMigrationsTableName())
+	_, err = db.Exec(fmt.Sprintf("alter table %s add column dump mediumtext;"), drv.quotedMigrationsTableName())
 	if err != nil {
 		fmt.Fprintf(db.Log, "Dump column already there.\n")
 	} else {
