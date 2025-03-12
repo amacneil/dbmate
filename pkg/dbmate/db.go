@@ -536,7 +536,7 @@ func (db *DB) UpdateEmptyDumps() (error) {
 	// Get all migrations dump from database.
 	dumpMigrations := map[string]string{}
 	if migrationsTableExists {
-		appliedMigrations, err = drv.SelectMigrationsFromVersion(sqlDB, "")
+		dumpMigrations, err = drv.SelectMigrationsFromVersion(sqlDB, "")
 		if err != nil {
 			return err
 		}
@@ -587,7 +587,7 @@ func (db *DB) UpdateEmptyDumps() (error) {
 						return err
 					}
 
-					appliedMigrations[migration.Version] = parsed.Down
+					dumpMigrations[migration.Version] = parsed.Down
 
 					err = drv.UpdateMigrationDump(sqlDB, migration.Version, parsed.Down)
 					if err != nil {
