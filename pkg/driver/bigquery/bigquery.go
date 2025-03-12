@@ -410,7 +410,7 @@ func (drv *Driver) SelectMigrationsFromVersion(db *sql.DB, version_from string) 
 		return nil, err
 	}
 
-	if isEmpty(version_from){
+	if version_from == "" {
 		query := fmt.Sprintf("SELECT * FROM %s.%s ORDER BY version DESC", config.dataSet, drv.migrationsTableName)
 	} else {
 		query := fmt.Sprintf("SELECT * FROM %s.%s WHERE version > '%s' ORDER BY version DESC", config.dataSet, drv.migrationsTableName, version_from)

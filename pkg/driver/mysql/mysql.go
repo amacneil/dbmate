@@ -286,7 +286,7 @@ func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, err
 // SelectMigrationsFromVersion returns a list of applied migrations
 // newer than a specified version
 func (drv *Driver) SelectMigrationsFromVersion(db *sql.DB, version_from string) (map[string]string, error) {
-	if isEmpty(version_from){
+	if version_from == "" {
 		query := fmt.Sprintf("select * from %s order by version desc", drv.quotedMigrationsTableName())
 	} else {
 		query := fmt.Sprintf("select * from %s where version > '%s' order by version desc", drv.quotedMigrationsTableName(), version_from)

@@ -337,7 +337,7 @@ func (drv *Driver) SelectMigrationsFromVersion(db *sql.DB, version_from string) 
 		return nil, err
 	}
 
-	if isEmpty(version_from){
+	if version_from == "" {
 		query := "select * from " + migrationsTable + " order by version desc"
 	} else {
 		query := "select * from " + migrationsTable + " where version > '" + version_from + "' order by version desc"
