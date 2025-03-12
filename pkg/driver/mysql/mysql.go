@@ -245,20 +245,20 @@ func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
 
 // CreateMigrationsTable creates the schema_migrations table
 func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
-	_, err := db.Exec(fmt.Sprintf(
-		`create table if not exists %s (version varchar(128) primary key, dump mediumtext);	delimiter // 
-		create procedure AddColumnIfNotExists() 
-		begin 
-		if not exists ( select * from information_schema.columns where table_name = %s and column_name = 'dump') then 
-		alter table %s add column dump mediumtext; 
-		end if; 
-		end // 
-		call AddColumnIfNotExists(); 
-		drop procedure AddColumnIfNotExists; // 
-		delimiter ;`,
-		drv.quotedMigrationsTableName(), drv.quotedMigrationsTableName(), drv.quotedMigrationsTableName()))
+	_, err := db.Exec(fmt.Sprintf("create table if not exists %s (version varchar(128) primary key, dump mediumtext);"), drv.quotedMigrationsTableName())
+	if err != nil {
+		return err
+	}
 
-	return err
+	// The add column query can fail because the column could be already there.
+	_, err := db.Exec(fmt.Sprintf("alter table %s add column dump mediumtext;"), drv.quotedMigrationsTableName())
+	if err != nil {
+		fmt.Fprintf(db.Log, "Dump column already there.\n")
+	} else {
+		fmt.Fprintf(db.Log, "Dump column added.\n")
+	}
+
+	return nil
 }
 
 // SelectMigrations returns a list of applied migrations
