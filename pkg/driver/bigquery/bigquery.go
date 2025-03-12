@@ -410,10 +410,11 @@ func (drv *Driver) SelectMigrationsFromVersion(db *sql.DB, version_from string) 
 		return nil, err
 	}
 
+	var query string
 	if version_from == "" {
-		query := fmt.Sprintf("SELECT * FROM %s.%s ORDER BY version DESC", config.dataSet, drv.migrationsTableName)
+		query = fmt.Sprintf("SELECT * FROM %s.%s ORDER BY version DESC", config.dataSet, drv.migrationsTableName)
 	} else {
-		query := fmt.Sprintf("SELECT * FROM %s.%s WHERE version > '%s' ORDER BY version DESC", config.dataSet, drv.migrationsTableName, version_from)
+		query = fmt.Sprintf("SELECT * FROM %s.%s WHERE version > '%s' ORDER BY version DESC", config.dataSet, drv.migrationsTableName, version_from)
 	}
 
 	rows, err := db.Query(query)
@@ -431,7 +432,7 @@ func (drv *Driver) SelectMigrationsFromVersion(db *sql.DB, version_from string) 
 		}
 
 		if dump.Valid {
-			migrations[version] = dump
+			migrations[version] = dump.String
 		} else {
 			migrations[version] = ""
 		}

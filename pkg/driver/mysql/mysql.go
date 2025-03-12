@@ -286,10 +286,11 @@ func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, err
 // SelectMigrationsFromVersion returns a list of applied migrations
 // newer than a specified version
 func (drv *Driver) SelectMigrationsFromVersion(db *sql.DB, version_from string) (map[string]string, error) {
+	var query string
 	if version_from == "" {
-		query := fmt.Sprintf("select * from %s order by version desc", drv.quotedMigrationsTableName())
+		query = fmt.Sprintf("select * from %s order by version desc", drv.quotedMigrationsTableName())
 	} else {
-		query := fmt.Sprintf("select * from %s where version > '%s' order by version desc", drv.quotedMigrationsTableName(), version_from)
+		query = fmt.Sprintf("select * from %s where version > '%s' order by version desc", drv.quotedMigrationsTableName(), version_from)
 	}
 
 	rows, err := db.Query(query)
@@ -308,7 +309,7 @@ func (drv *Driver) SelectMigrationsFromVersion(db *sql.DB, version_from string) 
 		}
 
 		if dump.Valid {
-			migrations[version] = dump
+			migrations[version] = dump.String
 		} else {
 			migrations[version] = ""
 		}

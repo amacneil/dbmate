@@ -337,10 +337,11 @@ func (drv *Driver) SelectMigrationsFromVersion(db *sql.DB, version_from string) 
 		return nil, err
 	}
 
+	var query string
 	if version_from == "" {
-		query := "select * from " + migrationsTable + " order by version desc"
+		query = "select * from " + migrationsTable + " order by version desc"
 	} else {
-		query := "select * from " + migrationsTable + " where version > '" + version_from + "' order by version desc"
+		query = "select * from " + migrationsTable + " where version > '" + version_from + "' order by version desc"
 	}
 
 	rows, err := db.Query(query)
@@ -359,7 +360,7 @@ func (drv *Driver) SelectMigrationsFromVersion(db *sql.DB, version_from string) 
 		}
 
 		if dump.Valid {
-			migrations[version] = dump
+			migrations[version] = dump.String
 		} else {
 			migrations[version] = ""
 		}
