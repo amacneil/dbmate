@@ -109,15 +109,13 @@ func TestDumpSchema(t *testing.T) {
 	db := newTestDB(t, sqliteTestURL(t))
 
 	// create custom schema file directory
-	dir, err := os.MkdirTemp("", "dbmate")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	// create schema.sql in subdirectory to test creating directory
 	db.SchemaFile = filepath.Join(dir, "/schema/schema.sql")
 
 	// drop database
-	err = db.Drop()
+	err := db.Drop()
 	require.NoError(t, err)
 
 	// create and migrate
@@ -143,15 +141,13 @@ func TestAutoDumpSchema(t *testing.T) {
 	db.AutoDumpSchema = true
 
 	// create custom schema file directory
-	dir, err := os.MkdirTemp("", "dbmate")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	// create schema.sql in subdirectory to test creating directory
 	db.SchemaFile = filepath.Join(dir, "/schema/schema.sql")
 
 	// drop database
-	err = db.Drop()
+	err := db.Drop()
 	require.NoError(t, err)
 
 	// schema.sql should not exist
@@ -187,9 +183,7 @@ func TestLoadSchema(t *testing.T) {
 	require.NoError(t, err)
 
 	// create custom schema file directory
-	dir, err := os.MkdirTemp("", "dbmate")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	// create schema.sql in subdirectory to test creating directory
 	db.SchemaFile = filepath.Join(dir, "/schema/schema.sql")
@@ -556,9 +550,7 @@ func TestFindMigrationsAbsolute(t *testing.T) {
 	})
 
 	t.Run("absolute path", func(t *testing.T) {
-		dir, err := os.MkdirTemp("", "dbmate")
-		require.NoError(t, err)
-		defer os.RemoveAll(dir)
+		dir := t.TempDir()
 		require.True(t, filepath.IsAbs(dir))
 
 		file, err := os.Create(filepath.Join(dir, "1234_example.sql"))
