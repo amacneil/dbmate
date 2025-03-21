@@ -175,7 +175,7 @@ func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
 // CreateMigrationsTable creates the schema migrations table
 func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 	_, err := db.Exec(fmt.Sprintf(
-		"create table if not exists %s (version varchar(128) primary key)",
+		"create table if not exists %s (version varchar(128) primary key, dump mediumtext)",
 		drv.quotedMigrationsTableName()))
 
 	return err
@@ -212,11 +212,50 @@ func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, err
 	return migrations, nil
 }
 
+// SelectMigrationsFromVersion returns a list of applied migrations
+// newer than a specified version
+func (drv *Driver) SelectMigrationsFromVersion(db *sql.DB, version_from string) (map[string]string, error) {
+	var query string
+	if version_from == "" {
+		query = fmt.Sprintf("select * from %s order by version desc", drv.quotedMigrationsTableName())
+	} else {
+		query = fmt.Sprintf("select * from %s where version > '%s' order by version desc", drv.quotedMigrationsTableName(), version_from)
+	}
+	
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+
+	defer dbutil.MustClose(rows)
+
+	migrations := map[string]string{}
+	for rows.Next() {
+		var version string
+		var dump sql.NullString
+		if err := rows.Scan(&version, &dump); err != nil {
+			return nil, err
+		}
+
+		if dump.Valid {
+			migrations[version] = dump.String
+		} else {
+			migrations[version] = ""
+		}
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return migrations, nil
+}
+
 // InsertMigration adds a new migration record
-func (drv *Driver) InsertMigration(db dbutil.Transaction, version string) error {
+func (drv *Driver) InsertMigration(db dbutil.Transaction, version string, dump string) error {
 	_, err := db.Exec(
-		fmt.Sprintf("insert into %s (version) values (?)", drv.quotedMigrationsTableName()),
-		version)
+		fmt.Sprintf("insert into %s (version, dump) values (?, ?)", drv.quotedMigrationsTableName()),
+		version, dump)
 
 	return err
 }
@@ -226,6 +265,15 @@ func (drv *Driver) DeleteMigration(db dbutil.Transaction, version string) error 
 	_, err := db.Exec(
 		fmt.Sprintf("delete from %s where version = ?", drv.quotedMigrationsTableName()),
 		version)
+
+	return err
+}
+
+// UpdateMigrationDump updates the dump column of a specific migration record
+func (drv *Driver) UpdateMigrationDump(db dbutil.Transaction, version string, dump string) error {
+	_, err := db.Exec(
+		fmt.Sprintf("update %s set dump = ? where version = ?", drv.quotedMigrationsTableName()),
+		dump, version)
 
 	return err
 }

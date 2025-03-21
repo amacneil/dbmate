@@ -394,7 +394,7 @@ func (db *DB) Migrate() error {
 			}
 
 			// record migration
-			return drv.InsertMigration(tx, migration.Version)
+			return drv.InsertMigration(tx, migration.Version, parsed.Down)
 		}
 
 		if parsed.UpOptions.Transaction() {
@@ -514,6 +514,96 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 	return migrations, nil
 }
 
+// UpdateEmptyDumps lists all available migrations
+func (db *DB) UpdateEmptyDumps() (error) {
+	drv, err := db.Driver()
+	if err != nil {
+		return err
+	}
+
+	sqlDB, err := drv.Open()
+	if err != nil {
+		return err
+	}
+	defer dbutil.MustClose(sqlDB)
+
+	// find applied migrations
+	migrationsTableExists, err := drv.MigrationsTableExists(sqlDB)
+	if err != nil {
+		return err
+	}
+
+	// Get all migrations dump from database.
+	dumpMigrations := map[string]string{}
+	if migrationsTableExists {
+		dumpMigrations, err = drv.SelectMigrationsFromVersion(sqlDB, "")
+		if err != nil {
+			return err
+		}
+	}
+
+	// Get all migrations dump from database.
+	appliedMigrations := map[string]bool{}
+	if migrationsTableExists {
+		appliedMigrations, err = drv.SelectMigrations(sqlDB, -1)
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, dir := range db.MigrationsDir {
+		// find filesystem migrations
+		files, err := db.readMigrationsDir(dir)
+		if err != nil {
+			return fmt.Errorf("%w `%s`", ErrMigrationDirNotFound, dir)
+		}
+
+		for _, file := range files {
+			if file.IsDir() {
+				continue
+			}
+
+			matches := migrationFileRegexp.FindStringSubmatch(file.Name())
+			if len(matches) < 2 {
+				continue
+			}
+
+			migration := Migration{
+				Applied:  false,
+				FileName: matches[0],
+				FilePath: path.Join(dir, matches[0]),
+				FS:       db.FS,
+				Version:  matches[1],
+			}
+			if ok := appliedMigrations[migration.Version]; ok {
+				// Migration already applied, check if the dump column in db is eventually empty.
+				if dumpMigrations[migration.Version] == "" {
+					fmt.Fprintf(db.Log, "Updating dump column of: %s\n", migration.Version)
+
+					start := time.Now()
+
+					parsed, err := migration.Parse()
+					if err != nil {
+						return err
+					}
+
+					dumpMigrations[migration.Version] = parsed.Down
+
+					err = drv.UpdateMigrationDump(sqlDB, migration.Version, parsed.Down)
+					if err != nil {
+						return err
+					}
+
+					elapsed := time.Since(start)
+					fmt.Fprintf(db.Log, "Updated dump column of: %s in %s\n", migration.Version, elapsed)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 // Rollback rolls back the most recent migration
 func (db *DB) Rollback() error {
 	drv, err := db.Driver()
@@ -579,6 +669,144 @@ func (db *DB) Rollback() error {
 
 	if err != nil {
 		return err
+	}
+
+	// automatically update schema file, silence errors
+	if db.AutoDumpSchema {
+		_ = db.DumpSchema()
+	}
+
+	return nil
+}
+
+// Strips eventual later migrations or migrate up in case the database is older.
+func (db *DB) Synchronize() error {
+	drv, err := db.Driver()
+	if err != nil {
+		return err
+	}
+
+	sqlDB, err := db.openDatabaseForMigration(drv)
+	if err != nil {
+		return err
+	}
+	defer dbutil.MustClose(sqlDB)
+
+	// find last applied migration
+	migrations, err := db.FindMigrations()
+	if err != nil {
+		return err
+	}
+
+	err = db.UpdateEmptyDumps()
+	if err != nil {
+		return err
+	}
+
+	highestAppliedMigrationVersion := ""
+	pendingMigrations := []Migration{}
+	for _, migration := range migrations {
+		if migration.Applied {
+			if highestAppliedMigrationVersion <= migration.Version {
+				highestAppliedMigrationVersion = migration.Version
+			}
+		} else {
+			pendingMigrations = append(pendingMigrations, migration)
+		}
+	}
+
+	if len(pendingMigrations) > 0 && db.Strict && pendingMigrations[0].Version <= highestAppliedMigrationVersion {
+		return fmt.Errorf(
+			"migration `%s` is out of order with already applied migrations, the version number has to be higher than the applied migration `%s` in --strict mode",
+			pendingMigrations[0].Version,
+			highestAppliedMigrationVersion,
+		)
+	}
+
+	// If there is at least one pending up migration we apply them all.
+	if len(pendingMigrations) > 0 {
+
+		for _, migration := range pendingMigrations {
+			fmt.Fprintf(db.Log, "Applying: %s\n", migration.FileName)
+
+			start := time.Now()
+
+			parsed, err := migration.Parse()
+			if err != nil {
+				return err
+			}
+
+			execMigration := func(tx dbutil.Transaction) error {
+				// run actual migration
+				result, err := tx.Exec(parsed.Up)
+				if err != nil {
+					return drv.QueryError(parsed.Up, err)
+				} else if db.Verbose {
+					db.printVerbose(result)
+				}
+
+				// record migration
+				return drv.InsertMigration(tx, migration.Version, parsed.Down)
+			}
+
+			if parsed.UpOptions.Transaction() {
+				// begin transaction
+				err = doTransaction(sqlDB, execMigration)
+			} else {
+				// run outside of transaction
+				err = execMigration(sqlDB)
+			}
+
+			elapsed := time.Since(start)
+			fmt.Fprintf(db.Log, "Applied: %s in %s\n", migration.FileName, elapsed)
+
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		// Otherwise we need to check if we need to rollback some newer migration that the db have.
+		migrationsTableExists, err := drv.MigrationsTableExists(sqlDB)
+		if err != nil {
+			return err
+		}
+
+		fmt.Fprintf(db.Log, "Latest available migration file: %s.sql\n", highestAppliedMigrationVersion)
+
+		migrationsToBeRolledBack := map[string]string{}
+		if migrationsTableExists {
+			migrationsToBeRolledBack, err = drv.SelectMigrationsFromVersion(sqlDB, highestAppliedMigrationVersion)
+			if err != nil {
+				return err
+			}
+		}
+		for version, dump := range migrationsToBeRolledBack {
+			fmt.Fprintf(db.Log, "Rolling back later db migration: %s\n", version)
+
+			start := time.Now()
+
+			// run actual migration dump rollback
+			result, err := sqlDB.Exec(dump)
+			if err != nil {
+				return drv.QueryError(dump, err)
+			} else if db.Verbose {
+				db.printVerbose(result)
+			}
+
+			// record migration
+			err = drv.DeleteMigration(sqlDB, version)
+
+			if err != nil {
+				return err
+			}
+
+			elapsed := time.Since(start)
+			fmt.Fprintf(db.Log, "Rolled back: %s in %s\n", version, elapsed)
+
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	// automatically update schema file, silence errors

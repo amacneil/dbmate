@@ -233,8 +233,8 @@ func TestBigQuerySelectMigrations(t *testing.T) {
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
-	_, err = db.Exec(`insert into test_migrations (version)
-		values ('abc2'), ('abc1'), ('abc3')`)
+	_, err = db.Exec(`insert into test_migrations (version, dump)
+		values ('abc2','abc2'), ('abc1','abc1'), ('abc3','abc3')`)
 	require.NoError(t, err)
 
 	migrations, err := drv.SelectMigrations(db, -1)
@@ -249,6 +249,12 @@ func TestBigQuerySelectMigrations(t *testing.T) {
 	require.Equal(t, true, migrations["abc3"])
 	require.Equal(t, false, migrations["abc1"])
 	require.Equal(t, false, migrations["abc2"])
+
+	// test migration from
+	migrations_dump, err := drv.SelectMigrationsFromVersion(db, "abc1")
+	require.NoError(t, err)
+	require.Equal(t, "abc3", migrations_dump["abc3"])
+	require.Equal(t, "abc2", migrations_dump["abc2"])
 }
 
 func TestBigQueryInsertMigration(t *testing.T) {
@@ -267,7 +273,7 @@ func TestBigQueryInsertMigration(t *testing.T) {
 	require.Equal(t, 0, count)
 
 	// insert migration
-	err = drv.InsertMigration(db, "abc1")
+	err = drv.InsertMigration(db, "abc1", "abc1")
 	require.NoError(t, err)
 
 	err = db.QueryRow("select count(*) from test_migrations where version = 'abc1'").
@@ -286,8 +292,8 @@ func TestBigQueryDeleteMigration(t *testing.T) {
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
-	_, err = db.Exec(`insert into test_migrations (version)
-		values ('abc1'), ('abc2')`)
+	_, err = db.Exec(`insert into test_migrations (version, dump)
+		values ('abc1','abc1'), ('abc2','abc2')`)
 	require.NoError(t, err)
 
 	err = drv.DeleteMigration(db, "abc2")
@@ -297,6 +303,31 @@ func TestBigQueryDeleteMigration(t *testing.T) {
 	err = db.QueryRow("select count(*) from test_migrations").Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
+}
+
+func TestBigQueryUpdateMigrationDump(t *testing.T) {
+	drv := testBigQueryDriver(t)
+	drv.migrationsTableName = "test_migrations"
+
+	db := prepTestBigQueryDB(t)
+	defer dbutil.MustClose(db)
+
+	err := drv.CreateMigrationsTable(db)
+	require.NoError(t, err)
+
+	_, err = db.Exec(`insert into test_migrations (version, dump)
+		values ('abc1','')`)
+	require.NoError(t, err)
+
+	err = drv.UpdateMigrationDump(db, "abc1", "abc1")
+	require.NoError(t, err)
+
+	var version string
+	var dump string
+	err = db.QueryRow("select * from test_migrations").Scan(&version, &dump)
+	require.NoError(t, err)
+	require.Equal(t, "abc1", version)
+	require.Equal(t, "abc1", dump)
 }
 
 func TestBigQueryPingError(t *testing.T) {
@@ -353,9 +384,9 @@ func TestGoogleBigQueryDumpSchema(t *testing.T) {
 		require.NoError(t, err)
 
 		// insert migration
-		err = drv.InsertMigration(db, "abc1")
+		err = drv.InsertMigration(db, "abc1", "abc1")
 		require.NoError(t, err)
-		err = drv.InsertMigration(db, "abc2")
+		err = drv.InsertMigration(db, "abc2", "abc2")
 		require.NoError(t, err)
 
 		// DumpSchema should return schema
@@ -368,8 +399,8 @@ func TestGoogleBigQueryDumpSchema(t *testing.T) {
 		require.Contains(t, string(schema), "\n--\n"+
 			"-- Dbmate schema migrations\n"+
 			"--\n\n"+
-			"INSERT INTO schema_migrations (version) VALUES\n"+
-			"    ('abc1'),\n"+
-			"    ('abc2');\n")
+			"INSERT INTO schema_migrations (version, dump) VALUES\n"+
+			"    ('abc1','abc1'),\n"+
+			"    ('abc2','abc2');\n")
 	})
 }

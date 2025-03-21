@@ -184,6 +184,22 @@ func NewApp() *cli.App {
 			}),
 		},
 		{
+			Name:    "sync",
+			Usage:   "Strips eventual later migrations or migrate up in case the database is older",
+			Flags: []cli.Flag{
+				&cli.BoolFlag{
+					Name:    "verbose",
+					Aliases: []string{"v"},
+					EnvVars: []string{"DBMATE_VERBOSE"},
+					Usage:   "print the result of each statement execution",
+				},
+			},
+			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				db.Verbose = c.Bool("verbose")
+				return db.Synchronize()
+			}),
+		},
+		{
 			Name:  "status",
 			Usage: "List applied and pending migrations",
 			Flags: []cli.Flag{
