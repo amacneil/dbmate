@@ -421,6 +421,94 @@ func (db *DB) Migrate() error {
 	return nil
 }
 
+// MigrateNext applies only the next pending migration
+func (db *DB) MigrateNext() error {
+	drv, err := db.Driver()
+	if err != nil {
+		return err
+	}
+
+	// Find all migrations
+	migrations, err := db.FindMigrations()
+	if err != nil {
+		return err
+	}
+
+	if len(migrations) == 0 {
+		return ErrNoMigrationFiles
+	}
+
+	// Determine the next migration to apply
+	var nextMigration *Migration
+	highestAppliedMigrationVersion := ""
+	for _, migration := range migrations {
+		if migration.Applied {
+			if db.Strict && highestAppliedMigrationVersion <= migration.Version {
+				highestAppliedMigrationVersion = migration.Version
+			}
+		} else {
+			nextMigration = &migration
+			break // choose the first pending migration
+		}
+	}
+
+	if nextMigration == nil {
+		return fmt.Errorf("no pending migrations to apply")
+	}
+
+	if db.Strict && nextMigration.Version <= highestAppliedMigrationVersion {
+		return fmt.Errorf(
+			"migration `%s` is out of order: it must be higher than the applied migration `%s` in strict mode",
+			nextMigration.Version,
+			highestAppliedMigrationVersion,
+		)
+	}
+
+	sqlDB, err := db.openDatabaseForMigration(drv)
+	if err != nil {
+		return err
+	}
+	defer dbutil.MustClose(sqlDB)
+
+	fmt.Fprintf(db.Log, "Applying next migration: %s\n", nextMigration.FileName)
+	start := time.Now()
+
+	parsed, err := nextMigration.Parse()
+	if err != nil {
+		return err
+	}
+
+	execMigration := func(tx dbutil.Transaction) error {
+		result, err := tx.Exec(parsed.Up)
+		if err != nil {
+			return drv.QueryError(parsed.Up, err)
+		} else if db.Verbose {
+			db.printVerbose(result)
+		}
+
+		return drv.InsertMigration(tx, nextMigration.Version)
+	}
+
+	if parsed.UpOptions.Transaction() {
+		err = doTransaction(sqlDB, execMigration)
+	} else {
+		err = execMigration(sqlDB)
+	}
+
+	elapsed := time.Since(start)
+	fmt.Fprintf(db.Log, "Applied: %s in %s\n", nextMigration.FileName, elapsed)
+	if err != nil {
+		return err
+	}
+
+	// Automatically update the schema file if AutoDumpSchema is enabled
+	if db.AutoDumpSchema {
+		_ = db.DumpSchema()
+	}
+
+	return nil
+}
+
 func (db *DB) printVerbose(result sql.Result) {
 	lastInsertID, err := result.LastInsertId()
 	if err == nil {
