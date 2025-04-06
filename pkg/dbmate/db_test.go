@@ -378,6 +378,68 @@ func TestMigrate(t *testing.T) {
 	})
 }
 
+func TestMigrateNext(t *testing.T) {
+	testEachURL(t, func(t *testing.T, u *url.URL) {
+		// Create test database
+		db := newTestDB(t, u)
+		drv, err := db.Driver()
+		require.NoError(t, err)
+
+		// Drop and recreate the database
+		err = db.Drop()
+		require.NoError(t, err)
+		err = db.Create()
+		require.NoError(t, err)
+
+		// First call to MigrateNext should apply only the first migration
+		err = db.MigrateNext()
+		require.NoError(t, err)
+
+		// Verify that only the first migration has been applied
+		sqlDB, err := drv.Open()
+		require.NoError(t, err)
+		appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
+		require.NoError(t, err)
+		// Expect only migration "20151129054053" to be applied
+		require.Equal(t, map[string]bool{"20151129054053": true}, appliedMigrations)
+		dbutil.MustClose(sqlDB)
+
+		// Check that the "users" table exists (created by the first migration)
+		sqlDB, err = drv.Open()
+		require.NoError(t, err)
+		var count int
+		err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
+		require.NoError(t, err)
+		// Expect one record in the "users" table
+		require.Equal(t, 1, count)
+		dbutil.MustClose(sqlDB)
+
+		// Second call to MigrateNext should apply the second migration
+		err = db.MigrateNext()
+		require.NoError(t, err)
+
+		sqlDB, err = drv.Open()
+		require.NoError(t, err)
+		appliedMigrations, err = drv.SelectMigrations(sqlDB, -1)
+		require.NoError(t, err)
+		// Expect both migrations to be applied
+		require.Equal(t, map[string]bool{"20151129054053": true, "20200227231541": true}, appliedMigrations)
+		dbutil.MustClose(sqlDB)
+
+		// Verify that the "posts" table exists (created by the second migration)
+		sqlDB, err = drv.Open()
+		require.NoError(t, err)
+		err = sqlDB.QueryRow("select count(*) from posts").Scan(&count)
+		require.NoError(t, err)
+		dbutil.MustClose(sqlDB)
+
+		// Third call to MigrateNext should return an error because there are no pending migrations
+		err = db.MigrateNext()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "no pending migrations to apply")
+	})
+}
+
 func TestUp(t *testing.T) {
 	testEachURL(t, func(t *testing.T, u *url.URL) {
 		db := newTestDB(t, u)
