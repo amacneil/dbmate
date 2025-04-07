@@ -1,4 +1,4 @@
-module github.com/amacneil/dbmate/v2
+module github.com/assetnote/dbmate
 
 go 1.23.0
 
@@ -31,6 +31,7 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.50.0 // indirect
 	github.com/andybalholm/brotli v1.1.1 // indirect
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
+	github.com/ashwanthkumar/slack-go-webhook v0.0.0-20200209025033-430dd4e66960 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.6 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.32.4 // indirect
@@ -49,6 +50,8 @@ require (
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
+	github.com/moul/http2curl v1.0.0 // indirect
+	github.com/parnurzeal/gorequest v0.3.0 // indirect
 	github.com/paulmach/orb v0.11.1 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/pkg/errors v0.9.1 // indirect

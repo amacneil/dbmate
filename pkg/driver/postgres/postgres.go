@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/amacneil/dbmate/v2/pkg/dbmate"
-	"github.com/amacneil/dbmate/v2/pkg/dbutil"
+	"github.com/assetnote/dbmate/pkg/dbmate"
+	"github.com/assetnote/dbmate/pkg/dbutil"
 
 	"github.com/lib/pq"
 )

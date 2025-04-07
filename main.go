@@ -6,15 +6,17 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"time"
 
+	"github.com/ashwanthkumar/slack-go-webhook"
+	"github.com/assetnote/dbmate/pkg/dbmate"
+	_ "github.com/assetnote/dbmate/pkg/driver/bigquery"
+	_ "github.com/assetnote/dbmate/pkg/driver/clickhouse"
+	_ "github.com/assetnote/dbmate/pkg/driver/mysql"
+	_ "github.com/assetnote/dbmate/pkg/driver/postgres"
+	_ "github.com/assetnote/dbmate/pkg/driver/sqlite"
 	"github.com/joho/godotenv"
 	"github.com/urfave/cli/v2"
-
-	"github.com/amacneil/dbmate/v2/pkg/dbmate"
-	_ "github.com/amacneil/dbmate/v2/pkg/driver/bigquery"
-	_ "github.com/amacneil/dbmate/v2/pkg/driver/clickhouse"
-	_ "github.com/amacneil/dbmate/v2/pkg/driver/mysql"
-	_ "github.com/amacneil/dbmate/v2/pkg/driver/postgres"
 )
 
 func main() {
@@ -25,11 +27,25 @@ func main() {
 	}
 
 	app := NewApp()
-	err = app.Run(os.Args)
-
+	err := app.Run(os.Args)
 	if err != nil {
 		errText := redactLogString(fmt.Sprintf("Error: %s\n", err))
 		_, _ = fmt.Fprint(os.Stderr, errText)
+		// Send notification to #migrations Slack channel
+		slackWebhook := os.Getenv("DBMATE_SLACK_WEBHOOK_URL")
+		customerTag := os.Getenv("CUSTOMER_TAG")
+		currentTime := time.Now()
+		date := currentTime.Format("2006-01-02 15:04:05 Monday")
+		if slackWebhook != "" && customerTag != "" {
+			payload := slack.Payload{
+				Text:        fmt.Sprintf("## %s\nTime of execution: %s\n%s", customerTag, date, errText),
+				Username:    "migrations-bot",
+				Channel:     "#migrations",
+				IconEmoji:   ":monkey_face:",
+				Attachments: []slack.Attachment{},
+			}
+			_ = slack.Send(slackWebhook, "", payload)
+		}
 		os.Exit(2)
 	}
 }

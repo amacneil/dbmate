@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/amacneil/dbmate/v2/pkg/dbtest"
-	"github.com/amacneil/dbmate/v2/pkg/dbutil"
+	"github.com/assetnote/dbmate/pkg/dbtest"
+	"github.com/assetnote/dbmate/pkg/dbutil"
 
 	_ "github.com/mattn/go-sqlite3" // database/sql driver
 	"github.com/stretchr/testify/require"
