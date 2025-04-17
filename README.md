@@ -244,6 +244,15 @@ To specify an absolute path, add a forward slash to the path. The following will
 DATABASE_URL="sqlite:/tmp/database.sqlite3"
 ```
 
+Note that for some common [settings](https://sqlite.org/pragma.html) like `journal_mode` to improve performance, transactions need to be disabled for that migration file, e.g.
+
+```sql
+-- migrate:up transaction:false
+PRAGMA journal_mode = WAL;
+```
+
+Otherwise the migration will fail with "Error: cannot change into wal mode from within a transaction".
+
 #### ClickHouse
 
 ```sh
