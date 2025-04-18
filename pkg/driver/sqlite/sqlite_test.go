@@ -176,9 +176,9 @@ func TestSQLiteDumpSchema(t *testing.T) {
 	require.NoError(t, err)
 
 	// insert migration
-	err = drv.InsertMigration(db, "abc1")
+	err = drv.InsertMigration(db, "abc1", "abc1")
 	require.NoError(t, err)
-	err = drv.InsertMigration(db, "abc2")
+	err = drv.InsertMigration(db, "abc2", "abc2")
 	require.NoError(t, err)
 
 	// create a table that will trigger `sqlite_sequence` system table
@@ -290,8 +290,8 @@ func TestSQLiteSelectMigrations(t *testing.T) {
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
-	_, err = db.Exec(`insert into test_migrations (version)
-		values ('abc2'), ('abc1'), ('abc3')`)
+	_, err = db.Exec(`insert into test_migrations (version, dump)
+		values ('abc2','abc2'), ('abc1','abc1'), ('abc3','abc3')`)
 	require.NoError(t, err)
 
 	migrations, err := drv.SelectMigrations(db, -1)
@@ -306,6 +306,12 @@ func TestSQLiteSelectMigrations(t *testing.T) {
 	require.Equal(t, true, migrations["abc3"])
 	require.Equal(t, false, migrations["abc1"])
 	require.Equal(t, false, migrations["abc2"])
+
+	// test migration from
+	migrations_dump, err := drv.SelectMigrationsFromVersion(db, "abc1")
+	require.NoError(t, err)
+	require.Equal(t, "abc3", migrations_dump["abc3"])
+	require.Equal(t, "abc2", migrations_dump["abc2"])
 }
 
 func TestSQLiteInsertMigration(t *testing.T) {
@@ -324,7 +330,7 @@ func TestSQLiteInsertMigration(t *testing.T) {
 	require.Equal(t, 0, count)
 
 	// insert migration
-	err = drv.InsertMigration(db, "abc1")
+	err = drv.InsertMigration(db, "abc1", "abc1")
 	require.NoError(t, err)
 
 	err = db.QueryRow("select count(*) from test_migrations where version = 'abc1'").
@@ -354,6 +360,31 @@ func TestSQLiteDeleteMigration(t *testing.T) {
 	err = db.QueryRow("select count(*) from test_migrations").Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
+}
+
+func TestSQLiteUpdateMigrationDump(t *testing.T) {
+	drv := testSQLiteDriver(t)
+	drv.migrationsTableName = "test_migrations"
+
+	db := prepTestSQLiteDB(t)
+	defer dbutil.MustClose(db)
+
+	err := drv.CreateMigrationsTable(db)
+	require.NoError(t, err)
+
+	_, err = db.Exec(`insert into test_migrations (version, dump)
+		values ('abc1','')`)
+	require.NoError(t, err)
+
+	err = drv.UpdateMigrationDump(db, "abc1", "abc1")
+	require.NoError(t, err)
+
+	var version string
+	var dump string
+	err = db.QueryRow("select * from test_migrations").Scan(&version, &dump)
+	require.NoError(t, err)
+	require.Equal(t, "abc1", version)
+	require.Equal(t, "abc1", dump)
 }
 
 func TestSQLitePing(t *testing.T) {

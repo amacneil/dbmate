@@ -19,8 +19,10 @@ type Driver interface {
 	MigrationsTableExists(*sql.DB) (bool, error)
 	CreateMigrationsTable(*sql.DB) error
 	SelectMigrations(*sql.DB, int) (map[string]bool, error)
-	InsertMigration(dbutil.Transaction, string) error
+	SelectMigrationsFromVersion(*sql.DB, string) (map[string]string, error)
+	InsertMigration(dbutil.Transaction, string, string) error
 	DeleteMigration(dbutil.Transaction, string) error
+	UpdateMigrationDump(dbutil.Transaction, string, string) error
 	Ping() error
 	QueryError(string, error) error
 }

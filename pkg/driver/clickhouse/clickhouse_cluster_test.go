@@ -101,13 +101,13 @@ func TestClickHouseDumpSchemaOnCluster(t *testing.T) {
 	// insert migration
 	tx, err := db.Begin()
 	require.NoError(t, err)
-	err = drv.InsertMigration(tx, "abc1")
+	err = drv.InsertMigration(tx, "abc1", "abc1")
 	require.NoError(t, err)
 	err = tx.Commit()
 	require.NoError(t, err)
 	tx, err = db.Begin()
 	require.NoError(t, err)
-	err = drv.InsertMigration(tx, "abc2")
+	err = drv.InsertMigration(tx, "abc2", "abc2")
 	require.NoError(t, err)
 	err = tx.Commit()
 	require.NoError(t, err)
@@ -120,9 +120,9 @@ func TestClickHouseDumpSchemaOnCluster(t *testing.T) {
 	require.Contains(t, string(schema), "--\n"+
 		"-- Dbmate schema migrations\n"+
 		"--\n\n"+
-		"INSERT INTO test_migrations (version) VALUES\n"+
-		"    ('abc1'),\n"+
-		"    ('abc2');\n")
+		"INSERT INTO test_migrations (version, dump) VALUES\n"+
+		"    ('abc1','abc1'),\n"+
+		"    ('abc2','abc2');\n")
 
 	// DumpSchema should return error if command fails
 	drv.databaseURL.Path = "/fakedb"
@@ -246,6 +246,12 @@ func TestClickHouseSelectMigrationsOnCluster(t *testing.T) {
 	require.Equal(t, false, migrations01["abc1"])
 	require.Equal(t, false, migrations01["abc2"])
 
+	// test migration from
+	migrations01_dump, err := drv01.SelectMigrationsFromVersion(db01, "abc1")
+	require.NoError(t, err)
+	require.Equal(t, "abc3", migrations01_dump["abc3"])
+	require.Equal(t, "abc2", migrations01_dump["abc2"])
+
 	// test limit param on other node
 	migrations02, err = drv02.SelectMigrations(db02, 1)
 	require.NoError(t, err)
@@ -282,7 +288,7 @@ func TestClickHouseInsertMigrationOnCluster(t *testing.T) {
 	// insert migration
 	tx, err := db01.Begin()
 	require.NoError(t, err)
-	err = drv01.InsertMigration(tx, "abc1")
+	err = drv01.InsertMigration(tx, "abc1", "abc1")
 	require.NoError(t, err)
 	err = tx.Commit()
 	require.NoError(t, err)
