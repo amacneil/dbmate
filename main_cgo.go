@@ -4,5 +4,6 @@
 package main
 
 import (
+	_ "github.com/amacneil/dbmate/v2/pkg/driver/duckdb"
 	_ "github.com/amacneil/dbmate/v2/pkg/driver/sqlite"
 )
