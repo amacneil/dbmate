@@ -593,6 +593,87 @@ func TestRollbackAll(t *testing.T) {
 	})
 }
 
+func TestMigrateOnly(t *testing.T) {
+	testEachURL(t, func(t *testing.T, u *url.URL) {
+		const v1 = "20151129054053" // users
+		const v2 = "20200227231541" // posts
+
+		db := newTestDB(t, u)
+		drv, err := db.Driver()
+		require.NoError(t, err)
+
+		require.NoError(t, db.Drop())
+		require.NoError(t, db.Create())
+
+		require.NoError(t, db.MigrateOnly(v1))
+
+		sqlDB, err := drv.Open()
+		require.NoError(t, err)
+		defer dbutil.MustClose(sqlDB)
+
+		applied, err := drv.SelectMigrations(sqlDB, -1)
+		require.NoError(t, err)
+		require.Equal(t, map[string]bool{v1: true}, applied)
+
+		var cnt int
+		require.NoError(t, sqlDB.QueryRow("select count(*) from users").Scan(&cnt))
+		require.Error(t, sqlDB.QueryRow("select count(*) from posts").Scan(&cnt))
+
+		require.NoError(t, db.MigrateOnly(v1))
+
+		err = db.MigrateOnly("99999999999999")
+		require.ErrorIs(t, err, dbmate.ErrMigrationNotFound)
+
+		db.Strict = true
+		err = db.MigrateOnly(v2)
+		require.NoError(t, err)
+
+		require.NoError(t, db.MigrateOnly(v1))
+	})
+}
+
+func TestRollbackOnly(t *testing.T) {
+	testEachURL(t, func(t *testing.T, u *url.URL) {
+		const v1 = "20151129054053" // users
+		const v2 = "20200227231541" // posts
+
+		db := newTestDB(t, u)
+		drv, err := db.Driver()
+		require.NoError(t, err)
+
+		require.NoError(t, db.Drop())
+		require.NoError(t, db.Create())
+		require.NoError(t, db.Migrate())
+
+		sqlDB, err := drv.Open()
+		require.NoError(t, err)
+		defer dbutil.MustClose(sqlDB)
+
+		applied, _ := drv.SelectMigrations(sqlDB, -1)
+		require.Equal(t, map[string]bool{v1: true, v2: true}, applied)
+
+		require.NoError(t, db.RollbackOnly(v2))
+
+		applied, _ = drv.SelectMigrations(sqlDB, -1)
+		require.Equal(t, map[string]bool{v1: true}, applied)
+
+		var cnt int
+		require.NoError(t, sqlDB.QueryRow("select count(*) from users").Scan(&cnt))
+		require.Error(t, sqlDB.QueryRow("select count(*) from posts").Scan(&cnt))
+
+		err = db.RollbackOnly(v2)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "not applied")
+
+		err = db.RollbackOnly("99999999999999")
+		require.ErrorIs(t, err, dbmate.ErrMigrationNotFound)
+
+		require.NoError(t, db.RollbackOnly(v1))
+		applied, _ = drv.SelectMigrations(sqlDB, -1)
+		require.Empty(t, applied)
+	})
+}
+
 func TestFindMigrations(t *testing.T) {
 	testEachURL(t, func(t *testing.T, u *url.URL) {
 		db := newTestDB(t, u)
