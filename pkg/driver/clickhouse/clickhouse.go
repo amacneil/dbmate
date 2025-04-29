@@ -128,7 +128,7 @@ func (drv *Driver) quoteIdentifier(str string) string {
 		return str
 	}
 
-	str = strings.Replace(str, `"`, `""`, -1)
+	str = strings.ReplaceAll(str, `"`, `""`)
 
 	return fmt.Sprintf(`"%s"`, str)
 }
@@ -177,7 +177,7 @@ func (drv *Driver) DropDatabase() error {
 
 func (drv *Driver) schemaDump(db *sql.DB, buf *bytes.Buffer, databaseName string) error {
 	buf.WriteString("\n--\n-- Database schema\n--\n\n")
-	buf.WriteString(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s%s;\n\n", drv.quoteIdentifier(databaseName), drv.onClusterClause()))
+	fmt.Fprintf(buf, "CREATE DATABASE IF NOT EXISTS %s%s;\n\n", drv.quoteIdentifier(databaseName), drv.onClusterClause())
 
 	tables, err := dbutil.QueryColumn(db, "show tables")
 	if err != nil {
