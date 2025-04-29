@@ -549,6 +549,50 @@ func TestRollback(t *testing.T) {
 	})
 }
 
+func TestRollbackAll(t *testing.T) {
+	testEachURL(t, func(t *testing.T, u *url.URL) {
+		db := newTestDB(t, u)
+		drv, err := db.Driver()
+		require.NoError(t, err)
+
+		err = db.Drop()
+		require.NoError(t, err)
+		err = db.Create()
+		require.NoError(t, err)
+
+		err = db.RollbackAll()
+		require.Error(t, err)
+		require.ErrorContains(t, err, "can't rollback")
+
+		err = db.Migrate()
+		require.NoError(t, err)
+
+		sqlDB, err := drv.Open()
+		require.NoError(t, err)
+		defer dbutil.MustClose(sqlDB)
+
+		var cnt int
+		err = sqlDB.QueryRow("select count(*) from schema_migrations").Scan(&cnt)
+		require.NoError(t, err)
+		require.Equal(t, 2, cnt)
+
+		err = db.RollbackAll()
+		require.NoError(t, err)
+
+		err = sqlDB.QueryRow("select count(*) from schema_migrations").Scan(&cnt)
+		require.NoError(t, err)
+		require.Equal(t, 0, cnt)
+
+		err = sqlDB.QueryRow("select count(*) from users").Scan(&cnt)
+		require.Error(t, err)
+		require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
+
+		err = sqlDB.QueryRow("select count(*) from posts").Scan(&cnt)
+		require.Error(t, err)
+		require.Regexp(t, "(does not exist|doesn't exist|no such table)", err.Error())
+	})
+}
+
 func TestFindMigrations(t *testing.T) {
 	testEachURL(t, func(t *testing.T, u *url.URL) {
 		db := newTestDB(t, u)

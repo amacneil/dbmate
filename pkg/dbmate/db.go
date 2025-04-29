@@ -509,6 +509,70 @@ func (db *DB) MigrateNext() error {
 	return nil
 }
 
+// RollbackAll rolls back every applied migration (latest-first) until none remain
+func (db *DB) RollbackAll() error {
+	drv, err := db.Driver()
+	if err != nil {
+		return err
+	}
+
+	sqlDB, err := db.openDatabaseForMigration(drv)
+	if err != nil {
+		return err
+	}
+	defer dbutil.MustClose(sqlDB)
+
+	migrations, err := db.FindMigrations()
+	if err != nil {
+		return err
+	}
+
+	applied := make([]*Migration, 0, len(migrations))
+	for i := len(migrations) - 1; i >= 0; i-- {
+		if migrations[i].Applied {
+			applied = append(applied, &migrations[i])
+		}
+	}
+	if len(applied) == 0 {
+		return ErrNoRollback
+	}
+
+	for _, mig := range applied {
+		fmt.Fprintf(db.Log, "Rolling back: %s\n", mig.FileName)
+		start := time.Now()
+		parsed, err := mig.Parse()
+		if err != nil {
+			return err
+		}
+		execMigration := func(tx dbutil.Transaction) error {
+			result, err := tx.Exec(parsed.Down)
+			if err != nil {
+				return drv.QueryError(parsed.Down, err)
+			} else if db.Verbose {
+				db.printVerbose(result)
+			}
+			return drv.DeleteMigration(tx, mig.Version)
+		}
+		if parsed.DownOptions.Transaction() {
+			err = doTransaction(sqlDB, execMigration)
+		} else {
+			err = execMigration(sqlDB)
+		}
+		elapsed := time.Since(start)
+		fmt.Fprintf(db.Log, "Rolled back: %s in %s\n", mig.FileName, elapsed)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	if db.AutoDumpSchema {
+		_ = db.DumpSchema()
+	}
+
+	return nil
+}
+
 func (db *DB) printVerbose(result sql.Result) {
 	lastInsertID, err := result.LastInsertId()
 	if err == nil {
