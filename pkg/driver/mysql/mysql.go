@@ -88,7 +88,7 @@ func (drv *Driver) openRootDB() (*sql.DB, error) {
 }
 
 func (drv *Driver) quoteIdentifier(str string) string {
-	str = strings.Replace(str, "`", "\\`", -1)
+	str = strings.ReplaceAll(str, "`", "\\`")
 
 	return fmt.Sprintf("`%s`", str)
 }
