@@ -167,22 +167,6 @@ func NewApp() *cli.App {
 			}),
 		},
 		{
-			Name:  "migrate-next",
-			Usage: "Apply a single (next) pending migration",
-			Flags: []cli.Flag{
-				&cli.BoolFlag{
-					Name:    "verbose",
-					Aliases: []string{"v"},
-					EnvVars: []string{"DBMATE_VERBOSE"},
-					Usage:   "print the result of each statement execution",
-				},
-			},
-			Action: action(func(db *dbmate.DB, c *cli.Context) error {
-				db.Verbose = c.Bool("verbose")
-				return db.MigrateNext()
-			}),
-		},
-		{
 			Name:    "rollback",
 			Aliases: []string{"down"},
 			Usage:   "Rollback the most recent migration",
