@@ -655,22 +655,20 @@ func TestRollbackTo(t *testing.T) {
 		require.NoError(t, db.RollbackTo(v2))
 
 		applied, _ = drv.SelectMigrations(sqlDB, -1)
-		require.Equal(t, map[string]bool{v1: true}, applied)
+		require.Equal(t, map[string]bool{v1: true, v2: true}, applied)
 
 		var cnt int
 		require.NoError(t, sqlDB.QueryRow("select count(*) from users").Scan(&cnt))
-		require.Error(t, sqlDB.QueryRow("select count(*) from posts").Scan(&cnt))
+		require.NoError(t, sqlDB.QueryRow("select count(*) from posts").Scan(&cnt))
 
-		err = db.RollbackTo(v2)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "not applied")
+		require.NoError(t, db.RollbackTo(v2))
 
 		err = db.RollbackTo("99999999999999")
 		require.ErrorIs(t, err, dbmate.ErrMigrationNotFound)
 
 		require.NoError(t, db.RollbackTo(v1))
 		applied, _ = drv.SelectMigrations(sqlDB, -1)
-		require.Empty(t, applied)
+		require.Equal(t, map[string]bool{v1: true}, applied)
 	})
 }
 

@@ -742,13 +742,8 @@ func (db *DB) Rollback() error {
 }
 
 // migrateOnly applies exactly one pending migration that matches the given version.
-func (db *DB) migrateOnly(version string) error {
+func (db *DB) migrateOnly(migrations []Migration, version string) error {
 	drv, err := db.Driver()
-	if err != nil {
-		return err
-	}
-
-	migrations, err := db.FindMigrations()
 	if err != nil {
 		return err
 	}
@@ -814,13 +809,8 @@ func (db *DB) migrateOnly(version string) error {
 }
 
 // rollbackOnly rolls back exactly one applied migration that matches the given version.
-func (db *DB) rollbackOnly(version string) error {
+func (db *DB) rollbackOnly(migrations []Migration, version string) error {
 	drv, err := db.Driver()
-	if err != nil {
-		return err
-	}
-
-	migrations, err := db.FindMigrations()
 	if err != nil {
 		return err
 	}
@@ -880,35 +870,59 @@ func (db *DB) rollbackOnly(version string) error {
 
 // MigrateTo applies every pending migration whose version ≤ target (inclusive).
 func (db *DB) MigrateTo(target string) error {
-	migs, err := db.FindMigrations()
+	migrations, err := db.FindMigrations()
 	if err != nil {
 		return err
 	}
 
-	for _, m := range migs {
+	found := false
+	for _, m := range migrations {
+		if m.Version == target {
+			found = true
+		}
 		if m.Applied || m.Version > target {
 			continue
 		}
-		if err := db.migrateOnly(m.Version); err != nil {
+		if err := db.migrateOnly(migrations, m.Version); err != nil {
 			return err
 		}
+	}
+
+	if !found {
+		return ErrMigrationNotFound
 	}
 	return nil
 }
 
 // RollbackTo rolls back until version == target remains applied (exclusive).
 func (db *DB) RollbackTo(target string) error {
-	migs, err := db.FindMigrations()
+	migrations, err := db.FindMigrations()
 	if err != nil {
 		return err
 	}
-	// process latest-first
-	for i := len(migs) - 1; i >= 0; i-- {
-		m := migs[i]
-		if !m.Applied || m.Version == target {
+
+	var targetApplied bool
+	var targetExists bool
+	for _, m := range migrations {
+		if m.Version == target {
+			targetExists = true
+			targetApplied = m.Applied
+			break
+		}
+	}
+	if !targetExists {
+		return ErrMigrationNotFound
+	}
+	if !targetApplied {
+		return fmt.Errorf("migration `%s` is not applied, nothing to rollback", target)
+	}
+
+	for i := len(migrations) - 1; i >= 0; i-- {
+		m := migrations[i]
+		if !m.Applied || m.Version <= target {
 			continue
 		}
-		if err := db.rollbackOnly(m.Version); err != nil {
+		if err := db.rollbackOnly(migrations, m.Version); err != nil {
 			return err
 		}
 	}
