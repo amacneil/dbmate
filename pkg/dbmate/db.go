@@ -741,8 +741,8 @@ func (db *DB) Rollback() error {
 	return nil
 }
 
-// MigrateOnly applies exactly one pending migration that matches the given version.
-func (db *DB) MigrateOnly(version string) error {
+// migrateOnly applies exactly one pending migration that matches the given version.
+func (db *DB) migrateOnly(version string) error {
 	drv, err := db.Driver()
 	if err != nil {
 		return err
@@ -813,8 +813,8 @@ func (db *DB) MigrateOnly(version string) error {
 	return nil
 }
 
-// RollbackOnly rolls back exactly one applied migration that matches the given version.
-func (db *DB) RollbackOnly(version string) error {
+// rollbackOnly rolls back exactly one applied migration that matches the given version.
+func (db *DB) rollbackOnly(version string) error {
 	drv, err := db.Driver()
 	if err != nil {
 		return err
@@ -874,6 +874,43 @@ func (db *DB) RollbackOnly(version string) error {
 	}
 	if db.AutoDumpSchema {
 		_ = db.DumpSchema()
+	}
+	return nil
+}
+
+// MigrateTo applies every pending migration whose version ≤ target (inclusive).
+func (db *DB) MigrateTo(target string) error {
+	migs, err := db.FindMigrations()
+	if err != nil {
+		return err
+	}
+
+	for _, m := range migs {
+		if m.Applied || m.Version > target {
+			continue
+		}
+		if err := db.migrateOnly(m.Version); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// RollbackTo rolls back until version == target remains applied (exclusive).
+func (db *DB) RollbackTo(target string) error {
+	migs, err := db.FindMigrations()
+	if err != nil {
+		return err
+	}
+	// process latest-first
+	for i := len(migs) - 1; i >= 0; i-- {
+		m := migs[i]
+		if !m.Applied || m.Version == target {
+			continue
+		}
+		if err := db.rollbackOnly(m.Version); err != nil {
+			return err
+		}
 	}
 	return nil
 }
