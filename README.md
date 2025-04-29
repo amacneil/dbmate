@@ -188,7 +188,7 @@ Applied: 20151127184807_create_users_table.sql in 123µs
 Alternatively, you can specify the url directly on the command line:
 
 ```sh
-dbmate -u "postgres://postgres@127.0.0.1:5432/myapp_test?sslmode=disable" up
+$ dbmate -u "postgres://postgres@127.0.0.1:5432/myapp_test?sslmode=disable" up
 ```
 
 The only advantage of using `dbmate -e TEST_DATABASE_URL` over `dbmate -u $TEST_DATABASE_URL` is that the former takes advantage of dbmate's automatic `.env` file loading.
@@ -431,7 +431,7 @@ In general, your application should be resilient to not having a working databas
 If the database is available, `wait` will return no output:
 
 ```sh
-dbmate wait
+$ dbmate wait
 ```
 
 If the database is unavailable, `wait` will block until the database becomes available:
@@ -488,20 +488,20 @@ Here is a simple example. Remember to import the driver you need!
 package main
 
 import (
- "net/url"
+	"net/url"
 
- "github.com/amacneil/dbmate/v2/pkg/dbmate"
- _ "github.com/amacneil/dbmate/v2/pkg/driver/sqlite"
+	"github.com/amacneil/dbmate/v2/pkg/dbmate"
+	_ "github.com/amacneil/dbmate/v2/pkg/driver/sqlite"
 )
 
 func main() {
- u, _ := url.Parse("sqlite:foo.sqlite3")
- db := dbmate.New(u)
+	u, _ := url.Parse("sqlite:foo.sqlite3")
+	db := dbmate.New(u)
 
- err := db.CreateAndMigrate()
- if err != nil {
-  panic(err)
- }
+	err := db.CreateAndMigrate()
+	if err != nil {
+		panic(err)
+	}
 }
 ```
 
@@ -517,36 +517,36 @@ Use `db.FS` to specify the filesystem used for reading migrations:
 package main
 
 import (
- "embed"
- "fmt"
- "net/url"
+	"embed"
+	"fmt"
+	"net/url"
 
- "github.com/amacneil/dbmate/v2/pkg/dbmate"
- _ "github.com/amacneil/dbmate/v2/pkg/driver/sqlite"
+	"github.com/amacneil/dbmate/v2/pkg/dbmate"
+	_ "github.com/amacneil/dbmate/v2/pkg/driver/sqlite"
 )
 
 //go:embed db/migrations/*.sql
 var fs embed.FS
 
 func main() {
- u, _ := url.Parse("sqlite:foo.sqlite3")
- db := dbmate.New(u)
- db.FS = fs
+	u, _ := url.Parse("sqlite:foo.sqlite3")
+	db := dbmate.New(u)
+	db.FS = fs
 
- fmt.Println("Migrations:")
- migrations, err := db.FindMigrations()
- if err != nil {
-  panic(err)
- }
- for _, m := range migrations {
-  fmt.Println(m.Version, m.FilePath)
- }
+	fmt.Println("Migrations:")
+	migrations, err := db.FindMigrations()
+	if err != nil {
+		panic(err)
+	}
+	for _, m := range migrations {
+		fmt.Println(m.Version, m.FilePath)
+	}
 
- fmt.Println("\nApplying...")
- err = db.CreateAndMigrate()
- if err != nil {
-  panic(err)
- }
+	fmt.Println("\nApplying...")
+	err = db.CreateAndMigrate()
+	if err != nil {
+		panic(err)
+	}
 }
 ```
 
@@ -624,11 +624,12 @@ Dbmate is written in Go, pull requests are welcome.
 Tests are run against a real database using docker compose. To build a docker image and run the tests:
 
 ```sh
-make docker-all
+$ make docker-all
 ```
 
 To start a development shell:
 
 ```sh
-make docker-sh
+$ make docker-sh
 ```
+
