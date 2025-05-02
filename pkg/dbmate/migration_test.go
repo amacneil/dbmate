@@ -28,9 +28,9 @@ drop table users;
 
 	parsed, err := migration.Parse()
 	require.Nil(t, err)
-	require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);\n", parsed.Up)
+	require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);\n", parsed.Up[0])
 	require.True(t, parsed.UpOptions.Transaction())
-	require.Equal(t, "-- migrate:down\ndrop table users;\n", parsed.Down)
+	require.Equal(t, "-- migrate:down\ndrop table users;\n", parsed.Down[0])
 	require.True(t, parsed.DownOptions.Transaction())
 }
 
@@ -44,10 +44,10 @@ drop table users;`
 		parsed, err := parseMigrationContents(migration)
 		require.Nil(t, err)
 
-		require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);\n", parsed.Up)
+		require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);\n", parsed.Up[0])
 		require.Equal(t, true, parsed.UpOptions.Transaction())
 
-		require.Equal(t, "-- migrate:down\ndrop table users;", parsed.Down)
+		require.Equal(t, "-- migrate:down\ndrop table users;", parsed.Down[0])
 		require.Equal(t, true, parsed.DownOptions.Transaction())
 	})
 
@@ -63,10 +63,10 @@ drop table users;
 		parsed, err := parseMigrationContents(migration)
 		require.Nil(t, err)
 
-		require.Equal(t, "--migrate:up\ncreate table users (id serial, name text);\n\n", parsed.Up)
+		require.Equal(t, "--migrate:up\ncreate table users (id serial, name text);\n\n", parsed.Up[0])
 		require.Equal(t, true, parsed.UpOptions.Transaction())
 
-		require.Equal(t, "--migrate:down\ndrop table users;\n", parsed.Down)
+		require.Equal(t, "--migrate:down\ndrop table users;\n", parsed.Down[0])
 		require.Equal(t, true, parsed.DownOptions.Transaction())
 	})
 
@@ -93,10 +93,10 @@ ALTER TYPE colors ADD VALUE 'orange' AFTER 'red';
 		parsed, err := parseMigrationContents(migration)
 		require.Nil(t, err)
 
-		require.Equal(t, "-- migrate:up transaction:false\nALTER TYPE colors ADD VALUE 'orange' AFTER 'red';\n", parsed.Up)
+		require.Equal(t, "-- migrate:up transaction:false\nALTER TYPE colors ADD VALUE 'orange' AFTER 'red';\n", parsed.Up[0])
 		require.Equal(t, false, parsed.UpOptions.Transaction())
 
-		require.Equal(t, "-- migrate:down transaction:false\nALTER TYPE colors ADD VALUE 'orange' AFTER 'red';\n", parsed.Down)
+		require.Equal(t, "-- migrate:down transaction:false\nALTER TYPE colors ADD VALUE 'orange' AFTER 'red';\n", parsed.Down[0])
 		require.Equal(t, false, parsed.DownOptions.Transaction())
 	})
 
@@ -143,10 +143,10 @@ drop table users;
 		parsed, err := parseMigrationContents(migration)
 		require.Nil(t, err)
 
-		require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);\n\n", parsed.Up)
+		require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);\n\n", parsed.Up[0])
 		require.Equal(t, true, parsed.UpOptions.Transaction())
 
-		require.Equal(t, "-- migrate:down\ndrop table users;\n", parsed.Down)
+		require.Equal(t, "-- migrate:down\ndrop table users;\n", parsed.Down[0])
 		require.Equal(t, true, parsed.DownOptions.Transaction())
 	})
 
@@ -175,11 +175,11 @@ DROP COLUMN status;
 			parsed, err := parseMigrationContents(migration)
 			require.Nil(t, err)
 
-			require.Equal(t, "-- migrate:up\r\ncreate table users (id serial, name text);\r\n", parsed.Up)
+			require.Equal(t, "-- migrate:up\r\ncreate table users (id serial, name text);\r\n", parsed.Up[0])
 			require.Equal(t, migrationOptions{}, parsed.UpOptions)
 			require.Equal(t, true, parsed.UpOptions.Transaction())
 
-			require.Equal(t, "-- migrate:down\r\ndrop table users;\r\n", parsed.Down)
+			require.Equal(t, "-- migrate:down\r\ndrop table users;\r\n", parsed.Down[0])
 			require.Equal(t, migrationOptions{}, parsed.DownOptions)
 			require.Equal(t, true, parsed.DownOptions.Transaction())
 		})
@@ -190,13 +190,46 @@ DROP COLUMN status;
 			parsed, err := parseMigrationContents(migration)
 			require.Nil(t, err)
 
-			require.Equal(t, "-- migrate:up transaction:true\r\ncreate table users (id serial, name text);\r\n", parsed.Up)
+			require.Equal(t, "-- migrate:up transaction:true\r\ncreate table users (id serial, name text);\r\n", parsed.Up[0])
 			require.Equal(t, migrationOptions{"transaction": "true"}, parsed.UpOptions)
 			require.Equal(t, true, parsed.UpOptions.Transaction())
 
-			require.Equal(t, "-- migrate:down transaction:true\r\ndrop table users;\r\n", parsed.Down)
+			require.Equal(t, "-- migrate:down transaction:true\r\ndrop table users;\r\n", parsed.Down[0])
 			require.Equal(t, migrationOptions{"transaction": "true"}, parsed.DownOptions)
 			require.Equal(t, true, parsed.DownOptions.Transaction())
 		})
 	})
+}
+
+func TestParseSeparated(t *testing.T) {
+	fs := fstest.MapFS{
+		"bar/123_foo.sql": {
+			Data: []byte(`-- migrate:up
+create table users (id serial, name text);
+-- migrate:separator
+create table roles (id serial, name text);
+-- migrate:down
+drop table users;
+-- migrate:separator
+drop table roles;
+`),
+		},
+	}
+
+	migration := &Migration{
+		Applied:  false,
+		FileName: "123_foo.sql",
+		FilePath: "bar/123_foo.sql",
+		FS:       fs,
+		Version:  "123",
+	}
+
+	parsed, err := migration.Parse()
+	require.Nil(t, err)
+	require.Equal(t, "-- migrate:up:0\ncreate table users (id serial, name text);\n", parsed.Up[0])
+	require.Equal(t, "-- migrate:up:1\ncreate table roles (id serial, name text);\n", parsed.Up[1])
+	require.True(t, parsed.UpOptions.Transaction())
+	require.Equal(t, "-- migrate:down:0\ndrop table users;\n", parsed.Down[0])
+	require.Equal(t, "-- migrate:down:1\ndrop table roles;\n", parsed.Down[1])
+	require.True(t, parsed.DownOptions.Transaction())
 }
