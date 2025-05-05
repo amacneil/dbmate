@@ -192,9 +192,8 @@ func NewApp() *cli.App {
 					return db.MigrateTo(version)
 				} else if c.Bool("one") {
 					return db.MigrateNext()
-				} else {
-					return db.Migrate() // default: apply all
 				}
+				return db.Migrate() // default: apply all
 			}),
 		},
 		{
@@ -240,9 +239,8 @@ func NewApp() *cli.App {
 					return db.RollbackTo(version)
 				} else if c.Bool("all") {
 					return db.RollbackAll()
-				} else {
-					return db.Rollback() // default: rollback one migration
 				}
+				return db.Rollback() // default: rollback one migration
 			}),
 		},
 		{
