@@ -672,6 +672,96 @@ func TestRollbackTo(t *testing.T) {
 	})
 }
 
+func TestMigrateOnly(t *testing.T) {
+	testEachURL(t, func(t *testing.T, u *url.URL) {
+		const v2 = "20200227231541" // posts
+
+		db := newTestDB(t, u)
+		drv, err := db.Driver()
+		require.NoError(t, err)
+
+		require.NoError(t, db.Drop())
+		require.NoError(t, db.Create())
+
+		// Migrate only v2, without applying v1 first (should work if not strict)
+		migrations, err := db.FindMigrations()
+		require.NoError(t, err)
+		require.NoError(t, db.MigrateOnly(migrations, v2))
+
+		sqlDB, err := drv.Open()
+		require.NoError(t, err)
+		defer dbutil.MustClose(sqlDB)
+
+		applied, err := drv.SelectMigrations(sqlDB, -1)
+		require.NoError(t, err)
+		require.Equal(t, map[string]bool{v2: true}, applied)
+
+		// Check posts table exists, users table does not
+		var cnt int
+		require.NoError(t, sqlDB.QueryRow("select count(*) from posts").Scan(&cnt))
+		require.Error(t, sqlDB.QueryRow("select count(*) from users").Scan(&cnt))
+
+		// Attempt applying already applied migration (should be no-op)
+		migrations, err = db.FindMigrations()
+		require.NoError(t, err)
+		require.NoError(t, db.MigrateOnly(migrations, v2))
+
+		// Attempt applying nonexistent migration
+		err = db.MigrateOnly(migrations, "99999999999999")
+		require.ErrorIs(t, err, dbmate.ErrMigrationNotFound)
+	})
+}
+
+func TestRollbackOnly(t *testing.T) {
+	testEachURL(t, func(t *testing.T, u *url.URL) {
+		const v1 = "20151129054053" // users
+		const v2 = "20200227231541" // posts
+
+		db := newTestDB(t, u)
+		drv, err := db.Driver()
+		require.NoError(t, err)
+
+		require.NoError(t, db.Drop())
+		require.NoError(t, db.Create())
+
+		// Apply all migrations first
+		require.NoError(t, db.Migrate())
+
+		sqlDB, err := drv.Open()
+		require.NoError(t, err)
+		defer dbutil.MustClose(sqlDB)
+
+		applied, err := drv.SelectMigrations(sqlDB, -1)
+		require.NoError(t, err)
+		require.Equal(t, map[string]bool{v1: true, v2: true}, applied)
+
+		migrations, err := db.FindMigrations()
+		require.NoError(t, err)
+
+		// Rollback only v2 migration
+		require.NoError(t, db.RollbackOnly(migrations, v2))
+
+		applied, err = drv.SelectMigrations(sqlDB, -1)
+		require.NoError(t, err)
+		require.Equal(t, map[string]bool{v1: true}, applied)
+
+		// Ensure "posts" table no longer exists
+		var cnt int
+		require.Error(t, sqlDB.QueryRow("select count(*) from posts").Scan(&cnt))
+		require.NoError(t, sqlDB.QueryRow("select count(*) from users").Scan(&cnt))
+
+		// Attempt rolling back migration that's already rolled back (should fail)
+		migrations, err = db.FindMigrations()
+		require.NoError(t, err)
+		err = db.RollbackOnly(migrations, v2)
+		require.ErrorContains(t, err, "is not applied")
+
+		// Attempt rolling back nonexistent migration
+		err = db.RollbackOnly(migrations, "99999999999999")
+		require.ErrorIs(t, err, dbmate.ErrMigrationNotFound)
+	})
+}
+
 func TestFindMigrations(t *testing.T) {
 	testEachURL(t, func(t *testing.T, u *url.URL) {
 		db := newTestDB(t, u)
