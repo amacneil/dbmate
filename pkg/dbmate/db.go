@@ -741,8 +741,8 @@ func (db *DB) Rollback() error {
 	return nil
 }
 
-// migrateOnly applies exactly one pending migration that matches the given version.
-func (db *DB) migrateOnly(migrations []Migration, version string) error {
+// MigrateOnly applies exactly one pending migration that matches the given version.
+func (db *DB) MigrateOnly(migrations []Migration, version string) error {
 	drv, err := db.Driver()
 	if err != nil {
 		return err
@@ -808,8 +808,8 @@ func (db *DB) migrateOnly(migrations []Migration, version string) error {
 	return nil
 }
 
-// rollbackOnly rolls back exactly one applied migration that matches the given version.
-func (db *DB) rollbackOnly(migrations []Migration, version string) error {
+// RollbackOnly rolls back exactly one applied migration that matches the given version.
+func (db *DB) RollbackOnly(migrations []Migration, version string) error {
 	drv, err := db.Driver()
 	if err != nil {
 		return err
@@ -883,7 +883,7 @@ func (db *DB) MigrateTo(target string) error {
 		if m.Applied || m.Version > target {
 			continue
 		}
-		if err := db.migrateOnly(migrations, m.Version); err != nil {
+		if err := db.MigrateOnly(migrations, m.Version); err != nil {
 			return err
 		}
 	}
@@ -922,7 +922,7 @@ func (db *DB) RollbackTo(target string) error {
 		if !m.Applied || m.Version <= target {
 			continue
 		}
-		if err := db.rollbackOnly(migrations, m.Version); err != nil {
+		if err := db.RollbackOnly(migrations, m.Version); err != nil {
 			return err
 		}
 	}

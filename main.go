@@ -148,6 +148,22 @@ func NewApp() *cli.App {
 			Name:  "migrate",
 			Usage: "Migrate to the latest version",
 			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:  "only",
+					Usage: "apply only the specified migration version",
+				},
+				&cli.StringFlag{
+					Name:  "to",
+					Usage: "apply migrations up to specified version (inclusive)",
+				},
+				&cli.BoolFlag{
+					Name:  "one",
+					Usage: "apply exactly one pending migration",
+				},
+				&cli.BoolFlag{
+					Name:  "all",
+					Usage: "apply all pending migrations (default)",
+				},
 				&cli.BoolFlag{
 					Name:    "strict",
 					EnvVars: []string{"DBMATE_STRICT"},
@@ -163,7 +179,19 @@ func NewApp() *cli.App {
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
 				db.Strict = c.Bool("strict")
 				db.Verbose = c.Bool("verbose")
-				return db.Migrate()
+				if version := c.String("only"); version != "" {
+					migrations, err := db.FindMigrations()
+					if err != nil {
+						return err
+					}
+					return db.MigrateOnly(migrations, version)
+				} else if version := c.String("to"); version != "" {
+					return db.MigrateTo(version)
+				} else if c.Bool("one") {
+					return db.MigrateNext()
+				} else {
+					return db.Migrate() // default: apply all
+				}
 			}),
 		},
 		{
@@ -171,6 +199,22 @@ func NewApp() *cli.App {
 			Aliases: []string{"down"},
 			Usage:   "Rollback the most recent migration",
 			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:  "only",
+					Usage: "rollback only the specified migration version",
+				},
+				&cli.StringFlag{
+					Name:  "to",
+					Usage: "rollback migrations down to specified version (exclusive)",
+				},
+				&cli.BoolFlag{
+					Name:  "one",
+					Usage: "rollback exactly one migration (default)",
+				},
+				&cli.BoolFlag{
+					Name:  "all",
+					Usage: "rollback all migrations",
+				},
 				&cli.BoolFlag{
 					Name:    "verbose",
 					Aliases: []string{"v"},
@@ -180,7 +224,19 @@ func NewApp() *cli.App {
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
 				db.Verbose = c.Bool("verbose")
-				return db.Rollback()
+				if version := c.String("only"); version != "" {
+					migrations, err := db.FindMigrations()
+					if err != nil {
+						return err
+					}
+					return db.RollbackOnly(migrations, version)
+				} else if version := c.String("to"); version != "" {
+					return db.RollbackTo(version)
+				} else if c.Bool("all") {
+					return db.RollbackAll()
+				} else {
+					return db.Rollback() // default: rollback one migration
+				}
 			}),
 		},
 		{
