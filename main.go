@@ -179,6 +179,9 @@ func NewApp() *cli.App {
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
 				db.Strict = c.Bool("strict")
 				db.Verbose = c.Bool("verbose")
+				if err := validateMigrationFlags(c); err != nil {
+					return err
+				}
 				if version := c.String("only"); version != "" {
 					migrations, err := db.FindMigrations()
 					if err != nil {
@@ -224,6 +227,9 @@ func NewApp() *cli.App {
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
 				db.Verbose = c.Bool("verbose")
+				if err := validateMigrationFlags(c); err != nil {
+					return err
+				}
 				if version := c.String("only"); version != "" {
 					migrations, err := db.FindMigrations()
 					if err != nil {
@@ -296,6 +302,27 @@ func NewApp() *cli.App {
 	}
 
 	return app
+}
+
+// validateMigrationFlags checks that only one of the migration flags is set
+func validateMigrationFlags(c *cli.Context) error {
+	flagsSet := 0
+	if c.String("only") != "" {
+		flagsSet++
+	}
+	if c.String("to") != "" {
+		flagsSet++
+	}
+	if c.Bool("one") {
+		flagsSet++
+	}
+	if c.Bool("all") {
+		flagsSet++
+	}
+	if flagsSet > 1 {
+		return errors.New("only one of --only, --to, --one, or --all can be specified at a time")
+	}
+	return nil
 }
 
 // load environment variables from file(s)
