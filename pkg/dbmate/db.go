@@ -267,6 +267,10 @@ func ensureDir(dir string) error {
 	return nil
 }
 
+func getMigrationSectionVersion(migrationVersion string, sectionIdx int) string {
+	return migrationVersion + "-" + strconv.Itoa(sectionIdx)
+}
+
 const migrationTemplate = "-- migrate:up\n\n\n-- migrate:down\n\n"
 
 // NewMigration creates a new migration file
@@ -386,7 +390,7 @@ func (db *DB) Migrate() error {
 		}
 
 		for idx, migrationSection := range parsed {
-			migrationSectionVersion := migration.Version + "-" + strconv.Itoa(idx)
+			migrationSectionVersion := getMigrationSectionVersion(migration.Version, idx)
 			execMigration := func(tx dbutil.Transaction) error {
 				// run actual migration
 				result, err := tx.Exec(migrationSection.Up)
@@ -501,7 +505,7 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 				FS:       db.FS,
 				Version:  matches[1],
 			}
-			firstMigrationSection := migration.Version + "-" + strconv.Itoa(0)
+			firstMigrationSection := getMigrationSectionVersion(migration.Version, 0)
 			if ok := appliedMigrations[firstMigrationSection]; ok {
 				migration.Applied = true
 			}
@@ -559,7 +563,7 @@ func (db *DB) Rollback() error {
 	}
 
 	for idx, migrationSection := range parsedSections {
-		migrationSectionVersion := latest.Version + "-" + strconv.Itoa(idx)
+		migrationSectionVersion := getMigrationSectionVersion(latest.Version, idx)
 		execMigration := func(tx dbutil.Transaction) error {
 			// rollback migration
 			result, err := tx.Exec(migrationSection.Down)
