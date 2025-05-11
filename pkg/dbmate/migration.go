@@ -82,7 +82,7 @@ func parseMigrationContents(contents string) ([]*ParsedMigration, error) {
 		return nil, ErrParseMissingUp
 	}
 
-	firstUpDirectiveStart := sectionBeginEndIndices[0][0] 
+	firstUpDirectiveStart := sectionBeginEndIndices[0][0]
 	if statementsPrecedeMigrateBlocks(contents, firstUpDirectiveStart) {
 		return nil, ErrParseUnexpectedStmt
 	}

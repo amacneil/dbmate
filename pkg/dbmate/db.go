@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
-	"time"
 	"strconv"
+	"time"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
 )
