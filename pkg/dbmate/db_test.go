@@ -229,7 +229,7 @@ func TestLoadSchema(t *testing.T) {
 	// check applied migrations
 	appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
 	require.NoError(t, err)
-	require.Equal(t, map[string]bool{"20200227231541": true, "20151129054053": true}, appliedMigrations)
+	require.Equal(t, map[string]bool{"20200227231541-0": true, "20151129054053-0": true}, appliedMigrations)
 
 	// users and posts tables have been created
 	var count int
@@ -368,7 +368,7 @@ func TestMigrate(t *testing.T) {
 		// check applied migrations
 		appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
 		require.NoError(t, err)
-		require.Equal(t, map[string]bool{"20200227231541": true, "20151129054053": true}, appliedMigrations)
+		require.Equal(t, map[string]bool{"20200227231541-0": true, "20151129054053-0": true}, appliedMigrations)
 
 		// users table have records
 		count := 0
@@ -400,7 +400,7 @@ func TestUp(t *testing.T) {
 		// check applied migrations
 		appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
 		require.NoError(t, err)
-		require.Equal(t, map[string]bool{"20200227231541": true, "20151129054053": true}, appliedMigrations)
+		require.Equal(t, map[string]bool{"20200227231541-0": true, "20151129054053-0": true}, appliedMigrations)
 
 		// users table have records
 		count := 0
@@ -439,7 +439,7 @@ func TestRollback(t *testing.T) {
 		// check applied migrations
 		appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
 		require.NoError(t, err)
-		require.Equal(t, map[string]bool{"20200227231541": true, "20151129054053": true}, appliedMigrations)
+		require.Equal(t, map[string]bool{"20200227231541-0": true, "20151129054053-0": true}, appliedMigrations)
 
 		// users and posts tables have been created
 		var count int
@@ -581,6 +581,10 @@ func TestFindMigrationsFS(t *testing.T) {
 create table users (id serial, name text);
 -- migrate:down
 drop table users;
+-- migrate:up
+create table statuses (id serial, status text);
+-- migrate:down
+drop table statuses;
 `),
 		},
 		"db/migrations/002_test_migration.sql":                {},
@@ -618,12 +622,21 @@ drop table users;
 	require.Equal(t, false, actual[2].Applied)
 
 	// test parsing first migration
-	parsed, err := actual[0].Parse()
+	parsedSections, err := actual[0].Parse()
+
+	parsedFirstSection := parsedSections[0]
 	require.Nil(t, err)
-	require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);\n", parsed.Up[0])
-	require.True(t, parsed.UpOptions.Transaction())
-	require.Equal(t, "-- migrate:down\ndrop table users;\n", parsed.Down[0])
-	require.True(t, parsed.DownOptions.Transaction())
+	require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);\n", parsedFirstSection.Up)
+	require.True(t, parsedFirstSection.UpOptions.Transaction())
+	require.Equal(t, "-- migrate:down\ndrop table users;\n", parsedFirstSection.Down)
+	require.True(t, parsedFirstSection.DownOptions.Transaction())
+
+	parsedSecondSection := parsedSections[1]
+	require.Nil(t, err)
+	require.Equal(t, "-- migrate:up\ncreate table statuses (id serial, status text);\n", parsedSecondSection.Up)
+	require.True(t, parsedSecondSection.UpOptions.Transaction())
+	require.Equal(t, "-- migrate:down\ndrop table statuses;\n", parsedSecondSection.Down)
+	require.True(t, parsedSecondSection.DownOptions.Transaction())
 }
 
 func TestFindMigrationsFSMultipleDirs(t *testing.T) {

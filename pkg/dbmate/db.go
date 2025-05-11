@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"sort"
 	"time"
+	"strconv"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
 )
@@ -384,34 +385,35 @@ func (db *DB) Migrate() error {
 			return err
 		}
 
-		execMigration := func(tx dbutil.Transaction) error {
-			// run actual migration
-			for _, stmt := range parsed.Up {
-				result, err := tx.Exec(stmt)
+		for idx, migrationSection := range parsed {
+			migrationSectionVersion := migration.Version + "-" + strconv.Itoa(idx)
+			execMigration := func(tx dbutil.Transaction) error {
+				// run actual migration
+				result, err := tx.Exec(migrationSection.Up)
 				if err != nil {
-					return drv.QueryError(stmt, err)
+					return drv.QueryError(migrationSection.Up, err)
 				} else if db.Verbose {
 					db.printVerbose(result)
 				}
+
+				// record migration
+				return drv.InsertMigration(tx, migrationSectionVersion)
 			}
 
-			// record migration
-			return drv.InsertMigration(tx, migration.Version)
-		}
+			if migrationSection.UpOptions.Transaction() {
+				// begin transaction
+				err = doTransaction(sqlDB, execMigration)
+			} else {
+				// run outside of transaction
+				err = execMigration(sqlDB)
+			}
 
-		if parsed.UpOptions.Transaction() {
-			// begin transaction
-			err = doTransaction(sqlDB, execMigration)
-		} else {
-			// run outside of transaction
-			err = execMigration(sqlDB)
-		}
+			elapsed := time.Since(start)
+			fmt.Fprintf(db.Log, "Applied: %s in %s\n", migration.FileName, elapsed)
 
-		elapsed := time.Since(start)
-		fmt.Fprintf(db.Log, "Applied: %s in %s\n", migration.FileName, elapsed)
-
-		if err != nil {
-			return err
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -499,7 +501,8 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 				FS:       db.FS,
 				Version:  matches[1],
 			}
-			if ok := appliedMigrations[migration.Version]; ok {
+			firstMigrationSection := migration.Version + "-" + strconv.Itoa(0)
+			if ok := appliedMigrations[firstMigrationSection]; ok {
 				migration.Applied = true
 			}
 
@@ -550,44 +553,45 @@ func (db *DB) Rollback() error {
 
 	start := time.Now()
 
-	parsed, err := latest.Parse()
+	parsedSections, err := latest.Parse()
 	if err != nil {
 		return err
 	}
 
-	execMigration := func(tx dbutil.Transaction) error {
-		// rollback migration
-		for _, stmt := range parsed.Down {
-			result, err := tx.Exec(stmt)
+	for idx, migrationSection := range parsedSections {
+		migrationSectionVersion := latest.Version + "-" + strconv.Itoa(idx)
+		execMigration := func(tx dbutil.Transaction) error {
+			// rollback migration
+			result, err := tx.Exec(migrationSection.Down)
 			if err != nil {
-				return drv.QueryError(stmt, err)
+				return drv.QueryError(migrationSection.Down, err)
 			} else if db.Verbose {
 				db.printVerbose(result)
 			}
+
+			// remove migration record
+			return drv.DeleteMigration(tx, migrationSectionVersion)
 		}
 
-		// remove migration record
-		return drv.DeleteMigration(tx, latest.Version)
-	}
+		if migrationSection.DownOptions.Transaction() {
+			// begin transaction
+			err = doTransaction(sqlDB, execMigration)
+		} else {
+			// run outside of transaction
+			err = execMigration(sqlDB)
+		}
 
-	if parsed.DownOptions.Transaction() {
-		// begin transaction
-		err = doTransaction(sqlDB, execMigration)
-	} else {
-		// run outside of transaction
-		err = execMigration(sqlDB)
-	}
+		elapsed := time.Since(start)
+		fmt.Fprintf(db.Log, "Rolled back: %s in %s\n", latest.FileName, elapsed)
 
-	elapsed := time.Since(start)
-	fmt.Fprintf(db.Log, "Rolled back: %s in %s\n", latest.FileName, elapsed)
+		if err != nil {
+			return err
+		}
 
-	if err != nil {
-		return err
-	}
-
-	// automatically update schema file, silence errors
-	if db.AutoDumpSchema {
-		_ = db.DumpSchema()
+		// automatically update schema file, silence errors
+		if db.AutoDumpSchema {
+			_ = db.DumpSchema()
+		}
 	}
 
 	return nil
