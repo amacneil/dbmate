@@ -1,5 +1,5 @@
 # development stage
-FROM golang:1.24.2 as dev
+FROM golang:1.24.3 as dev
 WORKDIR /src
 ENV PATH="/src/typescript/node_modules/.bin:${PATH}"
 RUN git config --global --add safe.directory /src
