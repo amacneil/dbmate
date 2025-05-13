@@ -77,25 +77,20 @@ var (
 )
 
 func parseMigrationContents(contents string) ([]*ParsedMigration, error) {
-	sectionBeginEndIndices, err := getMigrationSectionBeginEndIndices(contents)
+	sectionSubstrings, err := getMigrationSectionSubstrings(contents)
 	if err != nil {
-		return nil, ErrParseMissingUp
-	}
-
-	firstUpDirectiveStart := sectionBeginEndIndices[0][0]
-	if statementsPrecedeMigrateBlocks(contents, firstUpDirectiveStart) {
-		return nil, ErrParseUnexpectedStmt
+		return nil, err
 	}
 
 	var migrationSections []*ParsedMigration
-	for _, sectionBeginEnd := range sectionBeginEndIndices {
-		begin, end := sectionBeginEnd[0], sectionBeginEnd[1]
-		migrationSection, err := parseMigrationSection(substring(contents, begin, end))
+	for _, sectionSubstring := range sectionSubstrings {
+		migrationSection, err := parseMigrationSection(sectionSubstring)
 		if err != nil {
-			return nil, ErrParseMissingUp
+			return nil, err
 		}
 		migrationSections = append(migrationSections, migrationSection)
 	}
+
 	return migrationSections, nil
 }
 
@@ -220,27 +215,41 @@ func getMatchPosition(s string, re *regexp.Regexp) (int, bool) {
 	return match[0], true
 }
 
-func getMigrationSectionBeginEndIndices(input string) ([][]int, error) {
+func getMigrationSectionSubstrings(contents string) ([]string, error) {
 	// Regex to match blocks starting with "-- migrate:up" and ending before the next one or EOF
-	allUpDirectives := upRegExp.FindAllStringIndex(input, -1)
+	allUpDirectives := upRegExp.FindAllStringIndex(contents, -1)
+
 	if allUpDirectives == nil {
 		return nil, ErrParseMissingUp
 	}
 
-	var sectionBeginEndIndices [][]int
+	if statementsPrecedeMigrateBlocks(contents, allUpDirectives[0][0]) {
+		return nil, ErrParseUnexpectedStmt
+	}
 
+	var sectionBeginEndIndices [][]int
 	for i := range len(allUpDirectives) {
 		start := allUpDirectives[i][0]
 		var end int
 		if i < len(allUpDirectives)-1 {
 			end = allUpDirectives[i+1][0]
 		} else {
-			end = len(input)
+			end = len(contents)
 		}
 		sectionBeginEndIndices = append(sectionBeginEndIndices, []int{start, end})
 	}
 
-	return sectionBeginEndIndices, nil
+	var sectionSubstrings []string
+	for _, sectionBeginEnd := range sectionBeginEndIndices {
+		begin, end := sectionBeginEnd[0], sectionBeginEnd[1]
+		contentsSubstring := substring(contents, begin, end)
+		if len(downRegExp.FindAllStringIndex(contentsSubstring, -1)) > 1 {
+			return nil, ErrParseMissingUp
+		}
+		sectionSubstrings = append(sectionSubstrings, contentsSubstring)
+	}
+
+	return sectionSubstrings, nil
 }
 
 func substring(s string, begin, end int) string {

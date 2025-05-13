@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
-	"strconv"
 	"time"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
@@ -267,10 +266,6 @@ func ensureDir(dir string) error {
 	return nil
 }
 
-func getMigrationSectionVersion(migrationVersion string, sectionIdx int) string {
-	return migrationVersion + "-" + strconv.Itoa(sectionIdx)
-}
-
 const migrationTemplate = "-- migrate:up\n\n\n-- migrate:down\n\n"
 
 // NewMigration creates a new migration file
@@ -389,8 +384,7 @@ func (db *DB) Migrate() error {
 			return err
 		}
 
-		for idx, migrationSection := range parsed {
-			migrationSectionVersion := getMigrationSectionVersion(migration.Version, idx)
+		for _, migrationSection := range parsed {
 			execMigration := func(tx dbutil.Transaction) error {
 				// run actual migration
 				result, err := tx.Exec(migrationSection.Up)
@@ -401,7 +395,7 @@ func (db *DB) Migrate() error {
 				}
 
 				// record migration
-				return drv.InsertMigration(tx, migrationSectionVersion)
+				return drv.InsertMigration(tx, migration.Version)
 			}
 
 			if migrationSection.UpOptions.Transaction() {
@@ -505,8 +499,7 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 				FS:       db.FS,
 				Version:  matches[1],
 			}
-			firstMigrationSection := getMigrationSectionVersion(migration.Version, 0)
-			if ok := appliedMigrations[firstMigrationSection]; ok {
+			if ok := appliedMigrations[migration.Version]; ok {
 				migration.Applied = true
 			}
 
@@ -562,8 +555,7 @@ func (db *DB) Rollback() error {
 		return err
 	}
 
-	for idx, migrationSection := range parsedSections {
-		migrationSectionVersion := getMigrationSectionVersion(latest.Version, idx)
+	for _, migrationSection := range parsedSections {
 		execMigration := func(tx dbutil.Transaction) error {
 			// rollback migration
 			result, err := tx.Exec(migrationSection.Down)
@@ -574,7 +566,7 @@ func (db *DB) Rollback() error {
 			}
 
 			// remove migration record
-			return drv.DeleteMigration(tx, migrationSectionVersion)
+			return drv.DeleteMigration(tx, latest.Version)
 		}
 
 		if migrationSection.DownOptions.Transaction() {

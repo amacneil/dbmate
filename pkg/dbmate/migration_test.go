@@ -14,10 +14,6 @@ func TestParse(t *testing.T) {
 create table users (id serial, name text);
 -- migrate:down
 drop table users;
--- migrate:up
-create table statuses (id serial, status text);
--- migrate:down
-drop table statuses;
 `),
 		},
 	}
@@ -31,18 +27,12 @@ drop table statuses;
 	}
 
 	parsedSections, err := migration.Parse()
-	firstSectionParsed := parsedSections[0]
+	parsed := parsedSections[0]
 	require.Nil(t, err)
-	require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);\n", firstSectionParsed.Up)
-	require.True(t, firstSectionParsed.UpOptions.Transaction())
-	require.Equal(t, "-- migrate:down\ndrop table users;\n", firstSectionParsed.Down)
-	require.True(t, firstSectionParsed.DownOptions.Transaction())
-	secondSectionParsed := parsedSections[1]
-	require.Nil(t, err)
-	require.Equal(t, "-- migrate:up\ncreate table statuses (id serial, status text);\n", secondSectionParsed.Up)
-	require.True(t, secondSectionParsed.UpOptions.Transaction())
-	require.Equal(t, "-- migrate:down\ndrop table statuses;\n", secondSectionParsed.Down)
-	require.True(t, secondSectionParsed.DownOptions.Transaction())
+	require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);\n", parsed.Up)
+	require.True(t, parsed.UpOptions.Transaction())
+	require.Equal(t, "-- migrate:down\ndrop table users;\n", parsed.Down)
+	require.True(t, parsed.DownOptions.Transaction())
 }
 
 func TestParseMigrationContents(t *testing.T) {
@@ -101,10 +91,22 @@ create table users (id serial, name text);
 ALTER TYPE colors ADD VALUE 'orange' AFTER 'red';
 -- migrate:down transaction:false
 ALTER TYPE colors ADD VALUE 'orange' AFTER 'red';
+-- migrate:up transaction:true
+ALTER TYPE colors ADD VALUE 'green' AFTER 'red';
+-- migrate:down transaction:true
+ALTER TYPE colors ADD VALUE 'green' AFTER 'red';
+-- migrate:up
+ALTER TYPE colors ADD VALUE 'yellow' AFTER 'red';
+-- migrate:down
+ALTER TYPE colors ADD VALUE 'yellow' AFTER 'red';
 -- migrate:up transaction:false
-ALTER TYPE colors ADD VALUE 'green' AFTER 'red';
+ALTER TYPE colors ADD VALUE 'blue' AFTER 'red';
+-- migrate:down
+ALTER TYPE colors ADD VALUE 'blue' AFTER 'red';
+-- migrate:up
+ALTER TYPE colors ADD VALUE 'purple' AFTER 'red';
 -- migrate:down transaction:false
-ALTER TYPE colors ADD VALUE 'green' AFTER 'red';
+ALTER TYPE colors ADD VALUE 'purple' AFTER 'red';
 `
 
 		parsedSections, err := parseMigrationContents(migration)
@@ -120,11 +122,38 @@ ALTER TYPE colors ADD VALUE 'green' AFTER 'red';
 		parsedSecondSection := parsedSections[1]
 		require.Nil(t, err)
 
-		require.Equal(t, "-- migrate:up transaction:false\nALTER TYPE colors ADD VALUE 'green' AFTER 'red';\n", parsedSecondSection.Up)
-		require.Equal(t, false, parsedSecondSection.UpOptions.Transaction())
+		require.Equal(t, "-- migrate:up transaction:true\nALTER TYPE colors ADD VALUE 'green' AFTER 'red';\n", parsedSecondSection.Up)
+		require.Equal(t, true, parsedSecondSection.UpOptions.Transaction())
 
-		require.Equal(t, "-- migrate:down transaction:false\nALTER TYPE colors ADD VALUE 'green' AFTER 'red';\n", parsedSecondSection.Down)
-		require.Equal(t, false, parsedSecondSection.DownOptions.Transaction())
+		require.Equal(t, "-- migrate:down transaction:true\nALTER TYPE colors ADD VALUE 'green' AFTER 'red';\n", parsedSecondSection.Down)
+		require.Equal(t, true, parsedSecondSection.DownOptions.Transaction())
+
+		parsedThirdSection := parsedSections[2]
+		require.Nil(t, err)
+
+		require.Equal(t, "-- migrate:up\nALTER TYPE colors ADD VALUE 'yellow' AFTER 'red';\n", parsedThirdSection.Up)
+		require.Equal(t, true, parsedThirdSection.UpOptions.Transaction())
+
+		require.Equal(t, "-- migrate:down\nALTER TYPE colors ADD VALUE 'yellow' AFTER 'red';\n", parsedThirdSection.Down)
+		require.Equal(t, true, parsedThirdSection.DownOptions.Transaction())
+
+		parsedForthSection := parsedSections[3]
+		require.Nil(t, err)
+
+		require.Equal(t, "-- migrate:up transaction:false\nALTER TYPE colors ADD VALUE 'blue' AFTER 'red';\n", parsedForthSection.Up)
+		require.Equal(t, false, parsedForthSection.UpOptions.Transaction())
+
+		require.Equal(t, "-- migrate:down\nALTER TYPE colors ADD VALUE 'blue' AFTER 'red';\n", parsedForthSection.Down)
+		require.Equal(t, true, parsedForthSection.DownOptions.Transaction())
+
+		parsedFifthSection := parsedSections[4]
+		require.Nil(t, err)
+
+		require.Equal(t, "-- migrate:up\nALTER TYPE colors ADD VALUE 'purple' AFTER 'red';\n", parsedFifthSection.Up)
+		require.Equal(t, true, parsedFifthSection.UpOptions.Transaction())
+
+		require.Equal(t, "-- migrate:down transaction:false\nALTER TYPE colors ADD VALUE 'purple' AFTER 'red';\n", parsedFifthSection.Down)
+		require.Equal(t, false, parsedFifthSection.DownOptions.Transaction())
 	})
 
 	t.Run("require migrate blocks", func(t *testing.T) {
@@ -228,5 +257,31 @@ DROP COLUMN status;
 			require.Equal(t, migrationOptions{"transaction": "true"}, parsed.DownOptions)
 			require.Equal(t, true, parsed.DownOptions.Transaction())
 		})
+	})
+
+	t.Run("require a down block in each section", func(t *testing.T) {
+		migration := `-- migrate:up
+create table users (id serial, name text);
+-- migrate:up
+create table statuses (id serial, name text);
+-- migrate:down
+drop table statuses;
+`
+
+		_, err := parseMigrationContents(migration)
+		require.Error(t, err, "dbmate requires each migration to define a down block with '-- migrate:down'")
+	})
+
+	t.Run("require an up block in each section", func(t *testing.T) {
+		migration := `-- migrate:up
+create table users (id serial, name text);
+-- migrate:down
+drop table users;
+-- migrate:down
+drop table statuses;
+`
+
+		_, err := parseMigrationContents(migration)
+		require.Error(t, err, "dbmate requires each migration to define an up block with '-- migrate:up'")
 	})
 }
