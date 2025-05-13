@@ -620,12 +620,12 @@ drop table users;
 	// test parsing first migration
 	parsedSections, err := actual[0].Parse()
 
-	parsedFirstSection := parsedSections[0]
+	parsed := parsedSections[0]
 	require.Nil(t, err)
-	require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);\n", parsedFirstSection.Up)
-	require.True(t, parsedFirstSection.UpOptions.Transaction())
-	require.Equal(t, "-- migrate:down\ndrop table users;\n", parsedFirstSection.Down)
-	require.True(t, parsedFirstSection.DownOptions.Transaction())
+	require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);\n", parsed.Up)
+	require.True(t, parsed.UpOptions.Transaction())
+	require.Equal(t, "-- migrate:down\ndrop table users;\n", parsed.Down)
+	require.True(t, parsed.DownOptions.Transaction())
 }
 
 func TestFindMigrationsFSMultipleDirs(t *testing.T) {
