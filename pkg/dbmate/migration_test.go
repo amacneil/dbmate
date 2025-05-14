@@ -27,8 +27,8 @@ drop table users;
 	}
 
 	parsedSections, err := migration.Parse()
-	parsed := parsedSections[0]
 	require.Nil(t, err)
+	parsed := parsedSections[0]
 	require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);\n", parsed.Up)
 	require.True(t, parsed.UpOptions.Transaction())
 	require.Equal(t, "-- migrate:down\ndrop table users;\n", parsed.Down)
@@ -43,8 +43,8 @@ create table users (id serial, name text);
 drop table users;`
 
 		parsedSections, err := parseMigrationContents(migration)
-		parsed := parsedSections[0]
 		require.Nil(t, err)
+		parsed := parsedSections[0]
 
 		require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);\n", parsed.Up)
 		require.Equal(t, true, parsed.UpOptions.Transaction())
@@ -63,8 +63,8 @@ drop table users;
 `
 
 		parsedSections, err := parseMigrationContents(migration)
-		parsed := parsedSections[0]
 		require.Nil(t, err)
+		parsed := parsedSections[0]
 
 		require.Equal(t, "--migrate:up\ncreate table users (id serial, name text);\n\n", parsed.Up)
 		require.Equal(t, true, parsed.UpOptions.Transaction())
@@ -110,8 +110,9 @@ ALTER TYPE colors ADD VALUE 'purple' AFTER 'red';
 `
 
 		parsedSections, err := parseMigrationContents(migration)
-		parsedFirstSection := parsedSections[0]
 		require.Nil(t, err)
+
+		parsedFirstSection := parsedSections[0]
 
 		require.Equal(t, "-- migrate:up transaction:false\nALTER TYPE colors ADD VALUE 'orange' AFTER 'red';\n", parsedFirstSection.Up)
 		require.Equal(t, false, parsedFirstSection.UpOptions.Transaction())
@@ -120,7 +121,6 @@ ALTER TYPE colors ADD VALUE 'purple' AFTER 'red';
 		require.Equal(t, false, parsedFirstSection.DownOptions.Transaction())
 
 		parsedSecondSection := parsedSections[1]
-		require.Nil(t, err)
 
 		require.Equal(t, "-- migrate:up transaction:true\nALTER TYPE colors ADD VALUE 'green' AFTER 'red';\n", parsedSecondSection.Up)
 		require.Equal(t, true, parsedSecondSection.UpOptions.Transaction())
@@ -129,7 +129,6 @@ ALTER TYPE colors ADD VALUE 'purple' AFTER 'red';
 		require.Equal(t, true, parsedSecondSection.DownOptions.Transaction())
 
 		parsedThirdSection := parsedSections[2]
-		require.Nil(t, err)
 
 		require.Equal(t, "-- migrate:up\nALTER TYPE colors ADD VALUE 'yellow' AFTER 'red';\n", parsedThirdSection.Up)
 		require.Equal(t, true, parsedThirdSection.UpOptions.Transaction())
@@ -138,7 +137,6 @@ ALTER TYPE colors ADD VALUE 'purple' AFTER 'red';
 		require.Equal(t, true, parsedThirdSection.DownOptions.Transaction())
 
 		parsedForthSection := parsedSections[3]
-		require.Nil(t, err)
 
 		require.Equal(t, "-- migrate:up transaction:false\nALTER TYPE colors ADD VALUE 'blue' AFTER 'red';\n", parsedForthSection.Up)
 		require.Equal(t, false, parsedForthSection.UpOptions.Transaction())
@@ -147,7 +145,6 @@ ALTER TYPE colors ADD VALUE 'purple' AFTER 'red';
 		require.Equal(t, true, parsedForthSection.DownOptions.Transaction())
 
 		parsedFifthSection := parsedSections[4]
-		require.Nil(t, err)
 
 		require.Equal(t, "-- migrate:up\nALTER TYPE colors ADD VALUE 'purple' AFTER 'red';\n", parsedFifthSection.Up)
 		require.Equal(t, true, parsedFifthSection.UpOptions.Transaction())
@@ -197,8 +194,8 @@ drop table users;
 `
 
 		parsedSections, err := parseMigrationContents(migration)
-		parsed := parsedSections[0]
 		require.Nil(t, err)
+		parsed := parsedSections[0]
 
 		require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);\n\n", parsed.Up)
 		require.Equal(t, true, parsed.UpOptions.Transaction())
@@ -230,8 +227,8 @@ DROP COLUMN status;
 			migration := "-- migrate:up\r\ncreate table users (id serial, name text);\r\n-- migrate:down\r\ndrop table users;\r\n"
 
 			parsedSections, err := parseMigrationContents(migration)
-			parsed := parsedSections[0]
 			require.Nil(t, err)
+			parsed := parsedSections[0]
 
 			require.Equal(t, "-- migrate:up\r\ncreate table users (id serial, name text);\r\n", parsed.Up)
 			require.Equal(t, migrationOptions{}, parsed.UpOptions)
@@ -246,8 +243,8 @@ DROP COLUMN status;
 			migration := "-- migrate:up transaction:true\r\ncreate table users (id serial, name text);\r\n-- migrate:down transaction:true\r\ndrop table users;\r\n"
 
 			parsedSections, err := parseMigrationContents(migration)
-			parsed := parsedSections[0]
 			require.Nil(t, err)
+			parsed := parsedSections[0]
 
 			require.Equal(t, "-- migrate:up transaction:true\r\ncreate table users (id serial, name text);\r\n", parsed.Up)
 			require.Equal(t, migrationOptions{"transaction": "true"}, parsed.UpOptions)
