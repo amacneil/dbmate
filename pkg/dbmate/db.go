@@ -442,65 +442,31 @@ func (db *DB) MigrateNext() error {
 
 // RollbackAll rolls back every applied migration (latest-first) until none remain
 func (db *DB) RollbackAll() error {
-	drv, err := db.Driver()
-	if err != nil {
-		return err
-	}
-
-	sqlDB, err := db.openDatabaseForMigration(drv)
-	if err != nil {
-		return err
-	}
-	defer dbutil.MustClose(sqlDB)
-
 	migrations, err := db.FindMigrations()
 	if err != nil {
 		return err
 	}
-
-	applied := make([]*Migration, 0, len(migrations))
+	var appliedVersions []string
 	for i := len(migrations) - 1; i >= 0; i-- {
 		if migrations[i].Applied {
-			applied = append(applied, &migrations[i])
+			appliedVersions = append(appliedVersions, migrations[i].Version)
 		}
 	}
-	if len(applied) == 0 {
+	if len(appliedVersions) == 0 {
 		return ErrNoRollback
 	}
+	origAuto := db.AutoDumpSchema
+	db.AutoDumpSchema = false
+	defer func() { db.AutoDumpSchema = origAuto }()
 
-	for _, mig := range applied {
-		fmt.Fprintf(db.Log, "Rolling back: %s\n", mig.FileName)
-		start := time.Now()
-		parsed, err := mig.Parse()
-		if err != nil {
-			return err
-		}
-		execMigration := func(tx dbutil.Transaction) error {
-			result, err := tx.Exec(parsed.Down)
-			if err != nil {
-				return drv.QueryError(parsed.Down, err)
-			} else if db.Verbose {
-				db.printVerbose(result)
-			}
-			return drv.DeleteMigration(tx, mig.Version)
-		}
-		if parsed.DownOptions.Transaction() {
-			err = doTransaction(sqlDB, execMigration)
-		} else {
-			err = execMigration(sqlDB)
-		}
-		elapsed := time.Since(start)
-		fmt.Fprintf(db.Log, "Rolled back: %s in %s\n", mig.FileName, elapsed)
-
-		if err != nil {
+	for _, v := range appliedVersions {
+		if err := db.RollbackOnly(migrations, v); err != nil {
 			return err
 		}
 	}
-
-	if db.AutoDumpSchema {
+	if origAuto {
 		_ = db.DumpSchema()
 	}
-
 	return nil
 }
 
@@ -656,7 +622,7 @@ func (db *DB) MigrateOnly(migrations []Migration, version string) error {
 	if err != nil {
 		return err
 	}
-	exec := func(tx dbutil.Transaction) error {
+	execMigration := func(tx dbutil.Transaction) error {
 		res, err := tx.Exec(parsed.Up)
 		if err != nil {
 			return drv.QueryError(parsed.Up, err)
@@ -667,15 +633,17 @@ func (db *DB) MigrateOnly(migrations []Migration, version string) error {
 	}
 
 	if parsed.UpOptions.Transaction() {
-		err = doTransaction(sqlDB, exec)
+		err = doTransaction(sqlDB, execMigration)
 	} else {
-		err = exec(sqlDB)
+		err = execMigration(sqlDB)
 	}
 
 	fmt.Fprintf(db.Log, "Applied: %s in %s\n", target.FileName, time.Since(start))
 	if err != nil {
 		return err
 	}
+
+	// automatically update schema file, silence errors
 	if db.AutoDumpSchema {
 		_ = db.DumpSchema()
 	}
@@ -716,33 +684,39 @@ func (db *DB) RollbackOnly(migrations []Migration, version string) error {
 	if err != nil {
 		return err
 	}
-	exec := func(tx dbutil.Transaction) error {
-		res, err := tx.Exec(parsed.Down)
+	execMigration := func(tx dbutil.Transaction) error {
+		result, err := tx.Exec(parsed.Down)
 		if err != nil {
 			return drv.QueryError(parsed.Down, err)
 		} else if db.Verbose {
-			db.printVerbose(res)
+			db.printVerbose(result)
 		}
+
+		// remove migration record
 		return drv.DeleteMigration(tx, target.Version)
 	}
 
 	if parsed.DownOptions.Transaction() {
-		err = doTransaction(sqlDB, exec)
+		// begin transaction
+		err = doTransaction(sqlDB, execMigration)
 	} else {
-		err = exec(sqlDB)
+		// run outside of transaction
+		err = execMigration(sqlDB)
 	}
 
 	fmt.Fprintf(db.Log, "Rolled back: %s in %s\n", target.FileName, time.Since(start))
 	if err != nil {
 		return err
 	}
+
+	// automatically update schema file, silence errors
 	if db.AutoDumpSchema {
 		_ = db.DumpSchema()
 	}
 	return nil
 }
 
-// MigrateTo applies every pending migration whose version ≤ target (inclusive).
+// MigrateTo applies every pending migration whose version <= target (inclusive).
 func (db *DB) MigrateTo(target string) error {
 	migrations, err := db.FindMigrations()
 	if err != nil {
