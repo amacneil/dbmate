@@ -423,90 +423,21 @@ func (db *DB) Migrate() error {
 
 // MigrateNext applies only the next pending migration
 func (db *DB) MigrateNext() error {
-	drv, err := db.Driver()
-	if err != nil {
-		return err
-	}
-
-	// Find all migrations
 	migrations, err := db.FindMigrations()
 	if err != nil {
 		return err
 	}
-
-	if len(migrations) == 0 {
-		return ErrNoMigrationFiles
-	}
-
-	// Determine the next migration to apply
-	var nextMigration *Migration
-	highestAppliedMigrationVersion := ""
-	for _, migration := range migrations {
-		if migration.Applied {
-			if db.Strict && highestAppliedMigrationVersion <= migration.Version {
-				highestAppliedMigrationVersion = migration.Version
-			}
-		} else {
-			nextMigration = &migration
-			break // choose the first pending migration
+	var next *Migration
+	for _, m := range migrations {
+		if !m.Applied {
+			next = &m
+			break
 		}
 	}
-
-	if nextMigration == nil {
+	if next == nil {
 		return fmt.Errorf("no pending migrations to apply")
 	}
-
-	if db.Strict && nextMigration.Version <= highestAppliedMigrationVersion {
-		return fmt.Errorf(
-			"migration `%s` is out of order: it must be higher than the applied migration `%s` in strict mode",
-			nextMigration.Version,
-			highestAppliedMigrationVersion,
-		)
-	}
-
-	sqlDB, err := db.openDatabaseForMigration(drv)
-	if err != nil {
-		return err
-	}
-	defer dbutil.MustClose(sqlDB)
-
-	fmt.Fprintf(db.Log, "Applying next migration: %s\n", nextMigration.FileName)
-	start := time.Now()
-
-	parsed, err := nextMigration.Parse()
-	if err != nil {
-		return err
-	}
-
-	execMigration := func(tx dbutil.Transaction) error {
-		result, err := tx.Exec(parsed.Up)
-		if err != nil {
-			return drv.QueryError(parsed.Up, err)
-		} else if db.Verbose {
-			db.printVerbose(result)
-		}
-
-		return drv.InsertMigration(tx, nextMigration.Version)
-	}
-
-	if parsed.UpOptions.Transaction() {
-		err = doTransaction(sqlDB, execMigration)
-	} else {
-		err = execMigration(sqlDB)
-	}
-
-	elapsed := time.Since(start)
-	fmt.Fprintf(db.Log, "Applied: %s in %s\n", nextMigration.FileName, elapsed)
-	if err != nil {
-		return err
-	}
-
-	// Automatically update the schema file if AutoDumpSchema is enabled
-	if db.AutoDumpSchema {
-		_ = db.DumpSchema()
-	}
-
-	return nil
+	return db.MigrateOnly(migrations, next.Version)
 }
 
 // RollbackAll rolls back every applied migration (latest-first) until none remain
@@ -668,77 +599,20 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 
 // Rollback rolls back the most recent migration
 func (db *DB) Rollback() error {
-	drv, err := db.Driver()
-	if err != nil {
-		return err
-	}
-
-	sqlDB, err := db.openDatabaseForMigration(drv)
-	if err != nil {
-		return err
-	}
-	defer dbutil.MustClose(sqlDB)
-
-	// find last applied migration
-	var latest *Migration
 	migrations, err := db.FindMigrations()
 	if err != nil {
 		return err
 	}
-
-	for i, migration := range migrations {
-		if migration.Applied {
-			latest = &migrations[i]
+	var latest *Migration
+	for _, m := range migrations {
+		if m.Applied {
+			latest = &m
 		}
 	}
-
 	if latest == nil {
 		return ErrNoRollback
 	}
-
-	fmt.Fprintf(db.Log, "Rolling back: %s\n", latest.FileName)
-
-	start := time.Now()
-
-	parsed, err := latest.Parse()
-	if err != nil {
-		return err
-	}
-
-	execMigration := func(tx dbutil.Transaction) error {
-		// rollback migration
-		result, err := tx.Exec(parsed.Down)
-		if err != nil {
-			return drv.QueryError(parsed.Down, err)
-		} else if db.Verbose {
-			db.printVerbose(result)
-		}
-
-		// remove migration record
-		return drv.DeleteMigration(tx, latest.Version)
-	}
-
-	if parsed.DownOptions.Transaction() {
-		// begin transaction
-		err = doTransaction(sqlDB, execMigration)
-	} else {
-		// run outside of transaction
-		err = execMigration(sqlDB)
-	}
-
-	elapsed := time.Since(start)
-	fmt.Fprintf(db.Log, "Rolled back: %s in %s\n", latest.FileName, elapsed)
-
-	if err != nil {
-		return err
-	}
-
-	// automatically update schema file, silence errors
-	if db.AutoDumpSchema {
-		_ = db.DumpSchema()
-	}
-
-	return nil
+	return db.RollbackOnly(migrations, latest.Version)
 }
 
 // MigrateOnly applies exactly one pending migration that matches the given version.
