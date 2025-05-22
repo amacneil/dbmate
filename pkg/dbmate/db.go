@@ -874,22 +874,23 @@ func (db *DB) MigrateTo(target string) error {
 	if err != nil {
 		return err
 	}
-
-	found := false
+	targetExists := false
 	for _, m := range migrations {
 		if m.Version == target {
-			found = true
+			targetExists = true
+			break
 		}
+	}
+	if !targetExists {
+		return ErrMigrationNotFound
+	}
+	for _, m := range migrations {
 		if m.Applied || m.Version > target {
 			continue
 		}
 		if err := db.MigrateOnly(migrations, m.Version); err != nil {
 			return err
 		}
-	}
-
-	if !found {
-		return ErrMigrationNotFound
 	}
 	return nil
 }
