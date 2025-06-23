@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
 	"github.com/amacneil/dbmate/v2/pkg/dbtest"
@@ -788,5 +789,40 @@ func TestPostgresMigrationsTableExists(t *testing.T) {
 		exists, err := drv.MigrationsTableExists(db)
 		require.NoError(t, err)
 		require.Equal(t, true, exists)
+	})
+}
+
+func TestPostgresMigrationLock(t *testing.T) {
+	t.Run("lock and unlock", func(t *testing.T) {
+		drv := testPostgresDriver(t)
+		err := drv.Lock()
+		require.NoError(t, err)
+
+		err = drv.Lock()
+		require.Error(t, err, "Should not be able to lock again without unlock")
+
+		err = drv.Unlock()
+		require.NoError(t, err, "Should be able to unlock")
+	})
+
+	t.Run("lock on one instance should block lock attempt on another", func(t *testing.T) {
+		drv1 := testPostgresDriver(t)
+		err1 := drv1.Lock()
+		require.NoError(t, err1)
+
+		var isUnlocked bool
+		go func() {
+			time.Sleep(10 * time.Millisecond)
+			err := drv1.Unlock()
+			require.NoError(t, err, "Should be able to unlock")
+			isUnlocked = true
+		}()
+
+		drv2 := testPostgresDriver(t)
+		err2 := drv2.Lock()
+		require.NoError(t, err2)
+		require.Equal(t, true, isUnlocked)
+		err2 = drv2.Unlock()
+		require.NoError(t, err2, "Should be able to unlock")
 	})
 }
