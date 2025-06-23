@@ -618,8 +618,10 @@ drop table users;
 	require.Equal(t, false, actual[2].Applied)
 
 	// test parsing first migration
-	parsed, err := actual[0].Parse()
+	parsedSections, err := actual[0].Parse()
 	require.Nil(t, err)
+
+	parsed := parsedSections[0]
 	require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);\n", parsed.Up)
 	require.True(t, parsed.UpOptions.Transaction())
 	require.Equal(t, "-- migrate:down\ndrop table users;\n", parsed.Down)
