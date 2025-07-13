@@ -349,7 +349,7 @@ To create a new migration, run `dbmate new create_users_table`. You can name the
 -- migrate:down
 ```
 
-To write a migration, simply add your SQL to the `migrate:up` section: 
+To write a migration, simply add your SQL to the `migrate:up` section:
 
 ```sql
 -- migrate:up
