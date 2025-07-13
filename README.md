@@ -349,7 +349,7 @@ To create a new migration, run `dbmate new create_users_table`. You can name the
 -- migrate:down
 ```
 
-To write a migration, simply add your SQL to the `migrate:up` section:
+To write a migration, simply add your SQL to the `migrate:up` section. 
 
 ```sql
 -- migrate:up
@@ -360,6 +360,22 @@ create table users (
 );
 
 -- migrate:down
+```
+
+For related changes, it is possible to include multiple migrations in a single file using additional `migrate:up` and `migrate:down` sections. Migration file either succeeds or fails as a whole.
+
+```sql
+-- migrate:up
+CREATE TABLE users (id SERIAL PRIMARY KEY);
+
+-- migrate:down
+DROP TABLE users;
+
+-- migrate:up
+ALTER TABLE users ADD COLUMN email VARCHAR;
+
+-- migrate:down
+ALTER TABLE users DROP COLUMN email;
 ```
 
 > Note: Migration files are named in the format `[version]_[description].sql`. Only the version (defined as all leading numeric characters in the file name) is recorded in the database, so you can safely rename a migration file without having any effect on its current application state.
