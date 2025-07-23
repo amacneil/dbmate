@@ -9,16 +9,16 @@
   },
   "devDependencies": {
     "@actions/exec": "1.1.1",
-    "@foxglove/eslint-plugin": "2.0.0",
+    "@foxglove/eslint-plugin": "2.1.0",
     "@foxglove/tsconfig": "2.0.0",
-    "eslint": "9.25.1",
+    "eslint": "9.31.0",
     "handlebars": "4.7.8",
-    "npm-check-updates": "18.0.1",
-    "prettier": "3.5.3",
+    "npm-check-updates": "18.0.2",
+    "prettier": "3.6.2",
     "rimraf": "6.0.1",
     "ts-node": "10.9.2",
-    "typescript-eslint": "8.31.1",
+    "typescript-eslint": "8.38.0",
     "typescript": "5.8.3",
-    "yaml": "2.7.1"
+    "yaml": "2.8.0"
   }
 }
