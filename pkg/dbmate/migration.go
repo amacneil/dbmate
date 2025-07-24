@@ -28,7 +28,7 @@ func (m *Migration) readFile() (string, error) {
 }
 
 // Parse a migration
-func (m *Migration) Parse() (*ParsedMigration, error) {
+func (m *Migration) Parse() ([]*ParsedMigration, error) {
 	contents, err := m.readFile()
 	if err != nil {
 		return nil, err
@@ -76,14 +76,32 @@ var (
 	ErrParseUnexpectedStmt = errors.New("dbmate does not support statements preceding the '-- migrate:up' block")
 )
 
-// parseMigrationContents parses the string contents of a migration.
+func parseMigrationContents(contents string) ([]*ParsedMigration, error) {
+	sectionSubstrings, err := getMigrationSectionSubstrings(contents)
+	if err != nil {
+		return nil, err
+	}
+
+	var migrationSections []*ParsedMigration
+	for _, sectionSubstring := range sectionSubstrings {
+		migrationSection, err := parseMigrationSection(sectionSubstring)
+		if err != nil {
+			return nil, err
+		}
+		migrationSections = append(migrationSections, migrationSection)
+	}
+
+	return migrationSections, nil
+}
+
+// parseMigrationSection parses the string contents of a migration section.
 // It will return two Migration objects, the first representing the "up"
 // block and the second representing the "down" block. This function
-// requires that at least an up block was defined and will otherwise
+// requires that up and down blocks were defined and will otherwise
 // return an error.
-func parseMigrationContents(contents string) (*ParsedMigration, error) {
-	upDirectiveStart, hasDefinedUpBlock := getMatchPosition(contents, upRegExp)
-	downDirectiveStart, hasDefinedDownBlock := getMatchPosition(contents, downRegExp)
+func parseMigrationSection(section string) (*ParsedMigration, error) {
+	upDirectiveStart, hasDefinedUpBlock := getMatchPosition(section, upRegExp)
+	downDirectiveStart, hasDefinedDownBlock := getMatchPosition(section, downRegExp)
 
 	if !hasDefinedUpBlock {
 		return nil, ErrParseMissingUp
@@ -94,12 +112,9 @@ func parseMigrationContents(contents string) (*ParsedMigration, error) {
 	if upDirectiveStart > downDirectiveStart {
 		return nil, ErrParseWrongOrder
 	}
-	if statementsPrecedeMigrateBlocks(contents, upDirectiveStart) {
-		return nil, ErrParseUnexpectedStmt
-	}
 
-	upBlock := substring(contents, upDirectiveStart, downDirectiveStart)
-	downBlock := substring(contents, downDirectiveStart, len(contents))
+	upBlock := substring(section, upDirectiveStart, downDirectiveStart)
+	downBlock := substring(section, downDirectiveStart, len(section))
 
 	parsed := ParsedMigration{
 		Up:          upBlock,
@@ -117,25 +132,25 @@ func parseMigrationContents(contents string) (*ParsedMigration, error) {
 //
 //	fmt.Printf("%#v", parseMigrationOptions("-- migrate:up transaction:false"))
 //	// migrationOptions{"transaction": "false"}
-func parseMigrationOptions(contents string) ParsedMigrationOptions {
+func parseMigrationOptions(section string) ParsedMigrationOptions {
 	options := make(migrationOptions)
 
 	// remove everything after first newline
-	contents = strings.SplitN(contents, "\n", 2)[0]
+	section = strings.SplitN(section, "\n", 2)[0]
 
 	// strip away the -- migrate:[up|down] part
-	contents = blockDirectiveRegExp.ReplaceAllString(contents, "")
+	section = blockDirectiveRegExp.ReplaceAllString(section, "")
 
 	// remove leading and trailing whitespace
-	contents = strings.TrimSpace(contents)
+	section = strings.TrimSpace(section)
 
 	// return empty options if nothing is left to parse
-	if contents == "" {
+	if section == "" {
 		return options
 	}
 
 	// split the options string into pairs, e.g. "transaction:false foo:bar" -> []string{"transaction:false", "foo:bar"}
-	stringPairs := whitespaceRegExp.Split(contents, -1)
+	stringPairs := whitespaceRegExp.Split(section, -1)
 
 	for _, stringPair := range stringPairs {
 		// split stringified pair into key and value pairs, e.g. "transaction:false" -> []string{"transaction", "false"}
@@ -198,6 +213,43 @@ func getMatchPosition(s string, re *regexp.Regexp) (int, bool) {
 		return -1, false
 	}
 	return match[0], true
+}
+
+func getMigrationSectionSubstrings(contents string) ([]string, error) {
+	// Regex to match blocks starting with "-- migrate:up" and ending before the next one or EOF
+	allUpDirectives := upRegExp.FindAllStringIndex(contents, -1)
+
+	if allUpDirectives == nil {
+		return nil, ErrParseMissingUp
+	}
+
+	if statementsPrecedeMigrateBlocks(contents, allUpDirectives[0][0]) {
+		return nil, ErrParseUnexpectedStmt
+	}
+
+	var sectionBeginEndIndices [][]int
+	for i := range len(allUpDirectives) {
+		start := allUpDirectives[i][0]
+		var end int
+		if i < len(allUpDirectives)-1 {
+			end = allUpDirectives[i+1][0]
+		} else {
+			end = len(contents)
+		}
+		sectionBeginEndIndices = append(sectionBeginEndIndices, []int{start, end})
+	}
+
+	var sectionSubstrings []string
+	for _, sectionBeginEnd := range sectionBeginEndIndices {
+		begin, end := sectionBeginEnd[0], sectionBeginEnd[1]
+		contentsSubstring := substring(contents, begin, end)
+		if len(downRegExp.FindAllStringIndex(contentsSubstring, -1)) > 1 {
+			return nil, ErrParseMissingUp
+		}
+		sectionSubstrings = append(sectionSubstrings, contentsSubstring)
+	}
+
+	return sectionSubstrings, nil
 }
 
 func substring(s string, begin, end int) string {
