@@ -117,7 +117,15 @@ dbmate up        # create the database (if it does not already exist) and run an
 dbmate create    # create the database
 dbmate drop      # drop the database
 dbmate migrate   # run any pending migrations
-dbmate rollback  # roll back the most recent migration
+  --only <version>  # apply only the specified migration version
+  --to <version>    # apply migrations up to the specified version (inclusive)
+  --one             # apply exactly one pending migration
+  --all             # apply all pending migrations (default)
+dbmate rollback  # rollback migrations
+  --only <version>  # rollback only the specified migration version
+  --to <version>    # rollback migrations down to the specified version (exclusive)
+  --one             # rollback exactly one migration (default)
+  --all             # rollback all migrations
 dbmate down      # alias for rollback
 dbmate status    # show the status of all migrations (supports --exit-code and --quiet)
 dbmate dump      # write the database schema.sql file
@@ -632,3 +640,4 @@ To start a development shell:
 ```sh
 $ make docker-sh
 ```
+

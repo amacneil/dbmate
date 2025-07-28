@@ -421,6 +421,55 @@ func (db *DB) Migrate() error {
 	return nil
 }
 
+// MigrateNext applies only the next pending migration
+func (db *DB) MigrateNext() error {
+	migrations, err := db.FindMigrations()
+	if err != nil {
+		return err
+	}
+	var next *Migration
+	for _, m := range migrations {
+		if !m.Applied {
+			next = &m
+			break
+		}
+	}
+	if next == nil {
+		return fmt.Errorf("no pending migrations to apply")
+	}
+	return db.MigrateOnly(migrations, next.Version)
+}
+
+// RollbackAll rolls back every applied migration (latest-first) until none remain
+func (db *DB) RollbackAll() error {
+	migrations, err := db.FindMigrations()
+	if err != nil {
+		return err
+	}
+	var appliedVersions []string
+	for i := len(migrations) - 1; i >= 0; i-- {
+		if migrations[i].Applied {
+			appliedVersions = append(appliedVersions, migrations[i].Version)
+		}
+	}
+	if len(appliedVersions) == 0 {
+		return ErrNoRollback
+	}
+	origAuto := db.AutoDumpSchema
+	db.AutoDumpSchema = false
+	defer func() { db.AutoDumpSchema = origAuto }()
+
+	for _, v := range appliedVersions {
+		if err := db.RollbackOnly(migrations, v); err != nil {
+			return err
+		}
+	}
+	if origAuto {
+		_ = db.DumpSchema()
+	}
+	return nil
+}
+
 func (db *DB) printVerbose(result sql.Result) {
 	lastInsertID, err := result.LastInsertId()
 	if err == nil {
@@ -516,9 +565,48 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 
 // Rollback rolls back the most recent migration
 func (db *DB) Rollback() error {
+	migrations, err := db.FindMigrations()
+	if err != nil {
+		return err
+	}
+	var latest *Migration
+	for _, m := range migrations {
+		if m.Applied {
+			latest = &m
+		}
+	}
+	if latest == nil {
+		return ErrNoRollback
+	}
+	return db.RollbackOnly(migrations, latest.Version)
+}
+
+// MigrateOnly applies exactly one pending migration that matches the given version.
+func (db *DB) MigrateOnly(migrations []Migration, version string) error {
 	drv, err := db.Driver()
 	if err != nil {
 		return err
+	}
+
+	var target *Migration
+	highestApplied := ""
+	for i, m := range migrations {
+		if m.Version == version {
+			target = &migrations[i]
+		} else if m.Applied && db.Strict && m.Version > highestApplied {
+			highestApplied = m.Version
+		}
+	}
+
+	if target == nil {
+		return ErrMigrationNotFound
+	}
+	if target.Applied {
+		fmt.Fprintf(db.Log, "Skipping (already applied): %s\n", target.FileName)
+		return nil
+	}
+	if db.Strict && target.Version <= highestApplied {
+		return fmt.Errorf("migration `%s` is out of order with applied `%s` in --strict mode", target.Version, highestApplied)
 	}
 
 	sqlDB, err := db.openDatabaseForMigration(drv)
@@ -527,34 +615,76 @@ func (db *DB) Rollback() error {
 	}
 	defer dbutil.MustClose(sqlDB)
 
-	// find last applied migration
-	var latest *Migration
-	migrations, err := db.FindMigrations()
-	if err != nil {
-		return err
-	}
-
-	for i, migration := range migrations {
-		if migration.Applied {
-			latest = &migrations[i]
-		}
-	}
-
-	if latest == nil {
-		return ErrNoRollback
-	}
-
-	fmt.Fprintf(db.Log, "Rolling back: %s\n", latest.FileName)
-
+	fmt.Fprintf(db.Log, "Applying: %s\n", target.FileName)
 	start := time.Now()
 
-	parsed, err := latest.Parse()
+	parsed, err := target.Parse()
+	if err != nil {
+		return err
+	}
+	execMigration := func(tx dbutil.Transaction) error {
+		res, err := tx.Exec(parsed.Up)
+		if err != nil {
+			return drv.QueryError(parsed.Up, err)
+		} else if db.Verbose {
+			db.printVerbose(res)
+		}
+		return drv.InsertMigration(tx, target.Version)
+	}
+
+	if parsed.UpOptions.Transaction() {
+		err = doTransaction(sqlDB, execMigration)
+	} else {
+		err = execMigration(sqlDB)
+	}
+
+	fmt.Fprintf(db.Log, "Applied: %s in %s\n", target.FileName, time.Since(start))
 	if err != nil {
 		return err
 	}
 
+	// automatically update schema file, silence errors
+	if db.AutoDumpSchema {
+		_ = db.DumpSchema()
+	}
+	return nil
+}
+
+// RollbackOnly rolls back exactly one applied migration that matches the given version.
+func (db *DB) RollbackOnly(migrations []Migration, version string) error {
+	drv, err := db.Driver()
+	if err != nil {
+		return err
+	}
+
+	var target *Migration
+	for i, m := range migrations {
+		if m.Version == version {
+			target = &migrations[i]
+			break
+		}
+	}
+	if target == nil {
+		return ErrMigrationNotFound
+	}
+	if !target.Applied {
+		return fmt.Errorf("migration `%s` is not applied, nothing to rollback", version)
+	}
+
+	sqlDB, err := db.openDatabaseForMigration(drv)
+	if err != nil {
+		return err
+	}
+	defer dbutil.MustClose(sqlDB)
+
+	fmt.Fprintf(db.Log, "Rolling back: %s\n", target.FileName)
+	start := time.Now()
+
+	parsed, err := target.Parse()
+	if err != nil {
+		return err
+	}
 	execMigration := func(tx dbutil.Transaction) error {
-		// rollback migration
 		result, err := tx.Exec(parsed.Down)
 		if err != nil {
 			return drv.QueryError(parsed.Down, err)
@@ -563,7 +693,7 @@ func (db *DB) Rollback() error {
 		}
 
 		// remove migration record
-		return drv.DeleteMigration(tx, latest.Version)
+		return drv.DeleteMigration(tx, target.Version)
 	}
 
 	if parsed.DownOptions.Transaction() {
@@ -574,9 +704,7 @@ func (db *DB) Rollback() error {
 		err = execMigration(sqlDB)
 	}
 
-	elapsed := time.Since(start)
-	fmt.Fprintf(db.Log, "Rolled back: %s in %s\n", latest.FileName, elapsed)
-
+	fmt.Fprintf(db.Log, "Rolled back: %s in %s\n", target.FileName, time.Since(start))
 	if err != nil {
 		return err
 	}
@@ -585,7 +713,68 @@ func (db *DB) Rollback() error {
 	if db.AutoDumpSchema {
 		_ = db.DumpSchema()
 	}
+	return nil
+}
 
+// MigrateTo applies every pending migration whose version <= target (inclusive).
+func (db *DB) MigrateTo(target string) error {
+	migrations, err := db.FindMigrations()
+	if err != nil {
+		return err
+	}
+	targetExists := false
+	for _, m := range migrations {
+		if m.Version == target {
+			targetExists = true
+			break
+		}
+	}
+	if !targetExists {
+		return ErrMigrationNotFound
+	}
+	for _, m := range migrations {
+		if m.Applied || m.Version > target {
+			continue
+		}
+		if err := db.MigrateOnly(migrations, m.Version); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// RollbackTo rolls back until version == target remains applied (exclusive).
+func (db *DB) RollbackTo(target string) error {
+	migrations, err := db.FindMigrations()
+	if err != nil {
+		return err
+	}
+
+	var targetApplied bool
+	var targetExists bool
+	for _, m := range migrations {
+		if m.Version == target {
+			targetExists = true
+			targetApplied = m.Applied
+			break
+		}
+	}
+	if !targetExists {
+		return ErrMigrationNotFound
+	}
+	if !targetApplied {
+		return fmt.Errorf("migration `%s` is not applied, nothing to rollback", target)
+	}
+
+	for i := len(migrations) - 1; i >= 0; i-- {
+		m := migrations[i]
+		if !m.Applied || m.Version <= target {
+			continue
+		}
+		if err := db.RollbackOnly(migrations, m.Version); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
