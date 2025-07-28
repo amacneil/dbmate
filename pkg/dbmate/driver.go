@@ -25,6 +25,12 @@ type Driver interface {
 	QueryError(string, error) error
 }
 
+type DriverMigrationLock interface {
+	Lock() error
+	Unlock() error
+	IsLocked() bool
+}
+
 // DriverConfig holds configuration passed to driver constructors
 type DriverConfig struct {
 	DatabaseURL         *url.URL
