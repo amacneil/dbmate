@@ -177,9 +177,27 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 	}
 
 	// load applied migrations
-	migrations, err := dbutil.QueryColumn(db,
-		"select quote_literal(version) from "+migrationsTable+" order by version asc")
+	rows, err := db.Query("select quote_literal(version), quote_literal(checksum) from " + migrationsTable + " order by version asc")
 	if err != nil {
+		return nil, err
+	}
+
+	migrations := [][]string{}
+	for rows.Next() {
+		var version string
+		var checksum *string
+		if err := rows.Scan(&version, &checksum); err != nil {
+			return nil, err
+		}
+
+		if checksum == nil {
+			migrations = append(migrations, []string{version, ""})
+		} else {
+			migrations = append(migrations, []string{version, *checksum})
+		}
+	}
+
+	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
@@ -188,9 +206,19 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 	buf.WriteString("\n--\n-- Dbmate schema migrations\n--\n\n")
 
 	if len(migrations) > 0 {
-		buf.WriteString("INSERT INTO " + migrationsTable + " (version) VALUES\n    (" +
-			strings.Join(migrations, "),\n    (") +
-			");\n")
+		tuples := make([]string, 0, len(migrations))
+		for _, m := range migrations {
+			v := m[0]
+			c := m[1]
+			if c == "" {
+				tuples = append(tuples, fmt.Sprintf("(%s, NULL)", v))
+			} else {
+				tuples = append(tuples, fmt.Sprintf("(%s, %s)", v, c))
+			}
+		}
+		buf.WriteString("INSERT INTO " + migrationsTable + " (version, checksum) VALUES\n    " +
+			strings.Join(tuples, ",\n    ") +
+			";\n")
 	}
 
 	return buf.Bytes(), nil
@@ -265,7 +293,7 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 
 	// first attempt at creating migrations table
 	createTableStmt := fmt.Sprintf(
-		"create table if not exists %s.%s (version varchar primary key)",
+		"create table if not exists %s.%s (version varchar primary key, checksum varchar)",
 		schema, migrationsTable)
 	_, err = db.Exec(createTableStmt)
 	if err == nil {
@@ -293,15 +321,15 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 	return err
 }
 
-// SelectMigrations returns a list of applied migrations
+// SelectMigrations returns a list of applied migrations and its checksum
 // with an optional limit (in descending order)
-func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
+func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]*string, error) {
 	migrationsTable, err := drv.quotedMigrationsTableName(db)
 	if err != nil {
 		return nil, err
 	}
 
-	query := "select version from " + migrationsTable + " order by version desc"
+	query := "select version, checksum from " + migrationsTable + " order by version desc"
 	if limit >= 0 {
 		query = fmt.Sprintf("%s limit %d", query, limit)
 	}
@@ -312,14 +340,19 @@ func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, err
 
 	defer dbutil.MustClose(rows)
 
-	migrations := map[string]bool{}
+	migrations := map[string]*string{}
 	for rows.Next() {
 		var version string
-		if err := rows.Scan(&version); err != nil {
+		var checksum *string
+		if err := rows.Scan(&version, &checksum); err != nil {
 			return nil, err
 		}
 
-		migrations[version] = true
+		if checksum == nil {
+			empty := ""
+			checksum = &empty
+		}
+		migrations[version] = checksum
 	}
 
 	if err = rows.Err(); err != nil {
@@ -330,13 +363,13 @@ func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, err
 }
 
 // InsertMigration adds a new migration record
-func (drv *Driver) InsertMigration(db dbutil.Transaction, version string) error {
+func (drv *Driver) InsertMigration(db dbutil.Transaction, version string, checksum string) error {
 	migrationsTable, err := drv.quotedMigrationsTableName(db)
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec("insert into "+migrationsTable+" (version) values ($1)", version)
+	_, err = db.Exec("insert into "+migrationsTable+" (version, checksum) values ($1, $2)", version, checksum)
 
 	return err
 }

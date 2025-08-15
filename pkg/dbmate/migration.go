@@ -15,6 +15,7 @@ type Migration struct {
 	FilePath string
 	FS       fs.FS
 	Version  string
+	Checksum string
 }
 
 func (m *Migration) readFile() (string, error) {

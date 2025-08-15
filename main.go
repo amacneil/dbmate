@@ -96,6 +96,11 @@ func NewApp() *cli.App {
 			Usage:   "timeout for --wait flag",
 			Value:   defaultDB.WaitTimeout,
 		},
+		&cli.StringFlag{
+			Name:    "checksum-mode",
+			EnvVars: []string{"DBMATE_CHECKSUM_MODE"},
+			Usage:   "set the checksum mode used during local and applied migrations comparison",
+		},
 	}
 
 	app.Commands = []*cli.Command{
@@ -293,6 +298,10 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 		}
 		db := dbmate.New(u)
 		db.AutoDumpSchema = !c.Bool("no-dump-schema")
+		db.ChecksumMode, err = dbmate.ParseChecksumMode(c.String("checksum-mode"))
+		if err != nil {
+			return err
+		}
 		db.MigrationsDir = c.StringSlice("migrations-dir")
 		db.MigrationsTableName = c.String("migrations-table")
 		db.SchemaFile = c.String("schema-file")

@@ -131,7 +131,9 @@ func (drv *Driver) mysqldumpArgs() []string {
 	// generate CLI arguments
 	args := []string{"--opt", "--routines", "--no-data",
 		"--skip-dump-date", "--skip-add-drop-table"}
-
+	if tls := drv.databaseURL.Query().Get("tls"); tls == "false" {
+		args = append(args, "--skip-ssl")
+	}
 	socket := drv.databaseURL.Query().Get("socket")
 	if socket != "" {
 		args = append(args, "--socket="+socket)
@@ -161,9 +163,27 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 	migrationsTable := drv.quotedMigrationsTableName()
 
 	// load applied migrations
-	migrations, err := dbutil.QueryColumn(db,
-		fmt.Sprintf("select quote(version) from %s order by version asc", migrationsTable))
+	rows, err := db.Query(fmt.Sprintf("select quote(version), quote(checksum) from %s order by version asc", migrationsTable))
 	if err != nil {
+		return nil, err
+	}
+
+	migrations := [][]string{}
+	for rows.Next() {
+		var version string
+		var checksum *string
+		if err := rows.Scan(&version, &checksum); err != nil {
+			return nil, err
+		}
+
+		if checksum == nil {
+			migrations = append(migrations, []string{version, ""})
+		} else {
+			migrations = append(migrations, []string{version, *checksum})
+		}
+	}
+
+	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
@@ -173,10 +193,20 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 		fmt.Sprintf("LOCK TABLES %s WRITE;\n", migrationsTable))
 
 	if len(migrations) > 0 {
+		tuples := make([]string, 0, len(migrations))
+		for _, m := range migrations {
+			v := m[0]
+			c := m[1]
+			if c == "" {
+				tuples = append(tuples, fmt.Sprintf("(%s, NULL)", v))
+			} else {
+				tuples = append(tuples, fmt.Sprintf("(%s, %s)", v, c))
+			}
+		}
 		buf.WriteString(
-			fmt.Sprintf("INSERT INTO %s (version) VALUES\n  (", migrationsTable) +
-				strings.Join(migrations, "),\n  (") +
-				");\n")
+			fmt.Sprintf("INSERT INTO %s (version, checksum) VALUES\n  ", migrationsTable) +
+				strings.Join(tuples, ",\n  ") +
+				";\n")
 	}
 
 	buf.WriteString("UNLOCK TABLES;\n")
@@ -246,7 +276,7 @@ func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
 // CreateMigrationsTable creates the schema_migrations table
 func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 	_, err := db.Exec(fmt.Sprintf(
-		"create table if not exists %s (version varchar(128) primary key)",
+		"create table if not exists %s (version varchar(128) primary key, checksum varchar(64))",
 		drv.quotedMigrationsTableName()))
 
 	return err
@@ -254,8 +284,8 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 
 // SelectMigrations returns a list of applied migrations
 // with an optional limit (in descending order)
-func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
-	query := fmt.Sprintf("select version from %s order by version desc", drv.quotedMigrationsTableName())
+func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]*string, error) {
+	query := fmt.Sprintf("select version, checksum from %s order by version desc", drv.quotedMigrationsTableName())
 	if limit >= 0 {
 		query = fmt.Sprintf("%s limit %d", query, limit)
 	}
@@ -266,14 +296,20 @@ func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, err
 
 	defer dbutil.MustClose(rows)
 
-	migrations := map[string]bool{}
+	migrations := map[string]*string{}
 	for rows.Next() {
 		var version string
-		if err := rows.Scan(&version); err != nil {
+		var checksum *string
+		if err := rows.Scan(&version, &checksum); err != nil {
 			return nil, err
 		}
 
-		migrations[version] = true
+		if checksum == nil {
+			empty := ""
+			checksum = &empty
+		}
+
+		migrations[version] = checksum
 	}
 
 	if err = rows.Err(); err != nil {
@@ -284,10 +320,10 @@ func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, err
 }
 
 // InsertMigration adds a new migration record
-func (drv *Driver) InsertMigration(db dbutil.Transaction, version string) error {
+func (drv *Driver) InsertMigration(db dbutil.Transaction, version string, checksum string) error {
 	_, err := db.Exec(
-		fmt.Sprintf("insert into %s (version) values (?)", drv.quotedMigrationsTableName()),
-		version)
+		fmt.Sprintf("insert into %s (version, checksum) values (?, ?)", drv.quotedMigrationsTableName()),
+		version, checksum)
 
 	return err
 }

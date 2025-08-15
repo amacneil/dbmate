@@ -105,13 +105,13 @@ func TestClickHouseDumpSchema(t *testing.T) {
 	// insert migration
 	tx, err := db.Begin()
 	require.NoError(t, err)
-	err = drv.InsertMigration(tx, "abc1")
+	err = drv.InsertMigration(tx, "abc1", "checksum1")
 	require.NoError(t, err)
 	err = tx.Commit()
 	require.NoError(t, err)
 	tx, err = db.Begin()
 	require.NoError(t, err)
-	err = drv.InsertMigration(tx, "abc2")
+	err = drv.InsertMigration(tx, "abc2", "checksum2")
 	require.NoError(t, err)
 	err = tx.Commit()
 	require.NoError(t, err)
@@ -123,9 +123,9 @@ func TestClickHouseDumpSchema(t *testing.T) {
 	require.Contains(t, string(schema), "--\n"+
 		"-- Dbmate schema migrations\n"+
 		"--\n\n"+
-		"INSERT INTO test_migrations (version) VALUES\n"+
-		"    ('abc1'),\n"+
-		"    ('abc2');\n")
+		"INSERT INTO test_migrations (version, checksum) VALUES\n"+
+		"    ('abc1', 'checksum1'),\n"+
+		"    ('abc2', 'checksum2');\n")
 
 	// DumpSchema should return error if command fails
 	drv.databaseURL.Path = "/fakedb"
@@ -264,29 +264,29 @@ func TestClickHouseSelectMigrations(t *testing.T) {
 
 	tx, err := db.Begin()
 	require.NoError(t, err)
-	stmt, err := tx.Prepare("insert into test_migrations (version) values (?)")
+	stmt, err := tx.Prepare("insert into test_migrations (version, checksum) values (?,?)")
 	require.NoError(t, err)
-	_, err = stmt.Exec("abc2")
+	_, err = stmt.Exec("abc2", nil)
 	require.NoError(t, err)
-	_, err = stmt.Exec("abc1")
+	_, err = stmt.Exec("abc1", nil)
 	require.NoError(t, err)
-	_, err = stmt.Exec("abc3")
+	_, err = stmt.Exec("abc3", "checksum3")
 	require.NoError(t, err)
 	err = tx.Commit()
 	require.NoError(t, err)
 
 	migrations, err := drv.SelectMigrations(db, -1)
 	require.NoError(t, err)
-	require.Equal(t, true, migrations["abc1"])
-	require.Equal(t, true, migrations["abc2"])
-	require.Equal(t, true, migrations["abc2"])
+	require.Equal(t, "", *migrations["abc1"])
+	require.Equal(t, "", *migrations["abc2"])
+	require.Equal(t, "checksum3", *migrations["abc3"])
 
 	// test limit param
 	migrations, err = drv.SelectMigrations(db, 1)
 	require.NoError(t, err)
-	require.Equal(t, true, migrations["abc3"])
-	require.Equal(t, false, migrations["abc1"])
-	require.Equal(t, false, migrations["abc2"])
+	require.Equal(t, "checksum3", *migrations["abc3"])
+	require.Equal(t, (*string)(nil), migrations["abc1"])
+	require.Equal(t, (*string)(nil), migrations["abc2"])
 }
 
 func TestClickHouseInsertMigration(t *testing.T) {
@@ -307,7 +307,7 @@ func TestClickHouseInsertMigration(t *testing.T) {
 	// insert migration
 	tx, err := db.Begin()
 	require.NoError(t, err)
-	err = drv.InsertMigration(tx, "abc1")
+	err = drv.InsertMigration(tx, "abc1", "checksum1")
 	require.NoError(t, err)
 	err = tx.Commit()
 	require.NoError(t, err)

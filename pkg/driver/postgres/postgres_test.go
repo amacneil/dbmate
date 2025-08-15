@@ -217,9 +217,9 @@ func TestPostgresDumpSchema(t *testing.T) {
 		require.NoError(t, err)
 
 		// insert migration
-		err = drv.InsertMigration(db, "abc1")
+		err = drv.InsertMigration(db, "abc1", "checksum1")
 		require.NoError(t, err)
-		err = drv.InsertMigration(db, "abc2")
+		err = drv.InsertMigration(db, "abc2", "checksum2")
 		require.NoError(t, err)
 
 		// DumpSchema should return schema
@@ -232,9 +232,9 @@ func TestPostgresDumpSchema(t *testing.T) {
 			"--\n"+
 			"-- Dbmate schema migrations\n"+
 			"--\n\n"+
-			"INSERT INTO public.schema_migrations (version) VALUES\n"+
-			"    ('abc1'),\n"+
-			"    ('abc2');\n")
+			"INSERT INTO public.schema_migrations (version, checksum) VALUES\n"+
+			"    ('abc1', 'checksum1'),\n"+
+			"    ('abc2', 'checksum2');\n")
 
 		// DumpSchema should return error if command fails
 		drv.databaseURL.Path = "/fakedb"
@@ -255,9 +255,9 @@ func TestPostgresDumpSchema(t *testing.T) {
 		require.NoError(t, err)
 
 		// insert migration
-		err = drv.InsertMigration(db, "abc1")
+		err = drv.InsertMigration(db, "abc1", "checksum1")
 		require.NoError(t, err)
-		err = drv.InsertMigration(db, "abc2")
+		err = drv.InsertMigration(db, "abc2", "checksum2")
 		require.NoError(t, err)
 
 		// DumpSchema should return schema
@@ -270,9 +270,9 @@ func TestPostgresDumpSchema(t *testing.T) {
 			"--\n"+
 			"-- Dbmate schema migrations\n"+
 			"--\n\n"+
-			"INSERT INTO \"camelSchema\".\"testMigrations\" (version) VALUES\n"+
-			"    ('abc1'),\n"+
-			"    ('abc2');\n")
+			"INSERT INTO \"camelSchema\".\"testMigrations\" (version, checksum) VALUES\n"+
+			"    ('abc1', 'checksum1'),\n"+
+			"    ('abc2', 'checksum2');\n")
 	})
 }
 
@@ -477,22 +477,22 @@ func TestPostgresSelectMigrations(t *testing.T) {
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
-	_, err = db.Exec(`insert into public.test_migrations (version)
-		values ('abc2'), ('abc1'), ('abc3')`)
+	_, err = db.Exec(`insert into test_migrations (version, checksum)
+		values ('abc2', null), ('abc1', null), ('abc3', 'checksum3')`)
 	require.NoError(t, err)
 
 	migrations, err := drv.SelectMigrations(db, -1)
 	require.NoError(t, err)
-	require.Equal(t, true, migrations["abc1"])
-	require.Equal(t, true, migrations["abc2"])
-	require.Equal(t, true, migrations["abc2"])
+	require.Equal(t, "", *migrations["abc1"])
+	require.Equal(t, "", *migrations["abc2"])
+	require.Equal(t, "checksum3", *migrations["abc3"])
 
 	// test limit param
 	migrations, err = drv.SelectMigrations(db, 1)
 	require.NoError(t, err)
-	require.Equal(t, true, migrations["abc3"])
-	require.Equal(t, false, migrations["abc1"])
-	require.Equal(t, false, migrations["abc2"])
+	require.Equal(t, "checksum3", *migrations["abc3"])
+	require.Equal(t, (*string)(nil), migrations["abc1"])
+	require.Equal(t, (*string)(nil), migrations["abc2"])
 }
 
 func TestPostgresInsertMigration(t *testing.T) {
@@ -511,7 +511,7 @@ func TestPostgresInsertMigration(t *testing.T) {
 	require.Equal(t, 0, count)
 
 	// insert migration
-	err = drv.InsertMigration(db, "abc1")
+	err = drv.InsertMigration(db, "abc1", "checksum1")
 	require.NoError(t, err)
 
 	err = db.QueryRow("select count(*) from public.test_migrations where version = 'abc1'").
