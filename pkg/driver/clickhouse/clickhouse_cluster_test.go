@@ -101,13 +101,13 @@ func TestClickHouseDumpSchemaOnCluster(t *testing.T) {
 	// insert migration
 	tx, err := db.Begin()
 	require.NoError(t, err)
-	err = drv.InsertMigration(tx, "abc1")
+	err = drv.InsertMigration(tx, "abc1", "checksum1")
 	require.NoError(t, err)
 	err = tx.Commit()
 	require.NoError(t, err)
 	tx, err = db.Begin()
 	require.NoError(t, err)
-	err = drv.InsertMigration(tx, "abc2")
+	err = drv.InsertMigration(tx, "abc2", "checksum2")
 	require.NoError(t, err)
 	err = tx.Commit()
 	require.NoError(t, err)
@@ -120,9 +120,9 @@ func TestClickHouseDumpSchemaOnCluster(t *testing.T) {
 	require.Contains(t, string(schema), "--\n"+
 		"-- Dbmate schema migrations\n"+
 		"--\n\n"+
-		"INSERT INTO test_migrations (version) VALUES\n"+
-		"    ('abc1'),\n"+
-		"    ('abc2');\n")
+		"INSERT INTO test_migrations (version, checksum) VALUES\n"+
+		"    ('abc1', 'checksum1'),\n"+
+		"    ('abc2', 'checksum2');\n")
 
 	// DumpSchema should return error if command fails
 	drv.databaseURL.Path = "/fakedb"
@@ -215,43 +215,43 @@ func TestClickHouseSelectMigrationsOnCluster(t *testing.T) {
 
 	tx, err := db01.Begin()
 	require.NoError(t, err)
-	stmt, err := tx.Prepare("insert into test_migrations (version) values (?)")
+	stmt, err := tx.Prepare("insert into test_migrations (version, checksum) values (?, ?)")
 	require.NoError(t, err)
-	_, err = stmt.Exec("abc2")
+	_, err = stmt.Exec("abc2", nil)
 	require.NoError(t, err)
-	_, err = stmt.Exec("abc1")
+	_, err = stmt.Exec("abc1", "checksum1")
 	require.NoError(t, err)
-	_, err = stmt.Exec("abc3")
+	_, err = stmt.Exec("abc3", "checksum3")
 	require.NoError(t, err)
 	err = tx.Commit()
 	require.NoError(t, err)
 
 	migrations01, err := drv01.SelectMigrations(db01, -1)
 	require.NoError(t, err)
-	require.Equal(t, true, migrations01["abc1"])
-	require.Equal(t, true, migrations01["abc2"])
-	require.Equal(t, true, migrations01["abc3"])
+	require.Equal(t, "checksum1", *migrations01["abc1"])
+	require.Equal(t, "", *migrations01["abc2"])
+	require.Equal(t, "checksum3", *migrations01["abc3"])
 
 	// Assert select on other node
 	migrations02, err := drv02.SelectMigrations(db02, -1)
 	require.NoError(t, err)
-	require.Equal(t, true, migrations02["abc1"])
-	require.Equal(t, true, migrations02["abc2"])
-	require.Equal(t, true, migrations02["abc3"])
+	require.Equal(t, "checksum1", *migrations02["abc1"])
+	require.Equal(t, "", *migrations02["abc2"])
+	require.Equal(t, "checksum3", *migrations02["abc3"])
 
 	// test limit param
 	migrations01, err = drv01.SelectMigrations(db01, 1)
 	require.NoError(t, err)
-	require.Equal(t, true, migrations01["abc3"])
-	require.Equal(t, false, migrations01["abc1"])
-	require.Equal(t, false, migrations01["abc2"])
+	require.Equal(t, "checksum3", *migrations01["abc3"])
+	require.Equal(t, (*string)(nil), migrations01["abc2"])
+	require.Equal(t, (*string)(nil), migrations01["abc1"])
 
 	// test limit param on other node
 	migrations02, err = drv02.SelectMigrations(db02, 1)
 	require.NoError(t, err)
-	require.Equal(t, true, migrations02["abc3"])
-	require.Equal(t, false, migrations02["abc1"])
-	require.Equal(t, false, migrations02["abc2"])
+	require.Equal(t, "checksum3", *migrations02["abc3"])
+	require.Equal(t, (*string)(nil), migrations02["abc2"])
+	require.Equal(t, (*string)(nil), migrations02["abc1"])
 }
 
 func TestClickHouseInsertMigrationOnCluster(t *testing.T) {
@@ -282,7 +282,7 @@ func TestClickHouseInsertMigrationOnCluster(t *testing.T) {
 	// insert migration
 	tx, err := db01.Begin()
 	require.NoError(t, err)
-	err = drv01.InsertMigration(tx, "abc1")
+	err = drv01.InsertMigration(tx, "abc1", "checksum1")
 	require.NoError(t, err)
 	err = tx.Commit()
 	require.NoError(t, err)
