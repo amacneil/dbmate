@@ -139,6 +139,7 @@ The following options are available with all commands. You must use command line
 - `--strict` - fail if migrations would be applied out of order _(env: `DBMATE_STRICT`)_
 - `--wait` - wait for the db to become available before executing the subsequent command _(env: `DBMATE_WAIT`)_
 - `--wait-timeout 60s` - timeout for --wait flag _(env: `DBMATE_WAIT_TIMEOUT`)_
+- `--checksum-mode lenient` - specify checksum mode on applied migrations comparison, see [details about concept](#checksum-validation) _(env: `DBMATE_CHECKSUM_MODE`)_
 
 ## Usage
 
@@ -602,11 +603,25 @@ The table is very simple:
 
 ```sql
 CREATE TABLE IF NOT EXISTS schema_migrations (
-  version VARCHAR(255) PRIMARY KEY
+  version VARCHAR(128) PRIMARY KEY
+  checksum VARCHAR(64)
 )
 ```
 
 You can customize the name of this table using the `--migrations-table` flag or `DBMATE_MIGRATIONS_TABLE` environment variable.
+
+### Checksum validation
+
+Dbmate supports validating migration file integrity using checksums. When enabled, each migration's contents are hashed (SHA-256) and stored in the `schema_migrations` table. On subsequent runs, dbmate compares the current migration file's checksum with the stored value to detect any changes.
+
+You can configure checksum validation using the `DBMATE_CHECKSUM_MODE` environment variable or the `--checksum-mode` command-line option. Supported modes are:
+- `NONE`: Disable checksum validation (default).
+- `LENIENT`: Warn if a migration file has changed after being applied.
+- `STRICT`: Fail if a migration file has changed after being applied.
+
+Whatever mode is defined, Dbmate will still record each migration file's hash in database.
+
+This feature helps ensure that applied migrations remain unchanged, improving database integrity and team collaboration by explicitly raising bad practices using database schema migration tool.
 
 ## Alternatives
 
