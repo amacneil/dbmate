@@ -18,6 +18,8 @@ type Driver interface {
 	DumpSchema(*sql.DB) ([]byte, error)
 	MigrationsTableExists(*sql.DB) (bool, error)
 	CreateMigrationsTable(*sql.DB) error
+	HasChecksumColumn(*sql.DB) (bool, error)
+	AddChecksumColumn(*sql.DB) error
 	SelectMigrations(*sql.DB, int) (map[string]*string, error)
 	InsertMigration(dbutil.Transaction, string, string) error
 	DeleteMigration(dbutil.Transaction, string) error

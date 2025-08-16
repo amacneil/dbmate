@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -98,11 +99,108 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 					Type: bigquery.StringFieldType,
 				},
 				&bigquery.FieldSchema{
-					Name: "checksum",
-					Type: bigquery.StringFieldType,
+					Name:     "checksum",
+					Type:     bigquery.StringFieldType,
+					Required: false,
 				},
 			},
 		})
+	})
+}
+
+func (drv *Driver) HasChecksumColumn(db *sql.DB) (bool, error) {
+	ctx := context.Background()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer conn.Close()
+
+	err = conn.Raw(func(driverConn any) error {
+		client := getClient(driverConn)
+		config := getConfig(driverConn)
+		table := client.Dataset(config.dataSet).Table(drv.migrationsTableName)
+		meta, err := table.Metadata(context.Background())
+		if err != nil {
+			return err
+		}
+
+		for _, field := range meta.Schema {
+			if field.Name == "checksum" {
+				return nil
+			}
+		}
+
+		return errors.New("column not found in table")
+	})
+
+	if err != nil {
+		if err.Error() != "column not found in table" {
+			return false, err
+		}
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func (drv *Driver) AddChecksumColumn(db *sql.DB) error {
+	ctx := context.Background()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	return conn.Raw(func(driverConn any) error {
+		client := getClient(driverConn)
+		config := getConfig(driverConn)
+
+		exists, err := tableExists(client, config.dataSet, drv.migrationsTableName)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return errors.New("migrations table not found")
+		}
+
+		table := client.Dataset(config.dataSet).Table(drv.migrationsTableName)
+
+		meta, err := table.Metadata(context.Background())
+		if err != nil {
+			return fmt.Errorf("failed to get table metadata: %w", err)
+		}
+
+		for _, f := range meta.Schema {
+			if strings.EqualFold(f.Name, "checksum") {
+				return nil
+			}
+		}
+
+		checksumField := &bigquery.FieldSchema{
+			Name:     "checksum",
+			Type:     bigquery.StringFieldType,
+			Required: false,
+		}
+
+		newSchema := append(meta.Schema, checksumField)
+		_, err = table.Update(ctx, bigquery.TableMetadataToUpdate{Schema: newSchema}, meta.ETag)
+		if err != nil {
+			return fmt.Errorf("table update failed: %w", err)
+		}
+
+		meta2, merr := client.Dataset(config.dataSet).Table(drv.migrationsTableName).Metadata(ctx)
+		if merr == nil {
+			for _, f := range meta2.Schema {
+				if strings.EqualFold(f.Name, "checksum") {
+					return nil // success
+				}
+			}
+			return errors.New("new column not found")
+		}
+
+		fmt.Printf("Column %q added successfully to table %s.%s\n", checksumField.Name, config.dataSet, drv.migrationsTableName)
+		return nil
 	})
 }
 

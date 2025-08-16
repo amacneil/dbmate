@@ -471,6 +471,18 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 	}
 
 	if migrationsTableExists {
+		hasChecksumColumn, err := drv.HasChecksumColumn(sqlDB)
+		if err != nil {
+			return nil, err
+		}
+
+		if !hasChecksumColumn {
+			err = drv.AddChecksumColumn(sqlDB)
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		appliedMigrations, err = drv.SelectMigrations(sqlDB, -1)
 		if err != nil {
 			return nil, err
@@ -518,11 +530,11 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 					errMsg := fmt.Sprintf("The migration file `%s` has been modified since it was applied. Please ensure that the applied migrations are not modified afterwards.", migration.FileName)
 
 					if db.ChecksumMode == ChecksumStrict {
-						return nil, errors.New(errMsg)
+						return nil, fmt.Errorf("%s%s%s", "\x1b[31m", errMsg, "\x1b[0m")
 					}
 
 					if db.ChecksumMode == ChecksumLenient {
-						fmt.Fprintf(db.Log, "Warning: %s\n", errMsg)
+						fmt.Fprintf(db.Log, "%sWarning: %s%s\n", "\x1b[33m", errMsg, "\x1b[0m")
 					}
 				}
 			}

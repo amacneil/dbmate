@@ -2,6 +2,7 @@ package dbmate_test
 
 import (
 	"bytes"
+	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -766,6 +767,48 @@ DROP TABLE foo;
 
 		err = db.Migrate()
 		require.Error(t, err)
+	})
+}
+
+func TestChecksumFeatureRetroCompatibility(t *testing.T) {
+	testEachURL(t, func(t *testing.T, u *url.URL) {
+		db := newTestDB(t, u)
+		db.AutoDumpSchema = false
+
+		drv, err := db.Driver()
+		require.NoError(t, err)
+
+		// drop, recreate, and migrate database
+		err = db.Drop()
+		require.NoError(t, err)
+		err = db.Create()
+		require.NoError(t, err)
+
+		// verify migration
+		sqlDB, err := drv.Open()
+		require.NoError(t, err)
+		defer dbutil.MustClose(sqlDB)
+
+		err = drv.CreateMigrationsTable(sqlDB)
+		require.NoError(t, err)
+
+		err = db.Migrate()
+		require.NoError(t, err)
+
+		_, err = sqlDB.Exec(fmt.Sprintf("alter table %s drop column checksum", db.MigrationsTableName))
+		require.NoError(t, err)
+
+		pending, err := db.Status(false)
+		require.NoError(t, err)
+		require.Equal(t, 0, pending)
+
+		migrations, err := drv.SelectMigrations(sqlDB, -1)
+		require.NoError(t, err)
+		require.NotNil(t, migrations["20200227231541"])
+		require.NotNil(t, migrations["20151129054053"])
+		// old migrations have no checksum set
+		require.Equal(t, "", *migrations["20200227231541"])
+		require.Equal(t, "", *migrations["20151129054053"])
 	})
 }
 

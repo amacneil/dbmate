@@ -209,6 +209,27 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 	return err
 }
 
+func (drv *Driver) HasChecksumColumn(db *sql.DB) (bool, error) {
+	exists := false
+	err := db.QueryRow("SELECT 1 FROM sqlite_master "+
+		"WHERE type='table' AND name=$1 AND sql LIKE '%%checksum%%'",
+		drv.migrationsTableName).
+		Scan(&exists)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+
+	return exists, err
+}
+
+func (drv *Driver) AddChecksumColumn(db *sql.DB) error {
+	_, err := db.Exec(fmt.Sprintf(
+		"ALTER TABLE %s ADD COLUMN checksum VARCHAR(64)",
+		drv.quotedMigrationsTableName()))
+
+	return err
+}
+
 // SelectMigrations returns a list of applied migrations
 // with an optional limit (in descending order)
 func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]*string, error) {
