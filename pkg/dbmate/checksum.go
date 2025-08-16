@@ -1,6 +1,7 @@
 package dbmate
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -46,7 +47,9 @@ func ModeToString(m ChecksumMode) string {
 }
 
 // ComputeChecksum returns the hex SHA-256 of the supplied bytes.
+// It is platform resilient, normalizing CRLF to LF
 func ComputeChecksum(b []byte) string {
+	b = bytes.ReplaceAll(b, []byte("\r\n"), []byte("\n"))
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])
 }
