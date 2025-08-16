@@ -321,6 +321,40 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 	return err
 }
 
+func (drv *Driver) HasChecksumColumn(db *sql.DB) (bool, error) {
+	schema, migrationsTableNameParts, err := drv.migrationsTableNameParts(db)
+	if err != nil {
+		return false, err
+	}
+
+	migrationsTable := strings.Join(migrationsTableNameParts, ".")
+	exists := false
+	err = db.QueryRow("SELECT 1 FROM information_schema.columns "+
+		"WHERE  table_schema = $1 "+
+		"AND    table_name   = $2 "+
+		"AND    column_name  = 'checksum'",
+		schema, migrationsTable).
+		Scan(&exists)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+
+	return exists, err
+}
+
+func (drv *Driver) AddChecksumColumn(db *sql.DB) error {
+	schema, migrationsTable, err := drv.quotedMigrationsTableNameParts(db)
+	if err != nil {
+		return err
+	}
+
+	addColumnStmt := fmt.Sprintf(
+		"ALTER TABLE %s.%s ADD COLUMN IF NOT EXISTS checksum VARCHAR",
+		schema, migrationsTable)
+	_, err = db.Exec(addColumnStmt)
+	return err
+}
+
 // SelectMigrations returns a list of applied migrations and its checksum
 // with an optional limit (in descending order)
 func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]*string, error) {
