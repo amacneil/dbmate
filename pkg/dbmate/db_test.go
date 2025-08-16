@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -686,7 +687,7 @@ func TestFindMigrationsChecksum(t *testing.T) {
 		// prepare
 		relDir := "migrations"
 		fileName := "20250101000000_create_foo.sql"
-		fullKey := filepath.Join(relDir, fileName)
+		fullKey := path.Join(relDir, fileName)
 
 		// Original file content that will be used to compute the DB-stored checksum.
 		upSQLOriginal := `-- migrate:up
