@@ -12,6 +12,14 @@ import (
 	"unicode"
 )
 
+// minInt returns the minimum of two integers
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // Transaction can represent a database or open transaction
 type Transaction interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
@@ -57,30 +65,48 @@ func RunCommand(name string, args ...string) ([]byte, error) {
 	return stdout.Bytes(), nil
 }
 
-// TrimLeadingSQLComments removes sql comments and blank lines from the beginning of text
+// TrimLeadingSQLComments removes sql comments, blank lines, and psql meta-commands from the beginning and end of text
 // generally when performing sql dumps these contain host-specific information such as
-// client/server version numbers
+// client/server version numbers, or security headers like \restrict and \unrestrict
 func TrimLeadingSQLComments(data []byte) ([]byte, error) {
-	// create decent size buffer
-	out := bytes.NewBuffer(make([]byte, 0, len(data)))
-
-	// iterate over sql lines
-	preamble := true
+	// collect all lines first
+	var lines [][]byte
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	for scanner.Scan() {
-		// we read bytes directly for premature performance optimization
-		line := scanner.Bytes()
+		lines = append(lines, append([]byte(nil), scanner.Bytes()...))
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
 
-		if preamble && (len(line) == 0 || bytes.Equal(line[0:2], []byte("--"))) {
-			// header section, skip this line in output buffer
+	// find start of actual content (skip leading comments and meta-commands)
+	start := 0
+	for start < len(lines) {
+		line := lines[start]
+		if len(line) == 0 || bytes.Equal(line[0:minInt(2, len(line))], []byte("--")) || (len(line) > 0 && line[0] == '\\') {
+			start++
 			continue
 		}
+		break
+	}
 
-		// header section is over
-		preamble = false
+	// find end of actual content (skip trailing meta-commands and empty lines)
+	// but preserve trailing SQL comments as they may be part of the content
+	end := len(lines)
+	for end > start {
+		line := bytes.TrimSpace(lines[end-1])
+		if len(line) == 0 || (len(line) > 0 && line[0] == '\\') {
+			end--
+			continue
+		}
+		break
+	}
 
+	// create output buffer with only the content lines
+	out := bytes.NewBuffer(make([]byte, 0, len(data)))
+	for i := start; i < end; i++ {
 		// trim trailing whitespace
-		line = bytes.TrimRightFunc(line, unicode.IsSpace)
+		line := bytes.TrimRightFunc(lines[i], unicode.IsSpace)
 
 		// copy bytes to output buffer
 		if _, err := out.Write(line); err != nil {
@@ -89,9 +115,6 @@ func TrimLeadingSQLComments(data []byte) ([]byte, error) {
 		if _, err := out.WriteString("\n"); err != nil {
 			return nil, err
 		}
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, err
 	}
 
 	return out.Bytes(), nil
