@@ -285,7 +285,7 @@ func (drv *Driver) DatabaseExists() (bool, error) {
 	defer dbutil.MustClose(db)
 
 	exists := false
-	err = db.QueryRow("SELECT 1 FROM system.databases where name = ?", name).
+	err = db.QueryRow(fmt.Sprintf("EXISTS DATABASE %s", name)).
 		Scan(&exists)
 	if err == sql.ErrNoRows {
 		return false, nil
@@ -331,7 +331,7 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 
 func (drv *Driver) HasChecksumColumn(db *sql.DB) (bool, error) {
 	exists := false
-	err := db.QueryRow(fmt.Sprintf("SELECT 1 FROM system.columns WHERE database = '%s' AND table = '%s' AND name = 'checksum'", drv.databaseName(), drv.quotedMigrationsTableName())).
+	err := db.QueryRow(fmt.Sprintf("SHOW COLUMNS FROM %s.%s WHERE field = 'checksum'", drv.databaseName(), drv.migrationsTableName)).
 		Scan(&exists)
 	if err == sql.ErrNoRows {
 		return false, nil
