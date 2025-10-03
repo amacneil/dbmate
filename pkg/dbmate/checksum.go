@@ -18,6 +18,8 @@ const (
 
 var ErrUnknownChecksumMode = errors.New("unknown checksum mode")
 
+var utf8BOM = []byte{0xEF, 0xBB, 0xBF}
+
 // ParseChecksumMode parses environment/CLI strings to a ChecksumMode.
 // Accepted strings (case-insensitive): "NONE", "LENIENT", "STRICT".
 func ParseChecksumMode(s string) (ChecksumMode, error) {
@@ -46,9 +48,14 @@ func ModeToString(m ChecksumMode) string {
 	}
 }
 
-// ComputeChecksum returns the hex SHA-256 of the supplied bytes.
-// It is platform resilient, normalizing CRLF to LF
+// ComputeChecksum computes a SHA256 checksum of the given bytes after
+// canonicalizing text. We strip a leading UTF-8 BOM (if present) and normalize
+// CRLF -> LF so checksums are stable across platforms.
 func ComputeChecksum(b []byte) string {
+	// strip UTF-8 BOM if present
+	b = bytes.TrimPrefix(b, utf8BOM)
+
+	// normalize CRLF -> LF
 	b = bytes.ReplaceAll(b, []byte("\r\n"), []byte("\n"))
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])
