@@ -1,19 +1,19 @@
 # development stage
-FROM golang:1.24.6 as dev
+FROM golang:1.24.6 AS dev
 WORKDIR /src
 ENV PATH="/src/typescript/node_modules/.bin:${PATH}"
 RUN git config --global --add safe.directory /src
 
 # install development tools
 RUN apt-get update \
-  && apt-get install -qq --no-install-recommends \
+  && apt-get -y install -qq --no-install-recommends \
     curl \
     file \
     mariadb-client \
-    postgresql-client \
-    sqlite3 \
     nodejs \
     npm \
+    postgresql-client \
+    sqlite3 \
   && rm -rf /var/lib/apt/lists/*
 
 # golangci-lint
@@ -27,7 +27,7 @@ COPY . /src/
 RUN make build
 
 # release stage
-FROM alpine:3.22.1 as release
+FROM alpine:3.22.1 AS release
 RUN apk add --no-cache \
   mariadb-client \
   mariadb-connector-c \
