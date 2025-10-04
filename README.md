@@ -615,8 +615,8 @@ You can customize the name of this table using the `--migrations-table` flag or 
 Dbmate supports validating migration file integrity using checksums. When enabled, each migration's contents are hashed (SHA-256) and stored in the `schema_migrations` table. On subsequent runs, dbmate compares the current migration file's checksum with the stored value to detect any changes.
 
 You can configure checksum validation using the `DBMATE_CHECKSUM_MODE` environment variable or the `--checksum-mode` command-line option. Supported modes are:
-- `NONE`: Disable checksum validation (default).
-- `LENIENT`: Warn if a migration file has changed after being applied.
+- `NONE`: Disable checksum validation.
+- `LENIENT`: Warn if a migration file has changed after being applied (default).
 - `STRICT`: Fail if a migration file has changed after being applied.
 
 Whatever mode is defined, Dbmate will still record each migration file's hash in database.

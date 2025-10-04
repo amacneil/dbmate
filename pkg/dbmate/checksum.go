@@ -24,14 +24,14 @@ var utf8BOM = []byte{0xEF, 0xBB, 0xBF}
 // Accepted strings (case-insensitive): "NONE", "LENIENT", "STRICT".
 func ParseChecksumMode(s string) (ChecksumMode, error) {
 	switch strings.ToUpper(strings.TrimSpace(s)) {
-	case "", "NONE":
+	case "NONE":
 		return ChecksumNone, nil
-	case "LENIENT":
+	case "", "LENIENT":
 		return ChecksumLenient, nil
 	case "STRICT":
 		return ChecksumStrict, nil
 	default:
-		return ChecksumNone, ErrUnknownChecksumMode
+		return ChecksumLenient, ErrUnknownChecksumMode
 	}
 }
 
