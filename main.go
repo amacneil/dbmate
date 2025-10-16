@@ -96,6 +96,11 @@ func NewApp() *cli.App {
 			Usage:   "timeout for --wait flag",
 			Value:   defaultDB.WaitTimeout,
 		},
+		&cli.StringFlag{
+			Name:    "set-role",
+			EnvVars: []string{"DBMATE_SET_ROLE"},
+			Usage:   "set PostgreSQL role for all database operations",
+		},
 	}
 
 	app.Commands = []*cli.Command{
@@ -297,6 +302,7 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 		db.MigrationsTableName = c.String("migrations-table")
 		db.SchemaFile = c.String("schema-file")
 		db.WaitBefore = c.Bool("wait")
+		db.PostgresRole = c.String("set-role")
 		waitTimeout := c.Duration("wait-timeout")
 		if waitTimeout != 0 {
 			db.WaitTimeout = waitTimeout
