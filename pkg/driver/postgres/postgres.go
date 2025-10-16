@@ -41,7 +41,6 @@ func NewDriver(config dbmate.DriverConfig) dbmate.Driver {
 	}
 }
 
-// setRole sets the PostgreSQL role if configured
 func (drv *Driver) setRole(db dbutil.Transaction) error {
 	if drv.role == "" {
 		return nil
