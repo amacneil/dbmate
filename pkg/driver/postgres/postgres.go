@@ -28,7 +28,7 @@ type Driver struct {
 	migrationsTableName string
 	databaseURL         *url.URL
 	log                 io.Writer
-	role                string
+	role                *string
 }
 
 // NewDriver initializes the driver
@@ -42,10 +42,10 @@ func NewDriver(config dbmate.DriverConfig) dbmate.Driver {
 }
 
 func (drv *Driver) setRole(db dbutil.Transaction) error {
-	if drv.role == "" {
+	if drv.role == nil {
 		return nil
 	}
-	_, err := db.Exec(fmt.Sprintf("SET ROLE %s", pq.QuoteIdentifier(drv.role)))
+	_, err := db.Exec(fmt.Sprintf("SET ROLE %s", pq.QuoteIdentifier(*drv.role)))
 	return err
 }
 

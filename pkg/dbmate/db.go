@@ -49,7 +49,7 @@ type DB struct {
 	// MigrationsTableName specifies the database table to record migrations in
 	MigrationsTableName string
 	// PostgresRole specifies the PostgreSQL role to use for all operations
-	PostgresRole string
+	PostgresRole *string
 	// SchemaFile specifies the location for schema.sql file
 	SchemaFile string
 	// Fail if migrations would be applied out of order
@@ -79,7 +79,7 @@ func New(databaseURL *url.URL) *DB {
 		Log:                 os.Stdout,
 		MigrationsDir:       []string{"./db/migrations"},
 		MigrationsTableName: "schema_migrations",
-		PostgresRole:        "",
+		PostgresRole:        nil,
 		SchemaFile:          "./db/schema.sql",
 		Strict:              false,
 		Verbose:             false,

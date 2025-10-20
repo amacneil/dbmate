@@ -302,7 +302,9 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 		db.MigrationsTableName = c.String("migrations-table")
 		db.SchemaFile = c.String("schema-file")
 		db.WaitBefore = c.Bool("wait")
-		db.PostgresRole = c.String("set-role")
+		if setRole := c.String("set-role"); setRole != "" {
+			db.PostgresRole = &setRole
+		}
 		waitTimeout := c.Duration("wait-timeout")
 		if waitTimeout != 0 {
 			db.WaitTimeout = waitTimeout

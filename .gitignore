@@ -12,3 +12,4 @@
 dist
 docker-compose.override.yml
 node_modules
+CLAUDE.md
