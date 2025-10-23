@@ -37,7 +37,7 @@ func NewDriver(config dbmate.DriverConfig) dbmate.Driver {
 		migrationsTableName: config.MigrationsTableName,
 		databaseURL:         config.DatabaseURL,
 		log:                 config.Log,
-		role:                config.PostgresRole,
+		role:                config.DatabaseRole,
 	}
 }
 

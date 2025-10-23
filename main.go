@@ -303,7 +303,7 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 		db.SchemaFile = c.String("schema-file")
 		db.WaitBefore = c.Bool("wait")
 		if setRole := c.String("set-role"); setRole != "" {
-			db.PostgresRole = &setRole
+			db.DatabaseRole = &setRole
 		}
 		waitTimeout := c.Duration("wait-timeout")
 		if waitTimeout != 0 {

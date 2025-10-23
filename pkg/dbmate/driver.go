@@ -30,7 +30,7 @@ type DriverConfig struct {
 	DatabaseURL         *url.URL
 	Log                 io.Writer
 	MigrationsTableName string
-	PostgresRole        *string
+	DatabaseRole        *string
 }
 
 // DriverFunc represents a driver constructor
