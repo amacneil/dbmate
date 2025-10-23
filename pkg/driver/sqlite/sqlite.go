@@ -129,7 +129,7 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 }
 
 // DumpSchema returns the current database schema
-func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
+func (drv *Driver) DumpSchema(db *sql.DB, _ []string) ([]byte, error) {
 	path := ConnectionString(drv.databaseURL)
 	schema, err := dbutil.RunCommand("sqlite3", path, ".schema --nosys")
 	if err != nil {

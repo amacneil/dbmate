@@ -186,7 +186,7 @@ func TestSQLiteDumpSchema(t *testing.T) {
 	require.NoError(t, err)
 
 	// DumpSchema should return schema
-	schema, err := drv.DumpSchema(db)
+	schema, err := drv.DumpSchema(db, []string{})
 	require.NoError(t, err)
 	require.Contains(t, string(schema), "CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT)")
 	require.Contains(t, string(schema), "CREATE TABLE IF NOT EXISTS \"test_migrations\"")
@@ -200,7 +200,7 @@ func TestSQLiteDumpSchema(t *testing.T) {
 
 	// DumpSchema should return error if command fails
 	drv.databaseURL = dbtest.MustParseURL(t, ".")
-	schema, err = drv.DumpSchema(db)
+	schema, err = drv.DumpSchema(db, []string{})
 	require.Nil(t, schema)
 	require.Error(t, err)
 	require.EqualError(t, err, "Error: unable to open database \"/.\": unable to open database file")

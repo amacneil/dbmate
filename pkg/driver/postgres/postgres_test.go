@@ -223,7 +223,7 @@ func TestPostgresDumpSchema(t *testing.T) {
 		require.NoError(t, err)
 
 		// DumpSchema should return schema
-		schema, err := drv.DumpSchema(db)
+		schema, err := drv.DumpSchema(db, []string{})
 		require.NoError(t, err)
 		require.Contains(t, string(schema), "CREATE TABLE public.schema_migrations")
 		require.Contains(t, string(schema), "-- PostgreSQL database dump complete\n")
@@ -236,7 +236,7 @@ func TestPostgresDumpSchema(t *testing.T) {
 
 		// DumpSchema should return error if command fails
 		drv.databaseURL.Path = "/fakedb"
-		schema, err = drv.DumpSchema(db)
+		schema, err = drv.DumpSchema(db, []string{})
 		require.Nil(t, schema)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "database \"fakedb\" does not exist")
@@ -259,7 +259,7 @@ func TestPostgresDumpSchema(t *testing.T) {
 		require.NoError(t, err)
 
 		// DumpSchema should return schema
-		schema, err := drv.DumpSchema(db)
+		schema, err := drv.DumpSchema(db, []string{})
 		require.NoError(t, err)
 		require.Contains(t, string(schema), "CREATE TABLE \"camelSchema\".\"testMigrations\"")
 		require.Contains(t, string(schema), "-- PostgreSQL database dump complete\n")

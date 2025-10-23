@@ -219,7 +219,15 @@ func NewApp() *cli.App {
 		{
 			Name:  "dump",
 			Usage: "Write the database schema to disk",
-			Action: action(func(db *dbmate.DB, _ *cli.Context) error {
+			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				// Get arguments after command e.g. [extra, --flag] for "dbmate --url "url" dump extra --flag"
+				args := c.Args()
+				if args.Len() > 0 {
+					if args.Get(0) != "extra" && args.Get(0) != "e" {
+						return fmt.Errorf("unexpected argument: %s. Expected 'extra' or 'e'", args.Get(0))
+					}
+					db.DumpExtraArgs = args.Tail()
+				}
 				return db.DumpSchema()
 			}),
 		},
