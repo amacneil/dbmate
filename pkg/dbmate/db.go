@@ -48,7 +48,7 @@ type DB struct {
 	MigrationsDir []string
 	// MigrationsTableName specifies the database table to record migrations in
 	MigrationsTableName string
-	// DatabaseRole specifies the PostgreSQL role to use for all operations
+	// DatabaseRole specifies the database role to use for all operations
 	DatabaseRole *string
 	// SchemaFile specifies the location for schema.sql file
 	SchemaFile string
