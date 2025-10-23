@@ -99,7 +99,7 @@ func NewApp() *cli.App {
 		&cli.StringFlag{
 			Name:    "set-role",
 			EnvVars: []string{"DBMATE_SET_ROLE"},
-			Usage:   "set PostgreSQL role for all database operations",
+			Usage:   "set role for all database operations",
 		},
 	}
 
