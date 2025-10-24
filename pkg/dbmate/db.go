@@ -85,7 +85,7 @@ func New(databaseURL *url.URL) *DB {
 		WaitBefore:          false,
 		WaitInterval:        time.Second,
 		WaitTimeout:         60 * time.Second,
-		DumpExtraArgs: 		 []string{},
+		DumpExtraArgs:       []string{},
 	}
 }
 

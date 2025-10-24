@@ -232,7 +232,7 @@ func TestPostgresDumpSchema(t *testing.T) {
 			"--\n\n"+
 			"INSERT INTO public.schema_migrations (version) VALUES\n"+
 			"    ('abc1'),\n"+
-	 		"    ('abc2');\n")
+			"    ('abc2');\n")
 
 		// DumpSchema should return error if command fails
 		drv.databaseURL.Path = "/fakedb"
