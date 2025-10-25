@@ -3,17 +3,20 @@ package postgres
 import (
 	"bytes"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
 	"runtime"
-	"strconv"
 	"strings"
+
+	_ "github.com/jackc/pgx/v5/stdlib" // Required import to support postgres access via database/sql
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
-
-	"github.com/lib/pq"
 )
 
 func init() {
@@ -118,7 +121,7 @@ func connectionArgsForDump(conn *url.URL) []string {
 
 // Open creates a new database connection
 func (drv *Driver) Open() (*sql.DB, error) {
-	return sql.Open("postgres", connectionString(drv.databaseURL))
+	return sql.Open("pgx", connectionString(drv.databaseURL))
 }
 
 func (drv *Driver) openPostgresDB() (*sql.DB, error) {
@@ -133,7 +136,7 @@ func (drv *Driver) openPostgresDB() (*sql.DB, error) {
 		postgresURL.Path = "postgres"
 	}
 
-	return sql.Open("postgres", postgresURL.String())
+	return sql.Open("pgx", postgresURL.String())
 }
 
 // CreateDatabase creates the specified database
@@ -148,7 +151,7 @@ func (drv *Driver) CreateDatabase() error {
 	defer dbutil.MustClose(db)
 
 	_, err = db.Exec(fmt.Sprintf("create database %s",
-		pq.QuoteIdentifier(name)))
+		pgx.Identifier{name}.Sanitize()))
 
 	return err
 }
@@ -165,7 +168,7 @@ func (drv *Driver) DropDatabase() error {
 	defer dbutil.MustClose(db)
 
 	_, err = db.Exec(fmt.Sprintf("drop database if exists %s",
-		pq.QuoteIdentifier(name)))
+		pgx.Identifier{name}.Sanitize()))
 
 	return err
 }
@@ -274,7 +277,8 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 	}
 
 	// catch 'schema does not exist' error
-	pqErr, ok := err.(*pq.Error)
+	var pqErr *pgconn.PgError
+	ok := errors.As(err, &pqErr)
 	if !ok || pqErr.Code != "3F000" {
 		// unknown error
 		return err
@@ -371,7 +375,8 @@ func (drv *Driver) Ping() error {
 	}
 
 	// ignore 'database does not exist' error
-	pqErr, ok := err.(*pq.Error)
+	var pqErr *pgconn.PgError
+	ok := errors.As(err, &pqErr)
 	if ok && pqErr.Code == "3D000" {
 		return nil
 	}
@@ -383,10 +388,9 @@ func (drv *Driver) Ping() error {
 func (drv *Driver) QueryError(query string, err error) error {
 	position := 0
 
-	if pqErr, ok := err.(*pq.Error); ok {
-		if pos, err := strconv.Atoi(pqErr.Position); err == nil {
-			position = pos
-		}
+	var pqErr *pgconn.PgError
+	if errors.As(err, &pqErr) {
+		position = int(pqErr.Position)
 	}
 
 	return &dbmate.QueryError{Err: err, Query: query, Position: position}
@@ -442,14 +446,14 @@ func (drv *Driver) quotedMigrationsTableNameParts(db dbutil.Transaction) (string
 
 	// Quote identifiers for Redshift and Spanner
 	if drv.databaseURL.Scheme == "redshift" || drv.databaseURL.Scheme == "spanner-postgres" {
-		return pq.QuoteIdentifier(schema), pq.QuoteIdentifier(strings.Join(tableNameParts, ".")), nil
+		return pgx.Identifier{schema}.Sanitize(), pgx.Identifier(tableNameParts).Sanitize(), nil
 	}
 
 	// quote all parts
 	// use server rather than client to do this to avoid unnecessary quotes
 	// (which would change schema.sql diff)
 	tableNameParts = append([]string{schema}, tableNameParts...)
-	quotedNameParts, err := dbutil.QueryColumn(db, "select quote_ident(unnest($1::text[]))", pq.Array(tableNameParts))
+	quotedNameParts, err := dbutil.QueryColumn(db, "select quote_ident(unnest($1::text[]))", tableNameParts)
 	if err != nil {
 		return "", "", err
 	}
