@@ -48,6 +48,8 @@ type DB struct {
 	MigrationsDir []string
 	// MigrationsTableName specifies the database table to record migrations in
 	MigrationsTableName string
+	// DatabaseRole specifies the database role to use for all operations
+	DatabaseRole *string
 	// SchemaFile specifies the location for schema.sql file
 	SchemaFile string
 	// Fail if migrations would be applied out of order
@@ -77,6 +79,7 @@ func New(databaseURL *url.URL) *DB {
 		Log:                 os.Stdout,
 		MigrationsDir:       []string{"./db/migrations"},
 		MigrationsTableName: "schema_migrations",
+		DatabaseRole:        nil,
 		SchemaFile:          "./db/schema.sql",
 		Strict:              false,
 		Verbose:             false,
@@ -101,6 +104,7 @@ func (db *DB) Driver() (Driver, error) {
 		DatabaseURL:         db.DatabaseURL,
 		Log:                 db.Log,
 		MigrationsTableName: db.MigrationsTableName,
+		DatabaseRole:        db.DatabaseRole,
 	}
 	drv := driverFunc(config)
 

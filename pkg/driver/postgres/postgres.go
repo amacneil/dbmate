@@ -28,6 +28,7 @@ type Driver struct {
 	migrationsTableName string
 	databaseURL         *url.URL
 	log                 io.Writer
+	role                *string
 }
 
 // NewDriver initializes the driver
@@ -36,7 +37,16 @@ func NewDriver(config dbmate.DriverConfig) dbmate.Driver {
 		migrationsTableName: config.MigrationsTableName,
 		databaseURL:         config.DatabaseURL,
 		log:                 config.Log,
+		role:                config.DatabaseRole,
 	}
+}
+
+func (drv *Driver) setRole(db dbutil.Transaction) error {
+	if drv.role == nil {
+		return nil
+	}
+	_, err := db.Exec(fmt.Sprintf("SET ROLE %s", pq.QuoteIdentifier(*drv.role)))
+	return err
 }
 
 func connectionString(u *url.URL) string {
@@ -147,6 +157,10 @@ func (drv *Driver) CreateDatabase() error {
 	}
 	defer dbutil.MustClose(db)
 
+	if err := drv.setRole(db); err != nil {
+		return err
+	}
+
 	_, err = db.Exec(fmt.Sprintf("create database %s",
 		pq.QuoteIdentifier(name)))
 
@@ -164,6 +178,10 @@ func (drv *Driver) DropDatabase() error {
 	}
 	defer dbutil.MustClose(db)
 
+	if err := drv.setRole(db); err != nil {
+		return err
+	}
+
 	_, err = db.Exec(fmt.Sprintf("drop database if exists %s",
 		pq.QuoteIdentifier(name)))
 
@@ -171,6 +189,10 @@ func (drv *Driver) DropDatabase() error {
 }
 
 func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
+	if err := drv.setRole(db); err != nil {
+		return nil, err
+	}
+
 	migrationsTable, err := drv.quotedMigrationsTableName(db)
 	if err != nil {
 		return nil, err
@@ -225,6 +247,10 @@ func (drv *Driver) DatabaseExists() (bool, error) {
 	}
 	defer dbutil.MustClose(db)
 
+	if err := drv.setRole(db); err != nil {
+		return false, err
+	}
+
 	exists := false
 	err = db.QueryRow("select true from pg_database where datname = $1", name).
 		Scan(&exists)
@@ -237,6 +263,10 @@ func (drv *Driver) DatabaseExists() (bool, error) {
 
 // MigrationsTableExists checks if the schema_migrations table exists
 func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
+	if err := drv.setRole(db); err != nil {
+		return false, err
+	}
+
 	schema, migrationsTableNameParts, err := drv.migrationsTableNameParts(db)
 	if err != nil {
 		return false, err
@@ -258,6 +288,10 @@ func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
 
 // CreateMigrationsTable creates the schema_migrations table
 func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
+	if err := drv.setRole(db); err != nil {
+		return err
+	}
+
 	schema, migrationsTable, err := drv.quotedMigrationsTableNameParts(db)
 	if err != nil {
 		return err
@@ -296,6 +330,10 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 // SelectMigrations returns a list of applied migrations
 // with an optional limit (in descending order)
 func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
+	if err := drv.setRole(db); err != nil {
+		return nil, err
+	}
+
 	migrationsTable, err := drv.quotedMigrationsTableName(db)
 	if err != nil {
 		return nil, err
@@ -331,6 +369,10 @@ func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, err
 
 // InsertMigration adds a new migration record
 func (drv *Driver) InsertMigration(db dbutil.Transaction, version string) error {
+	if err := drv.setRole(db); err != nil {
+		return err
+	}
+
 	migrationsTable, err := drv.quotedMigrationsTableName(db)
 	if err != nil {
 		return err
@@ -343,6 +385,10 @@ func (drv *Driver) InsertMigration(db dbutil.Transaction, version string) error 
 
 // DeleteMigration removes a migration record
 func (drv *Driver) DeleteMigration(db dbutil.Transaction, version string) error {
+	if err := drv.setRole(db); err != nil {
+		return err
+	}
+
 	migrationsTable, err := drv.quotedMigrationsTableName(db)
 	if err != nil {
 		return err
@@ -364,6 +410,10 @@ func (drv *Driver) Ping() error {
 		return err
 	}
 	defer dbutil.MustClose(db)
+
+	if err := drv.setRole(db); err != nil {
+		return err
+	}
 
 	err = db.Ping()
 	if err == nil {
