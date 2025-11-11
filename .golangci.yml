@@ -14,6 +14,9 @@ linters:
   settings:
     misspell:
       locale: US
+    govet:
+      disable:
+        - buildtag
   exclusions:
     presets:
       - comments
