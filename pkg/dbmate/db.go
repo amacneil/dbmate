@@ -200,7 +200,7 @@ func (db *DB) DumpSchema() error {
 		return err
 	}
 
-	sqlDB, err := db.openDatabaseForMigration(drv)
+	sqlDB, err := drv.Open()
 	if err != nil {
 		return err
 	}
