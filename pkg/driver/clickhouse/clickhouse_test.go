@@ -137,6 +137,21 @@ func TestClickHouseDumpSchema(t *testing.T) {
 	require.EqualError(t, err, "code: 81, message: Database fakedb doesn't exist")
 }
 
+func TestClickHouseDumpSchemaNoMigrations(t *testing.T) {
+	drv := testClickHouseDriver(t)
+	drv.migrationsTableName = "test_migrations"
+
+	// prepare database
+	db := prepTestClickHouseDB(t, drv)
+	defer dbutil.MustClose(db)
+
+	// DumpSchema should return schema
+	schema, err := drv.DumpSchema(db)
+	require.NoError(t, err)
+	require.NotContains(t, string(schema), "CREATE TABLE "+drv.databaseName()+".test_migrations")
+	require.NotContains(t, string(schema), "--\n-- Dbmate schema migrations\n")
+}
+
 func TestClickHouseDatabaseExists(t *testing.T) {
 	drv := testClickHouseDriver(t)
 
