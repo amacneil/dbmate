@@ -393,7 +393,7 @@ func TestMySQLPing(t *testing.T) {
 	require.NoError(t, err)
 
 	// ping invalid host should return error
-	drv.databaseURL.Host = "mysql:404"
+	drv.databaseURL.Host = drv.databaseURL.Hostname() + ":404"
 	err = drv.Ping()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "connect: connection refused")
