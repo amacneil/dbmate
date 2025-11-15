@@ -2,37 +2,61 @@ package mysql
 
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"database/sql"
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 
+	"github.com/go-sql-driver/mysql" // database/sql driver
+
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
-
-	_ "github.com/go-sql-driver/mysql" // database/sql driver
 )
 
 func init() {
 	dbmate.RegisterDriver(NewDriver, "mysql")
 }
 
+// sslMode refers to the --ssl-mode options in
+// https://dev.mysql.com/doc/refman/8.4/en/connection-options.html#option_general_ssl-mode
+type sslMode string
+
+const (
+	sslModeDisabled       sslMode = "DISABLED"
+	sslModePreferred      sslMode = "PREFERRED"
+	sslModeRequired       sslMode = "REQUIRED"
+	sslModeVerifyCa       sslMode = "VERIFY_CA"
+	sslModeVerifyIdentity sslMode = "VERIFY_IDENTITY"
+)
+
 // Driver provides top level database functions
 type Driver struct {
 	migrationsTableName string
 	databaseURL         *url.URL
 	log                 io.Writer
+
+	sslMode    sslMode
+	sslConfErr error
+	// Path to the file containing the certificate authority file in PEM format.
+	caPath string
 }
 
 // NewDriver initializes the driver
 func NewDriver(config dbmate.DriverConfig) dbmate.Driver {
-	return &Driver{
+	driver := &Driver{
 		migrationsTableName: config.MigrationsTableName,
 		databaseURL:         config.DatabaseURL,
 		log:                 config.Log,
+		caPath:              os.Getenv("DBMATE_MYSQL_CA_PATH"),
 	}
+	driver.sslConfErr = driver.configureSsl(os.Getenv("DBMATE_MYSQL_SSL_MODE"))
+
+	return driver
 }
 
 func connectionString(u *url.URL) string {
@@ -69,12 +93,67 @@ func connectionString(u *url.URL) string {
 	return normalizedString
 }
 
+func (drv *Driver) configureSsl(mode string) error {
+	switch sslMode(mode) {
+	case sslModeDisabled,
+		sslModePreferred:
+		drv.sslMode = sslMode(mode)
+		return nil
+	case sslModeRequired,
+		sslModeVerifyCa,
+		sslModeVerifyIdentity:
+		drv.sslMode = sslMode(mode)
+	case "":
+		drv.sslMode = sslModePreferred
+		return nil
+	default:
+		return fmt.Errorf("unknown ssl mode: %s", mode)
+	}
+
+	var tlsConf tls.Config
+
+	if drv.caPath != "" {
+		caPem, err := os.ReadFile(drv.caPath)
+		if err != nil {
+			return fmt.Errorf("failed to read CA file: %w", err)
+		}
+
+		rootCertPool := x509.NewCertPool()
+		if ok := rootCertPool.AppendCertsFromPEM(caPem); !ok {
+			return fmt.Errorf("failed to append to root cert pool")
+		}
+		tlsConf.RootCAs = rootCertPool
+	}
+	switch drv.sslMode {
+	case sslModeRequired:
+		tlsConf.InsecureSkipVerify = true
+	case sslModeVerifyCa:
+	case sslModeVerifyIdentity:
+		tlsConf.ServerName = drv.databaseURL.Hostname()
+	}
+
+	err := mysql.RegisterTLSConfig("custom", &tlsConf)
+	if err != nil {
+		return fmt.Errorf("failed to register custom TLS config: %v", err)
+	}
+	query := drv.databaseURL.Query()
+	query.Set("tls", "custom")
+	drv.databaseURL.RawQuery = query.Encode()
+	return nil
+}
+
 // Open creates a new database connection
 func (drv *Driver) Open() (*sql.DB, error) {
+	if drv.sslConfErr != nil {
+		return nil, fmt.Errorf("failed to configure ssl: %w", drv.sslConfErr)
+	}
 	return sql.Open("mysql", connectionString(drv.databaseURL))
 }
 
 func (drv *Driver) openRootDB() (*sql.DB, error) {
+	if drv.sslConfErr != nil {
+		return nil, fmt.Errorf("failed to configure ssl: %w", drv.sslConfErr)
+	}
 	// clone databaseURL
 	rootURL, err := url.Parse(drv.databaseURL.String())
 	if err != nil {
@@ -129,8 +208,17 @@ func (drv *Driver) DropDatabase() error {
 
 func (drv *Driver) mysqldumpArgs() []string {
 	// generate CLI arguments
-	args := []string{"--opt", "--routines", "--no-data",
-		"--skip-dump-date", "--skip-add-drop-table"}
+	args := []string{
+		"--opt", "--routines", "--no-data",
+		"--skip-dump-date", "--skip-add-drop-table",
+	}
+
+	if drv.sslMode != sslModePreferred {
+		args = append(args, "--ssl-mode", string(drv.sslMode))
+	}
+	if drv.caPath != "" {
+		args = append(args, "--ssl-ca", drv.caPath)
+	}
 
 	socket := drv.databaseURL.Query().Get("socket")
 	if socket != "" {

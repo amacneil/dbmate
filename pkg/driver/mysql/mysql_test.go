@@ -146,6 +146,7 @@ func TestMySQLCreateDropDatabase(t *testing.T) {
 }
 
 func TestMySQLDumpArgs(t *testing.T) {
+	t.Setenv("DBMATE_MYSQL_SSL_MODE", "PREFERRED")
 	drv := testMySQLDriver(t)
 	drv.databaseURL = dbtest.MustParseURL(t, "mysql://bob/mydb")
 
@@ -179,6 +180,114 @@ func TestMySQLDumpArgs(t *testing.T) {
 		"--user=alice",
 		"--password=pw",
 		"mydb"}, drv.mysqldumpArgs())
+}
+
+func TestMySQLDumpArgsWithSsl(t *testing.T) {
+	t.Run("mode=DISABLED,ca=empty", func(t *testing.T) {
+		t.Setenv("DBMATE_MYSQL_SSL_MODE", "DISABLED")
+		drv := testMySQLDriver(t)
+		drv.databaseURL = dbtest.MustParseURL(t, "mysql://bob/mydb")
+		require.Equal(t, []string{
+			"--opt",
+			"--routines",
+			"--no-data",
+			"--skip-dump-date",
+			"--skip-add-drop-table",
+			"--ssl-mode",
+			"DISABLED",
+			"--host=bob",
+			"mydb",
+		}, drv.mysqldumpArgs())
+	})
+	t.Run("mode=DISABLED,ca=set", func(t *testing.T) {
+		t.Setenv("DBMATE_MYSQL_SSL_MODE", "DISABLED")
+		t.Setenv("DBMATE_MYSQL_CA_PATH", "/tmp/404")
+		drv := testMySQLDriver(t)
+		drv.databaseURL = dbtest.MustParseURL(t, "mysql://bob/mydb")
+		require.Equal(t, []string{
+			"--opt",
+			"--routines",
+			"--no-data",
+			"--skip-dump-date",
+			"--skip-add-drop-table",
+			"--ssl-mode",
+			"DISABLED",
+			"--ssl-ca",
+			"/tmp/404",
+			"--host=bob",
+			"mydb",
+		}, drv.mysqldumpArgs())
+	})
+	t.Run("mode=VERIFY_IDENTITY,ca=empty", func(t *testing.T) {
+		t.Setenv("DBMATE_MYSQL_SSL_MODE", "VERIFY_IDENTITY")
+		drv := testMySQLDriver(t)
+		drv.databaseURL = dbtest.MustParseURL(t, "mysql://bob/mydb")
+		require.Equal(t, []string{
+			"--opt",
+			"--routines",
+			"--no-data",
+			"--skip-dump-date",
+			"--skip-add-drop-table",
+			"--ssl-mode",
+			"VERIFY_IDENTITY",
+			"--host=bob",
+			"mydb",
+		}, drv.mysqldumpArgs())
+	})
+	t.Run("mode=VERIFY_IDENTITY,ca=set", func(t *testing.T) {
+		t.Setenv("DBMATE_MYSQL_SSL_MODE", "VERIFY_IDENTITY")
+		t.Setenv("DBMATE_MYSQL_CA_PATH", "/tmp/404")
+		drv := testMySQLDriver(t)
+		drv.databaseURL = dbtest.MustParseURL(t, "mysql://bob/mydb")
+		require.Equal(t, []string{
+			"--opt",
+			"--routines",
+			"--no-data",
+			"--skip-dump-date",
+			"--skip-add-drop-table",
+			"--ssl-mode",
+			"VERIFY_IDENTITY",
+			"--ssl-ca",
+			"/tmp/404",
+			"--host=bob",
+			"mydb",
+		}, drv.mysqldumpArgs())
+	})
+	t.Run("mode=REQUIRED,ca=empty", func(t *testing.T) {
+		t.Setenv("DBMATE_MYSQL_SSL_MODE", "REQUIRED")
+		drv := testMySQLDriver(t)
+		drv.databaseURL = dbtest.MustParseURL(t, "mysql://bob/mydb")
+		require.Equal(t, []string{
+			"--opt",
+			"--routines",
+			"--no-data",
+			"--skip-dump-date",
+			"--skip-add-drop-table",
+			"--ssl-mode",
+			"REQUIRED",
+			"--host=bob",
+			"mydb",
+		}, drv.mysqldumpArgs())
+	})
+	t.Run("mode=REQUIRED,ca=set", func(t *testing.T) {
+		t.Setenv("DBMATE_MYSQL_SSL_MODE", "REQUIRED")
+		t.Setenv("DBMATE_MYSQL_CA_PATH", "/tmp/404")
+		drv := testMySQLDriver(t)
+		drv.databaseURL = dbtest.MustParseURL(t, "mysql://bob/mydb")
+		require.Equal(t, []string{
+			"--opt",
+			"--routines",
+			"--no-data",
+			"--skip-dump-date",
+			"--skip-add-drop-table",
+			"--ssl-mode",
+			"REQUIRED",
+			"--ssl-ca",
+			"/tmp/404",
+			"--host=bob",
+			"mydb",
+		}, drv.mysqldumpArgs())
+	})
 }
 
 func TestMySQLDumpSchema(t *testing.T) {

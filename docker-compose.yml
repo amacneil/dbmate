@@ -18,6 +18,7 @@ services:
       CLICKHOUSE_CLUSTER_01_TEST_URL: clickhouse://ch-cluster-01:9000/dbmate_test
       CLICKHOUSE_CLUSTER_02_TEST_URL: clickhouse://ch-cluster-02:9000/dbmate_test
       MYSQL_TEST_URL: mysql://root:root@mysql/dbmate_test
+      DBMATE_MYSQL_SSL_MODE: DISABLED
       POSTGRES_TEST_URL: postgres://postgres:postgres@postgres/dbmate_test?sslmode=disable
       BIGQUERY_TEST_URL: bigquery://test/us-east5/dbmate_test?disable_auth=true&endpoint=http%3A%2F%2Fbigquery%3A9050
       SPANNER_POSTGRES_TEST_URL: spanner-postgres://spanner-emulator/dbmate_test?sslmode=disable
