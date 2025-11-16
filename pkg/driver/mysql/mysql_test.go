@@ -198,7 +198,7 @@ func TestMySQLDumpSchema(t *testing.T) {
 	require.NoError(t, err)
 
 	// DumpSchema should return schema
-	schema, err := drv.DumpSchema(db)
+	schema, err := drv.DumpSchema(db, "--disable-ssl")
 	require.NoError(t, err)
 	require.Contains(t, string(schema), "CREATE TABLE `test_migrations`")
 	require.Contains(t, string(schema), "\n-- Dump completed\n\n"+
@@ -213,7 +213,7 @@ func TestMySQLDumpSchema(t *testing.T) {
 
 	// DumpSchema should return error if command fails
 	drv.databaseURL.Path = "/fakedb"
-	schema, err = drv.DumpSchema(db)
+	schema, err = drv.DumpSchema(db, "--disable-ssl")
 	require.Nil(t, schema)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "Unknown database 'fakedb'")
@@ -242,7 +242,7 @@ func TestMySQLDumpSchemaContainsNoAutoIncrement(t *testing.T) {
 	require.Contains(t, tblCreate, "AUTO_INCREMENT=")
 
 	// AUTO_INCREMENT should not appear in the dump
-	schema, err := drv.DumpSchema(db)
+	schema, err := drv.DumpSchema(db, "--disable-ssl")
 	require.NoError(t, err)
 	require.NotContains(t, string(schema), "AUTO_INCREMENT=")
 }

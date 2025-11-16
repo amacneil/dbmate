@@ -217,9 +217,15 @@ func NewApp() *cli.App {
 			}),
 		},
 		{
-			Name:  "dump",
-			Usage: "Write the database schema to disk",
-			Action: action(func(db *dbmate.DB, _ *cli.Context) error {
+			Name: "dump",
+			Usage: "Write the database schema to disk.\n" +
+				"Supports passing extra arguments to the underlying dump tool for pg/mysql\n" +
+				"example: dbmate dump -- --extra-flag",
+			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				// Capture all arguments provided after the `dump` command
+				// and pass them through to the underlying tool
+				// e.g. [--flag] for "dbmate dump -- --flag"
+				db.DumpExtraArgs = c.Args().Slice()
 				return db.DumpSchema()
 			}),
 		},

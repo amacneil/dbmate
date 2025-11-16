@@ -227,7 +227,7 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB, buf *bytes.Buffer) error {
 }
 
 // DumpSchema returns the current database schema
-func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
+func (drv *Driver) DumpSchema(db *sql.DB, _ ...string) ([]byte, error) {
 	var buf bytes.Buffer
 	var err error
 
