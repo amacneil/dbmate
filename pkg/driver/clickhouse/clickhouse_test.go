@@ -117,7 +117,7 @@ func TestClickHouseDumpSchema(t *testing.T) {
 	require.NoError(t, err)
 
 	// DumpSchema should return schema
-	schema, err := drv.DumpSchema(db, []string{})
+	schema, err := drv.DumpSchema(db)
 	require.NoError(t, err)
 	require.Contains(t, string(schema), "CREATE TABLE "+drv.databaseName()+".test_migrations")
 	require.Contains(t, string(schema), "--\n"+
@@ -132,7 +132,7 @@ func TestClickHouseDumpSchema(t *testing.T) {
 	db, err = sql.Open("clickhouse", drv.databaseURL.String())
 	require.NoError(t, err)
 
-	schema, err = drv.DumpSchema(db, []string{})
+	schema, err = drv.DumpSchema(db)
 	require.Nil(t, schema)
 	require.EqualError(t, err, "code: 81, message: Database fakedb doesn't exist")
 }

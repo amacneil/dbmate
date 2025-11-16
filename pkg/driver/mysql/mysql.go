@@ -185,7 +185,7 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 }
 
 // DumpSchema returns the current database schema
-func (drv *Driver) DumpSchema(db *sql.DB, extraArgs []string) ([]byte, error) {
+func (drv *Driver) DumpSchema(db *sql.DB, extraArgs ...string) ([]byte, error) {
 	args := append(drv.mysqldumpArgs(), extraArgs...)
 	schema, err := dbutil.RunCommand("mysqldump", args...)
 	if err != nil {

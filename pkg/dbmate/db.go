@@ -209,7 +209,7 @@ func (db *DB) DumpSchema() error {
 	}
 	defer dbutil.MustClose(sqlDB)
 
-	schema, err := drv.DumpSchema(sqlDB, db.DumpExtraArgs)
+	schema, err := drv.DumpSchema(sqlDB, db.DumpExtraArgs...)
 	if err != nil {
 		return err
 	}

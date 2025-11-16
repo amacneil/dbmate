@@ -197,7 +197,7 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 }
 
 // DumpSchema returns the current database schema
-func (drv *Driver) DumpSchema(db *sql.DB, extraArgs []string) ([]byte, error) {
+func (drv *Driver) DumpSchema(db *sql.DB, extraArgs ...string) ([]byte, error) {
 	// load schema
 	args := append([]string{"--format=plain", "--encoding=UTF8", "--schema-only",
 		"--no-privileges", "--no-owner"}, connectionArgsForDump(drv.databaseURL)...)

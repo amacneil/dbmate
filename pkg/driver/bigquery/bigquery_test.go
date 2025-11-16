@@ -362,7 +362,7 @@ func TestGoogleBigQueryDumpSchema(t *testing.T) {
 		config, err := drv.getConfig(db)
 		require.NoError(t, err)
 
-		schema, err := drv.DumpSchema(db, []string{})
+		schema, err := drv.DumpSchema(db)
 		require.NoError(t, err)
 		require.Contains(t, string(schema), fmt.Sprintf("CREATE TABLE `%s.%s.schema_migrations`", config.projectID, config.dataSet))
 		require.Contains(t, string(schema), "\n--\n"+
