@@ -111,19 +111,19 @@ docker run --rm -it --network=host -v "$(pwd)/db:/db" ghcr.io/amacneil/dbmate ne
 ## Commands
 
 ```sh
-dbmate --help      		  # print usage help
-dbmate new         		  # generate a new migration file
-dbmate up          		  # create the database (if it does not already exist) and run any pending migrations
-dbmate create      		  # create the database
-dbmate drop        		  # drop the database
-dbmate migrate     		  # run any pending migrations
-dbmate rollback     	  # roll back the most recent migration
-dbmate down        		  # alias for rollback
-dbmate status      		  # show the status of all migrations (supports --exit-code and --quiet)
-dbmate dump               # write the database schema.sql file
-dbmate dump extra  [...]  # pass additional arguments directly to mysqldump or pg_dump
-dbmate load        		  # load schema.sql file to the database
-dbmate wait        		  # wait for the database server to become available
+dbmate --help      	  # print usage help
+dbmate new         	  # generate a new migration file
+dbmate up          	  # create the database (if it does not already exist) and run any pending migrations
+dbmate create      	  # create the database
+dbmate drop        	  # drop the database
+dbmate migrate     	  # run any pending migrations
+dbmate rollback       # roll back the most recent migration
+dbmate down           # alias for rollback
+dbmate status         # show the status of all migrations (supports --exit-code and --quiet)
+dbmate dump           # write the database schema.sql file
+dbmate dump -- [...]  # optionally pass additional arguments directly to mysqldump or pg_dump
+dbmate load       	  # load schema.sql file to the database
+dbmate wait       	  # wait for the database server to become available
 ```
 
 ### Command Line Options
@@ -489,12 +489,11 @@ $ dbmate dump
 exec: "pg_dump": executable file not found in $PATH
 ```
 
-On Ubuntu or Debian systems, you can fix this by installing `postgresql-client`, `mysql-client`, or `sqlite3` respectively. Ensure that the package version you install is greater than or equal to the version running on your database server.    
-You can also pass additional arguments directly to mysqldump or pg_dump by using `extra` or `e` command after dump:
+On Ubuntu or Debian systems, you can fix this by installing `postgresql-client`, `mysql-client`, or `sqlite3` respectively. Ensure that the package version you install is greater than or equal to the version running on your database server.
+It is possible to pass additional arguments directly to mysqldump or pg_dump:
 ```sh
-$ dbmate dump extra --flag1 --flag2
-$ dbmate dump e --flag1 --flag2
-$ dbmate --url="..." dump extra --restrict-key=restrict_key
+$ dbmate dump -- --flag1 --flag2
+$ dbmate --url="..." dump -- --restrict-key=restrict_key
 ```
 
 > Note: The `schema.sql` file will contain a complete schema for your database, even if some tables or columns were created outside of dbmate migrations.
