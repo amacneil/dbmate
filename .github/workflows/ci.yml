@@ -7,94 +7,6 @@ on:
   pull_request:
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: linux
-            image: ubuntu-latest
-            arch: 386
-            setup: sudo apt-get update && sudo apt-get install -qq gcc-i686-linux-gnu
-            env:
-              CC: i686-linux-gnu-gcc
-              CXX: i686-linux-gnu-g++
-          - os: linux
-            image: ubuntu-latest
-            arch: amd64
-            env: {}
-          - os: linux
-            image: ubuntu-latest
-            arch: arm
-            setup: sudo apt-get update && sudo apt-get install -qq gcc-arm-linux-gnueabi
-            env:
-              CC: arm-linux-gnueabi-gcc
-              CXX: arm-linux-gnueabi-g++
-              GOARM: 6
-          - os: linux
-            image: ubuntu-latest
-            arch: arm64
-            setup: sudo apt-get update && sudo apt-get install -qq gcc-aarch64-linux-gnu
-            env:
-              CC: aarch64-linux-gnu-gcc
-              CXX: aarch64-linux-gnu-g++
-          - os: macos
-            image: macos-latest
-            arch: amd64
-            env: {}
-          - os: macos
-            image: macos-latest
-            arch: arm64
-            env: {}
-          - os: windows
-            image: windows-latest
-            arch: amd64
-            setup: choco install sqlite
-            env: {}
-
-    name: Build (${{ matrix.os }}/${{ matrix.arch }})
-    runs-on: ${{ matrix.image }}
-    env: ${{ matrix.env }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - name: Setup environment
-        run: ${{ matrix.setup }}
-
-      - run: go mod download
-
-      - run: make build ls
-        env:
-          GOARCH: ${{ matrix.arch }}
-          OUTPUT: dbmate-${{ matrix.os }}-${{ matrix.arch }}
-
-      - run: make test
-        if: ${{ matrix.arch == 'amd64' }}
-        env:
-          GOARCH: ${{ matrix.arch }}
-
-      - run: dist/dbmate-${{ matrix.os }}-${{ matrix.arch }} --help
-        if: ${{ matrix.arch == 'amd64' }}
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: dbmate-${{ matrix.os }}-${{ matrix.arch }}
-          path: dist/dbmate-*
-
-      - name: Publish binaries
-        uses: softprops/action-gh-release@v2
-        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-        with:
-          files: dist/dbmate-*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   docker:
     name: Docker Test (linux/amd64)
     runs-on: ubuntu-latest
@@ -137,13 +49,6 @@ jobs:
       - name: Run make test
         run: docker compose run --rm dev make test
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
@@ -158,7 +63,6 @@ jobs:
         if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
         with:
           images: |
-            ${{ github.repository }}
             ghcr.io/${{ github.repository }}
           tags: |
             type=ref,event=branch
@@ -176,42 +80,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-
-  npm:
-    name: NPM
-    runs-on: ubuntu-latest
-    needs: build
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          registry-url: https://registry.npmjs.org
-          cache: npm
-          cache-dependency-path: typescript/package-lock.json
-
-      - uses: actions/download-artifact@v5
-        with:
-          path: dist
-
-      - run: find dist
-
-      - run: npm ci
-        working-directory: typescript
-
-      - run: npm run lint:ci
-        working-directory: typescript
-
-      - run: npm run generate
-        working-directory: typescript
-
-      - run: npm run publish
-        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-        working-directory: typescript
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
 
   dependabot:
     name: Dependabot
