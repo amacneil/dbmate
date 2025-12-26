@@ -130,7 +130,7 @@ dbmate wait      # wait for the database server to become available
 The following options are available with all commands. You must use command line arguments in the order `dbmate [global options] command [command options]`. Most options can also be configured via environment variables (and loaded from your `.env` file, which is helpful to share configuration between team members).
 
 - `--url, -u "protocol://host:port/dbname"` - specify the database url directly. _(env: `DATABASE_URL`)_
-- `--driver "driver_name"` - specify the driver to use (if empty, driver is derived from database URL scheme). _(env: `DBMATE_DRIVER`)_
+- `--driver "driver_name"` - specify the driver to use (if empty, the driver is derived from database URL scheme). _(env: `DBMATE_DRIVER`)_
 - `--env, -e "DATABASE_URL"` - specify an environment variable to read the database connection URL from.
 - `--env-file ".env"` - specify an alternate environment variables file(s) to load.
 - `--migrations-dir, -d "./db/migrations"` - where to keep the migration files. _(env: `DBMATE_MIGRATIONS_DIR`)_
