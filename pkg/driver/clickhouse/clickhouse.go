@@ -48,13 +48,13 @@ func connectionString(initialURL *url.URL) string {
 	// Update scheme and default port based on variant
     defaultPort := "9000"
     switch u.Scheme {
-    case "clickhouse+http":
+    case "clickhouse+http", "http":
         u.Scheme = "http"
         defaultPort = "8123"
-    case "clickhouse+https":
+    case "clickhouse+https", "https":
         u.Scheme = "https"
         defaultPort = "8443"
-    case "clickhouse+tcp":
+    case "clickhouse+tcp", "tcp":
         u.Scheme = "tcp"
         defaultPort = "9000"
     }
