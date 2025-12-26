@@ -93,7 +93,7 @@ func (db *DB) Driver() (Driver, error) {
 	if db.DatabaseURL == nil || db.DatabaseURL.Scheme == "" {
 		return nil, ErrInvalidURL
 	}
-	
+
 	driverName := db.DatabaseURL.Scheme
 	if db.DriverName != "" {
 		driverName = db.DriverName

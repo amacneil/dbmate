@@ -45,22 +45,22 @@ func connectionString(initialURL *url.URL) string {
 	u, _ := url.Parse(initialURL.String())
 
 	// Default TCP port for Clickhouse (works both for tcp and clickhouse scheme)
-    defaultPort := "9000"
+	defaultPort := "9000"
 
 	// Update scheme and default port based on variant
-    switch u.Scheme {
-    case "clickhouse+http", "http":
-        u.Scheme = "http"
-        defaultPort = "8123"
-    case "clickhouse+https", "https":
-        u.Scheme = "https"
-        defaultPort = "8443"
-    }
+	switch u.Scheme {
+	case "clickhouse+http", "http":
+		u.Scheme = "http"
+		defaultPort = "8123"
+	case "clickhouse+https", "https":
+		u.Scheme = "https"
+		defaultPort = "8443"
+	}
 
 	// Set default port if not specified
-    if u.Port() == "" {
-        u.Host = fmt.Sprintf("%s:%s", u.Hostname(), defaultPort)
-    }
+	if u.Port() == "" {
+		u.Host = fmt.Sprintf("%s:%s", u.Hostname(), defaultPort)
+	}
 
 	query := u.Query()
 	username := u.User.Username()

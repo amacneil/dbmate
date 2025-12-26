@@ -50,10 +50,10 @@ func NewApp() *cli.App {
 			Usage:   "specify the database URL",
 		},
 		&cli.StringFlag{
-            Name:    "driver",
-            EnvVars: []string{"DBMATE_DRIVER"},
-            Usage:   "specify the driver to use (instead of deriving from the database URL scheme)",
-        },
+			Name:    "driver",
+			EnvVars: []string{"DBMATE_DRIVER"},
+			Usage:   "specify the driver to use (instead of deriving from the database URL scheme)",
+		},
 		&cli.StringFlag{
 			Name:    "env",
 			Aliases: []string{"e"},
