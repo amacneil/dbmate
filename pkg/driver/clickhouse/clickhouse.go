@@ -18,6 +18,7 @@ import (
 
 func init() {
 	dbmate.RegisterDriver(NewDriver, "clickhouse")
+	dbmate.RegisterDriver(NewDriver, "clickhouse2")
 }
 
 // Driver provides top level database functions
