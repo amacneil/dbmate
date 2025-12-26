@@ -59,7 +59,7 @@ func connectionString(initialURL *url.URL) string {
 
 	// Set default port if not specified
 	if u.Port() == "" {
-		u.Host = fmt.Sprintf("%s:%s", u.Hostname(), defaultPort)
+		u.Host = fmt.Sprintf("%s:%s", u.Host, defaultPort)
 	}
 
 	query := u.Query()
