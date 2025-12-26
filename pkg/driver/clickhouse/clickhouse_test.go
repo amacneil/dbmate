@@ -34,7 +34,6 @@ func TestGetDriver(t *testing.T) {
 			// driver should have URL and default migrations table set
 			require.Equal(t, db.DatabaseURL.String(), drv.databaseURL.String())
 			require.Equal(t, "schema_migrations", drv.migrationsTableName)
-
 		})
 	}
 }
