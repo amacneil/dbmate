@@ -17,7 +17,6 @@ func TestGetDriver(t *testing.T) {
 		"clickhouse://",
 		"clickhouse+http://",
 		"clickhouse+https://",
-		"clickhouse+tcp://",
 	}
 	for _, urlStr := range cases {
 		t.Run(urlStr, func(t *testing.T) {
@@ -78,14 +77,10 @@ func TestConnectionString(t *testing.T) {
         {"clickhouse+https://myhost", "https://myhost:8443"},
         // clickhouse+https custom port
         {"clickhouse+https://myhost:1234", "https://myhost:1234"},
-		// clickhouse+tcp (alias)
+		// tcp (alias)
         {"tcp://myhost", "tcp://myhost:9000"},
 		// tcp (alias) custom port
         {"tcp://myhost:1234", "tcp://myhost:1234"},
-        // tcp (alias)
-        {"clickhouse+tcp://myhost", "tcp://myhost:9000"},
-		// clickhouse+tcp (alias) custom port
-        {"clickhouse+tcp://myhost:1234", "tcp://myhost:1234"},
 	}
 
 	for _, c := range cases {
