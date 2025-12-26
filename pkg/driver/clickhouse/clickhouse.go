@@ -18,6 +18,9 @@ import (
 
 func init() {
 	dbmate.RegisterDriver(NewDriver, "clickhouse")
+	dbmate.RegisterDriver(NewDriver, "clickhouse+http")
+	dbmate.RegisterDriver(NewDriver, "clickhouse+https")
+	dbmate.RegisterDriver(NewDriver, "clickhouse+tcp")
 }
 
 // Driver provides top level database functions
@@ -42,11 +45,24 @@ func connectionString(initialURL *url.URL) string {
 	// clone url
 	u, _ := url.Parse(initialURL.String())
 
-	host := u.Host
-	if u.Port() == "" {
-		host = fmt.Sprintf("%s:9000", host)
-	}
-	u.Host = host
+	// Update scheme and default port based on variant
+    defaultPort := "9000"
+    switch u.Scheme {
+    case "clickhouse+http":
+        u.Scheme = "http"
+        defaultPort = "8123"
+    case "clickhouse+https":
+        u.Scheme = "https"
+        defaultPort = "8443"
+    case "clickhouse+tcp":
+        u.Scheme = "tcp"
+        defaultPort = "9000"
+    }
+
+	// Set default port if not specified
+    if u.Port() == "" {
+        u.Host = fmt.Sprintf("%s:%s", u.Hostname(), defaultPort)
+    }
 
 	query := u.Query()
 	username := u.User.Username()
