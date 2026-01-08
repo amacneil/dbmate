@@ -154,6 +154,7 @@ func TestMySQLDumpArgs(t *testing.T) {
 		"--no-data",
 		"--skip-dump-date",
 		"--skip-add-drop-table",
+		"--ssl=false",
 		"--host=bob",
 		"mydb"}, drv.mysqldumpArgs())
 
@@ -163,6 +164,20 @@ func TestMySQLDumpArgs(t *testing.T) {
 		"--no-data",
 		"--skip-dump-date",
 		"--skip-add-drop-table",
+		"--ssl=false",
+		"--host=bob",
+		"--port=5678",
+		"--user=alice",
+		"--password=pw",
+		"mydb"}, drv.mysqldumpArgs())
+
+	drv.databaseURL = dbtest.MustParseURL(t, "mysql://alice:pw@bob:5678/mydb?tls=skip-verify")
+	require.Equal(t, []string{"--opt",
+		"--routines",
+		"--no-data",
+		"--skip-dump-date",
+		"--skip-add-drop-table",
+		"--ssl-verify-server-cert=false",
 		"--host=bob",
 		"--port=5678",
 		"--user=alice",
@@ -175,6 +190,7 @@ func TestMySQLDumpArgs(t *testing.T) {
 		"--no-data",
 		"--skip-dump-date",
 		"--skip-add-drop-table",
+		"--ssl=false",
 		"--socket=/var/run/mysqld/mysqld.sock",
 		"--user=alice",
 		"--password=pw",

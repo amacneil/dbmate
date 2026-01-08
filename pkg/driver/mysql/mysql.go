@@ -132,6 +132,14 @@ func (drv *Driver) mysqldumpArgs() []string {
 	args := []string{"--opt", "--routines", "--no-data",
 		"--skip-dump-date", "--skip-add-drop-table"}
 
+	tls := drv.databaseURL.Query().Get("tls")
+	if tls == "" || strings.EqualFold(tls, "false") {
+		args = append(args, "--ssl=false")
+	}
+	if strings.EqualFold(tls, "skip-verify") {
+		args = append(args, "--ssl-verify-server-cert=false")
+	}
+
 	socket := drv.databaseURL.Query().Get("socket")
 	if socket != "" {
 		args = append(args, "--socket="+socket)
