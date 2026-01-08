@@ -13,10 +13,11 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
+
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
 
-	"github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3" // database/sql driver
 )
 
@@ -253,8 +254,8 @@ func (drv *Driver) quotedMigrationsTableName() string {
 }
 
 // quoteIdentifier quotes a table or column name
-// we fall back to lib/pq implementation since both use ansi standard (double quotes)
+// we fall back to pgx implementation since both use ansi standard (double quotes)
 // and mattn/go-sqlite3 doesn't provide a sqlite-specific equivalent
 func (drv *Driver) quoteIdentifier(s string) string {
-	return pq.QuoteIdentifier(s)
+	return pgx.Identifier{s}.Sanitize()
 }
