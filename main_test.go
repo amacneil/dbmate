@@ -68,18 +68,14 @@ func TestLoadEnvFiles(t *testing.T) {
 		}
 
 		env := os.Environ()
+
+		t.Chdir("fixtures/loadEnvFiles")
+
+		// Clear environment after t.Chdir because t.Chdir sets PWD
 		os.Clearenv()
 
-		err = os.Chdir("fixtures/loadEnvFiles")
-		if err != nil {
-			t.Fatal(err)
-		}
-
 		t.Cleanup(func() {
-			err := os.Chdir(cwd)
-			if err != nil {
-				t.Fatal(err)
-			}
+			t.Chdir(cwd)
 
 			os.Clearenv()
 
