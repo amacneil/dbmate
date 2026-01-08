@@ -192,7 +192,7 @@ jobs:
           cache: npm
           cache-dependency-path: typescript/package-lock.json
 
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v7
         with:
           path: dist
 
