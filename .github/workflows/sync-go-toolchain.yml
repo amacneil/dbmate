@@ -36,15 +36,19 @@ jobs:
 
       - name: Update go.mod toolchain if needed
         if: steps.gomod.outputs.toolchain != format('go{0}', steps.dockerfile.outputs.version)
+        env:
+          NEW_VERSION: ${{ steps.dockerfile.outputs.version }}
         run: |
-          echo "Updating toolchain from ${{ steps.gomod.outputs.toolchain }} to go${{ steps.dockerfile.outputs.version }}"
-          go mod edit -toolchain=go${{ steps.dockerfile.outputs.version }}
+          echo "Updating toolchain to go${NEW_VERSION}"
+          go mod edit -toolchain="go${NEW_VERSION}"
 
       - name: Commit and push changes
         if: steps.gomod.outputs.toolchain != format('go{0}', steps.dockerfile.outputs.version)
+        env:
+          NEW_VERSION: ${{ steps.dockerfile.outputs.version }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add go.mod
-          git commit -m "Sync go.mod toolchain with Dockerfile (go${{ steps.dockerfile.outputs.version }})"
+          git commit -m "Sync go.mod toolchain with Dockerfile (go${NEW_VERSION})"
           git push
