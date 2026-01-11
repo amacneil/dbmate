@@ -23,7 +23,7 @@ jobs:
       - name: Extract Go version from Dockerfile
         id: dockerfile
         run: |
-          VERSION=$(sed -n 's/^FROM golang:\([^[:space:]]*\).*/\1/p' Dockerfile | head -1)
+          VERSION=$(sed -n 's/^FROM golang:\([0-9.]*\).*/\1/p' Dockerfile | head -1)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Dockerfile Go version: $VERSION"
 
