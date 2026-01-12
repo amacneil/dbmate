@@ -212,5 +212,5 @@ jobs:
         working-directory: typescript
 
       - run: npm run publish
-        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        # if: ${{ startsWith(github.ref, 'refs/tags/v') }}
         working-directory: typescript
