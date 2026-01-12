@@ -15,7 +15,9 @@
     "schema",
     "sqlite"
   ],
-  "bin": "./dist/cli.js",
+  "bin": {
+    "dbmate": "dist/cli.js"
+  },
   "main": "./dist/index.js",
   "files": [
     "dist"
