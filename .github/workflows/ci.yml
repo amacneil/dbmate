@@ -188,10 +188,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - run: corepack enable
+
       - uses: actions/setup-node@v6
         with:
           node-version: 20
-          registry-url: https://registry.npmjs.org
           cache: npm
           cache-dependency-path: typescript/package-lock.json
 
@@ -200,6 +201,9 @@ jobs:
           path: dist
 
       - run: find dist
+
+      - run: npm --version
+        working-directory: typescript
 
       - run: npm ci
         working-directory: typescript

@@ -8,8 +8,6 @@ async function main() {
   );
 
   for (const pkg of packages) {
-    // Unset NODE_AUTH_TOKEN to avoid conflicts with OIDC trusted publishing
-    delete process.env.NODE_AUTH_TOKEN;
     await exec("npm", ["publish", "--provenance", "--access", "public", pkg]);
   }
 }
