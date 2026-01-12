@@ -100,6 +100,50 @@ func TestGetDriver(t *testing.T) {
 	require.Equal(t, "schema_migrations", drv.migrationsTableName)
 }
 
+func TestPgDumpVersionRegexp(t *testing.T) {
+	cases := []struct {
+		input         string
+		expectedMajor int
+		expectedMinor int
+	}{
+		{"pg_dump (PostgreSQL) 17.6 (Debian 17.6-1.pgdg120+1)", 17, 6},
+		{"pg_dump (PostgreSQL) 16.0", 16, 0},
+		{"pg_dump (PostgreSQL) 15.12", 15, 12},
+	}
+
+	for _, c := range cases {
+		t.Run(c.input, func(t *testing.T) {
+			matches := pgDumpVersionRegexp.FindStringSubmatch(c.input)
+			require.Len(t, matches, 3)
+			require.Equal(t, fmt.Sprintf("%d", c.expectedMajor), matches[1])
+			require.Equal(t, fmt.Sprintf("%d", c.expectedMinor), matches[2])
+		})
+	}
+}
+
+func TestPgDumpVersionSupportsRestrictKey(t *testing.T) {
+	cases := []struct {
+		name     string
+		version  *pgDumpVersion
+		expected bool
+	}{
+		{"nil version", nil, false},
+		{"PostgreSQL 16.0", &pgDumpVersion{major: 16, minor: 0}, false},
+		{"PostgreSQL 17.0", &pgDumpVersion{major: 17, minor: 0}, false},
+		{"PostgreSQL 17.5", &pgDumpVersion{major: 17, minor: 5}, false},
+		{"PostgreSQL 17.6", &pgDumpVersion{major: 17, minor: 6}, true},
+		{"PostgreSQL 17.7", &pgDumpVersion{major: 17, minor: 7}, true},
+		{"PostgreSQL 18.0", &pgDumpVersion{major: 18, minor: 0}, true},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result := c.version.supportsRestrictKey()
+			require.Equal(t, c.expected, result)
+		})
+	}
+}
+
 func defaultConnString() string {
 	switch runtime.GOOS {
 	case "linux":
