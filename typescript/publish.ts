@@ -14,7 +14,6 @@ async function main() {
     await exec("corepack", [
       "npm",
       "publish",
-      "--dry-run",
       "--provenance",
       "--access",
       "public",
