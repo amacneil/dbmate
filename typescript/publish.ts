@@ -8,6 +8,7 @@ async function main() {
   );
 
   for (const pkg of packages) {
+    await exec("corepack", ["npm", "--version"]);
     await exec("corepack", [
       "npm",
       "publish",

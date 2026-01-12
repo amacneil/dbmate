@@ -202,9 +202,6 @@ jobs:
 
       - run: find dist
 
-      - run: npm --version
-        working-directory: typescript
-
       - run: npm ci
         working-directory: typescript
 
