@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os/exec"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -15,6 +17,50 @@ import (
 
 	"github.com/lib/pq"
 )
+
+// pgDumpVersion represents a parsed pg_dump version
+type pgDumpVersion struct {
+	major int
+	minor int
+}
+
+// pgDumpVersionRegexp matches pg_dump version output like "pg_dump (PostgreSQL) 17.6 (Debian 17.6-1.pgdg120+1)"
+var pgDumpVersionRegexp = regexp.MustCompile(`\(PostgreSQL\) (\d+)\.(\d+)`)
+
+// getPgDumpVersion returns the version of pg_dump, or nil if it cannot be determined
+func getPgDumpVersion() *pgDumpVersion {
+	cmd := exec.Command("pg_dump", "--version")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+
+	matches := pgDumpVersionRegexp.FindStringSubmatch(string(output))
+	if len(matches) < 3 {
+		return nil
+	}
+
+	major, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return nil
+	}
+
+	minor, err := strconv.Atoi(matches[2])
+	if err != nil {
+		return nil
+	}
+
+	return &pgDumpVersion{major: major, minor: minor}
+}
+
+// supportsRestrictKey returns true if pg_dump supports --restrict-key (added in PostgreSQL 17.6)
+func (v *pgDumpVersion) supportsRestrictKey() bool {
+	if v == nil {
+		return false
+	}
+	// --restrict-key was added in PostgreSQL 17.6
+	return v.major > 17 || (v.major == 17 && v.minor >= 6)
+}
 
 func init() {
 	dbmate.RegisterDriver(NewDriver, "postgres")
@@ -199,8 +245,17 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 // DumpSchema returns the current database schema
 func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
 	// load schema
-	args := append([]string{"--format=plain", "--encoding=UTF8", "--schema-only",
-		"--no-privileges", "--no-owner"}, connectionArgsForDump(drv.databaseURL)...)
+	args := []string{"--format=plain", "--encoding=UTF8", "--schema-only",
+		"--no-privileges", "--no-owner"}
+
+	// PostgreSQL 17.6+ adds \restrict/\unrestrict commands to pg_dump output with a random key
+	// by default, making the output non-deterministic. Use a fixed key for reproducible output.
+	// See: https://github.com/amacneil/dbmate/issues/678
+	if version := getPgDumpVersion(); version.supportsRestrictKey() {
+		args = append(args, "--restrict-key=dbmate")
+	}
+
+	args = append(args, connectionArgsForDump(drv.databaseURL)...)
 	schema, err := dbutil.RunCommand("pg_dump", args...)
 	if err != nil {
 		return nil, err
