@@ -8,7 +8,7 @@ async function main() {
   );
 
   for (const pkg of packages) {
-    await exec("npm", ["publish", "--access", "public", pkg]);
+    await exec("npm", ["publish", "--provenance", "--access", "public", pkg]);
   }
 }
 

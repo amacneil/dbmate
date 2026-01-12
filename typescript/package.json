@@ -1,5 +1,6 @@
 {
   "private": true,
+  "packageManager": "npm@11.7.0",
   "scripts": {
     "clean": "rimraf dist packages/dbmate/dist",
     "lint": "eslint --report-unused-disable-directives --fix .",
