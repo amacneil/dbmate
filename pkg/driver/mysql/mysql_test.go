@@ -172,7 +172,7 @@ func TestMysqldumpVersion(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			origExecCommand := execCommand
-			execCommand = func(command string, args ...string) execCmd {
+			execCommand = func(_ string, _ ...string) execCmd {
 				return &mockExecCmd{
 					output: c.version,
 				}
@@ -223,7 +223,7 @@ func TestMySQLDumpArgs(t *testing.T) {
 	for _, c := range cases {
 		t.Run(fmt.Sprintf("%s__%s", c.name, c.url), func(t *testing.T) {
 			origExecCommand := execCommand
-			execCommand = func(command string, args ...string) execCmd {
+			execCommand = func(_ string, _ ...string) execCmd {
 				return &mockExecCmd{
 					output: c.version,
 				}
