@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
@@ -14,6 +16,16 @@ import (
 
 	_ "github.com/go-sql-driver/mysql" // database/sql driver
 )
+
+// for mocking out during tests
+type execCmd interface {
+	Output() ([]byte, error)
+}
+
+var execCommand = func(command string, args ...string) execCmd {
+	return exec.Command(command, args...)
+}
+var execLookPath = exec.LookPath
 
 func init() {
 	dbmate.RegisterDriver(NewDriver, "mysql")
@@ -127,17 +139,82 @@ func (drv *Driver) DropDatabase() error {
 	return err
 }
 
-func (drv *Driver) mysqldumpArgs() []string {
+type mysqldumpVersion struct {
+	DbType  string  // "mysql" or "mariadb"
+	Version float64 // major.minor version (e.g., 5.7, 8.4, 11.8)
+	Command string  // "mysqldump" or "mariadb-dump"
+}
+
+var mysqldumpVersionRegexp = regexp.MustCompile(`(?:Ver \d+\.\d+ Distrib |Ver |from )(\d+\.\d+)`)
+
+func getMysqldumpVersion() *mysqldumpVersion {
+	ver := &mysqldumpVersion{
+		DbType:  "mysql",
+		Version: 5.0, // MariaDB 10.x is similar enough to MySQL 5.x
+		Command: "mysqldump",
+	}
+
+	if _, err := execLookPath("mariadb-dump"); err == nil {
+		// if we have mariadb-dump, we're at least MariaDB 11.x
+		ver.DbType = "mariadb"
+		ver.Version = 11.0
+		ver.Command = "mariadb-dump"
+	}
+
+	cmd := execCommand(ver.Command, "--version")
+	output, err := cmd.Output()
+	if err != nil {
+		return ver
+	}
+	outputStr := string(output)
+
+	if strings.Contains(outputStr, "MariaDB") {
+		ver.DbType = "mariadb"
+		ver.Version = 10.0
+	}
+
+	matches := mysqldumpVersionRegexp.FindStringSubmatch(outputStr)
+
+	if len(matches) < 2 {
+		return ver
+	}
+
+	version, err := strconv.ParseFloat(matches[1], 64)
+	if err != nil {
+		return ver
+	}
+
+	ver.Version = version
+
+	return ver
+}
+
+func (drv *Driver) mysqldumpArgs(ver *mysqldumpVersion) []string {
 	// generate CLI arguments
 	args := []string{"--opt", "--routines", "--no-data",
 		"--skip-dump-date", "--skip-add-drop-table"}
 
 	tls := drv.databaseURL.Query().Get("tls")
+
+	// Determine SSL flags based on database type and version
+	useSSLMode := ver.DbType == "mysql" && ver.Version >= 8.0
+
 	if tls == "" || strings.EqualFold(tls, "false") {
-		args = append(args, "--ssl=false")
+		if useSSLMode {
+			args = append(args, "--ssl-mode=DISABLED")
+		} else {
+			args = append(args, "--ssl=false")
+		}
 	}
 	if strings.EqualFold(tls, "skip-verify") {
-		args = append(args, "--ssl-verify-server-cert=false")
+		if useSSLMode {
+			args = append(args, "--ssl-mode=PREFERRED")
+		} else {
+			args = append(args, "--ssl-verify-server-cert=false")
+		}
+	}
+	if strings.EqualFold(tls, "true") && useSSLMode {
+		args = append(args, "--ssl-mode=REQUIRED")
 	}
 
 	socket := drv.databaseURL.Query().Get("socket")
@@ -194,7 +271,8 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 
 // DumpSchema returns the current database schema
 func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
-	schema, err := dbutil.RunCommand("mysqldump", drv.mysqldumpArgs()...)
+	ver := getMysqldumpVersion()
+	schema, err := dbutil.RunCommand(ver.Command, drv.mysqldumpArgs(ver)...)
 	if err != nil {
 		return nil, err
 	}
