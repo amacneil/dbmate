@@ -53,13 +53,16 @@ func getPgDumpVersion() *pgDumpVersion {
 	return &pgDumpVersion{major: major, minor: minor}
 }
 
-// supportsRestrictKey returns true if pg_dump supports --restrict-key (added in PostgreSQL 17.6)
+// supportsRestrictKey returns true if pg_dump supports --restrict-key.
 func (v *pgDumpVersion) supportsRestrictKey() bool {
 	if v == nil {
 		return false
 	}
-	// --restrict-key was added in PostgreSQL 17.6
-	return v.major > 17 || (v.major == 17 && v.minor >= 6)
+	// --restrict-key was added in PostgreSQL 15.14, 16.10, and 17.6
+	return v.major > 17 ||
+		(v.major == 17 && v.minor >= 6) ||
+		(v.major == 16 && v.minor >= 10) ||
+		(v.major == 15 && v.minor >= 14)
 }
 
 func init() {
@@ -248,7 +251,7 @@ func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
 	args := []string{"--format=plain", "--encoding=UTF8", "--schema-only",
 		"--no-privileges", "--no-owner"}
 
-	// PostgreSQL 17.6+ adds \restrict/\unrestrict commands to pg_dump output with a random key
+	// PostgreSQL 15.14+/16.10+/17.6+ adds \restrict/\unrestrict commands to pg_dump output with a random key
 	// by default, making the output non-deterministic. Use a fixed key for reproducible output.
 	// See: https://github.com/amacneil/dbmate/issues/678
 	if version := getPgDumpVersion(); version.supportsRestrictKey() {

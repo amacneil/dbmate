@@ -128,7 +128,11 @@ func TestPgDumpVersionSupportsRestrictKey(t *testing.T) {
 		expected bool
 	}{
 		{"nil version", nil, false},
+		{"PostgreSQL 15.13", &pgDumpVersion{major: 15, minor: 13}, false},
+		{"PostgreSQL 15.14", &pgDumpVersion{major: 15, minor: 14}, true},
 		{"PostgreSQL 16.0", &pgDumpVersion{major: 16, minor: 0}, false},
+		{"PostgreSQL 16.9", &pgDumpVersion{major: 16, minor: 9}, false},
+		{"PostgreSQL 16.10", &pgDumpVersion{major: 16, minor: 10}, true},
 		{"PostgreSQL 17.0", &pgDumpVersion{major: 17, minor: 0}, false},
 		{"PostgreSQL 17.5", &pgDumpVersion{major: 17, minor: 5}, false},
 		{"PostgreSQL 17.6", &pgDumpVersion{major: 17, minor: 6}, true},
