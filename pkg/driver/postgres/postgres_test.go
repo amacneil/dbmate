@@ -320,6 +320,27 @@ func TestPostgresDumpSchema(t *testing.T) {
 			"    ('abc1'),\n"+
 			"    ('abc2');\n")
 	})
+
+	t.Run("no migrations table on dump", func(t *testing.T) {
+		drv := testPostgresDriver(t)
+
+		// prepare database
+		db := prepTestPostgresDB(t)
+		defer dbutil.MustClose(db)
+
+		// DumpSchema should return schema
+		schema, err := drv.DumpSchema(db)
+		require.NoError(t, err)
+		require.NotContains(t, string(schema), "CREATE TABLE public.schema_migrations")
+		require.Contains(t, string(schema), "\n--\n"+
+			"-- PostgreSQL database dump complete\n"+
+			"--\n\n")
+		require.NotContains(t, string(schema), "-- Dbmate schema migrations\n"+
+			"--\n\n"+
+			"INSERT INTO public.schema_migrations (version) VALUES\n"+
+			"    ('abc1'),\n"+
+			"    ('abc2');\n")
+	})
 }
 
 func TestPostgresDatabaseExists(t *testing.T) {
