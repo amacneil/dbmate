@@ -60,6 +60,8 @@ type DB struct {
 	WaitInterval time.Duration
 	// WaitTimeout specifies maximum time for connection attempts
 	WaitTimeout time.Duration
+	// UseMigrationLock uses an exclusive lock while performing migrations
+	UseMigrationLock bool
 }
 
 // StatusResult represents an available migration status
@@ -83,6 +85,7 @@ func New(databaseURL *url.URL) *DB {
 		WaitBefore:          false,
 		WaitInterval:        time.Second,
 		WaitTimeout:         60 * time.Second,
+		UseMigrationLock:    false,
 	}
 }
 
@@ -153,10 +156,34 @@ func (db *DB) Wait() error {
 }
 
 // CreateAndMigrate creates the database (if necessary) and runs migrations
-func (db *DB) CreateAndMigrate() error {
+func (db *DB) CreateAndMigrate() (returnErr error) {
 	drv, err := db.Driver()
 	if err != nil {
 		return err
+	}
+
+	// try and acquire a lock for the duration of the migration.
+	// this is to prevent multiple instances performing the same migration in parallel.
+	if db.UseMigrationLock {
+		drvLock, ok := drv.(DriverMigrationLock)
+		if !ok {
+			return fmt.Errorf("driver does not support the use of a migration lock")
+		}
+
+		if err := drvLock.Lock(); err != nil {
+			return err
+		}
+
+		defer func() {
+			err := drvLock.Unlock()
+			if err != nil {
+				if returnErr != nil {
+					returnErr = fmt.Errorf("failed to unlock: %v: %w", err, returnErr)
+					return
+				}
+				returnErr = fmt.Errorf("failed to unlock: %w", err)
+			}
+		}()
 	}
 
 	// create database if it does not already exist
@@ -340,10 +367,35 @@ func (db *DB) openDatabaseForMigration(drv Driver) (*sql.DB, error) {
 }
 
 // Migrate migrates database to the latest version
-func (db *DB) Migrate() error {
+func (db *DB) Migrate() (returnErr error) {
 	drv, err := db.Driver()
 	if err != nil {
 		return err
+	}
+
+	if db.UseMigrationLock {
+		drvLock, ok := drv.(DriverMigrationLock)
+		if !ok {
+			return fmt.Errorf("driver does not support the use of a migration lock")
+		}
+
+		// only try and lock if we haven't already done so, e.g called CreateAndMigrate.
+		if !drvLock.IsLocked() {
+			if err := drvLock.Lock(); err != nil {
+				return err
+			}
+
+			defer func() {
+				err := drvLock.Unlock()
+				if err != nil {
+					if returnErr != nil {
+						returnErr = fmt.Errorf("failed to unlock: %v: %w", err, returnErr)
+						return
+					}
+					returnErr = fmt.Errorf("failed to unlock: %w", err)
+				}
+			}()
+		}
 	}
 
 	migrations, err := db.FindMigrations()
