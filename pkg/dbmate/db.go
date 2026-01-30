@@ -250,6 +250,13 @@ func (db *DB) LoadSchema() error {
 		return err
 	}
 
+	// Strip psql meta-commands (e.g., \restrict, \unrestrict) that cannot be
+	// executed directly against the database server.
+	bytes, err = dbutil.StripPsqlMetaCommands(bytes)
+	if err != nil {
+		return err
+	}
+
 	result, err := sqlDB.Exec(string(bytes))
 	if err != nil {
 		return err
