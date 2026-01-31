@@ -225,8 +225,22 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 		return nil, err
 	}
 
+	// check if checksum column exists
+	hasChecksumColumn, err := drv.HasChecksumColumn(db)
+	if err != nil {
+		return nil, err
+	}
+
+	// build query based on column existence
+	var query string
+	if hasChecksumColumn {
+		query = "select quote_literal(version), quote_literal(checksum) from " + migrationsTable + " order by version asc"
+	} else {
+		query = "select quote_literal(version) from " + migrationsTable + " order by version asc"
+	}
+
 	// load applied migrations
-	rows, err := db.Query("select quote_literal(version), quote_literal(checksum) from " + migrationsTable + " order by version asc")
+	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
 	}
@@ -234,16 +248,24 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 
 	migrations := [][]string{}
 	for rows.Next() {
-		var version string
-		var checksum *string
-		if err := rows.Scan(&version, &checksum); err != nil {
-			return nil, err
-		}
+		if hasChecksumColumn {
+			var version string
+			var checksum *string
+			if err := rows.Scan(&version, &checksum); err != nil {
+				return nil, err
+			}
 
-		if checksum == nil {
-			migrations = append(migrations, []string{version, ""})
+			if checksum == nil {
+				migrations = append(migrations, []string{version, ""})
+			} else {
+				migrations = append(migrations, []string{version, *checksum})
+			}
 		} else {
-			migrations = append(migrations, []string{version, *checksum})
+			var version string
+			if err := rows.Scan(&version); err != nil {
+				return nil, err
+			}
+			migrations = append(migrations, []string{version})
 		}
 	}
 
@@ -259,14 +281,22 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 		tuples := make([]string, 0, len(migrations))
 		for _, m := range migrations {
 			v := m[0]
-			c := m[1]
-			if c == "" {
-				tuples = append(tuples, fmt.Sprintf("(%s, NULL)", v))
+			if hasChecksumColumn {
+				c := m[1]
+				if c == "" {
+					tuples = append(tuples, fmt.Sprintf("(%s, NULL)", v))
+				} else {
+					tuples = append(tuples, fmt.Sprintf("(%s, %s)", v, c))
+				}
 			} else {
-				tuples = append(tuples, fmt.Sprintf("(%s, %s)", v, c))
+				tuples = append(tuples, fmt.Sprintf("(%s)", v))
 			}
 		}
-		buf.WriteString("INSERT INTO " + migrationsTable + " (version, checksum) VALUES\n    " +
+		columns := "version"
+		if hasChecksumColumn {
+			columns = "version, checksum"
+		}
+		buf.WriteString("INSERT INTO " + migrationsTable + " (" + columns + ") VALUES\n    " +
 			strings.Join(tuples, ",\n    ") +
 			";\n")
 	}

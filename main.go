@@ -132,6 +132,9 @@ func NewApp() *cli.App {
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
 				db.Strict = c.Bool("strict")
 				db.Verbose = c.Bool("verbose")
+				if db.Verbose {
+					fmt.Fprintf(db.Log, "Checksum mode: %s\n", dbmate.ModeToString(db.ChecksumMode))
+				}
 				return db.CreateAndMigrate()
 			}),
 		},
@@ -168,6 +171,9 @@ func NewApp() *cli.App {
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
 				db.Strict = c.Bool("strict")
 				db.Verbose = c.Bool("verbose")
+				if db.Verbose {
+					fmt.Fprintf(db.Log, "Checksum mode: %s\n", dbmate.ModeToString(db.ChecksumMode))
+				}
 				return db.Migrate()
 			}),
 		},
@@ -185,6 +191,9 @@ func NewApp() *cli.App {
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
 				db.Verbose = c.Bool("verbose")
+				if db.Verbose {
+					fmt.Fprintf(db.Log, "Checksum mode: %s\n", dbmate.ModeToString(db.ChecksumMode))
+				}
 				return db.Rollback()
 			}),
 		},
