@@ -210,7 +210,7 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB, buf *bytes.Buffer) error {
 	defer dbutil.MustClose(rows)
 
 	type migration struct {
-		version string
+		version  string
 		checksum *string
 	}
 	migrations := []migration{}
