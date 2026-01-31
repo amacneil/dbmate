@@ -309,7 +309,7 @@ func (drv *Driver) DatabaseExists() (bool, error) {
 	defer dbutil.MustClose(db)
 
 	exists := false
-	err = db.QueryRow(fmt.Sprintf("EXISTS DATABASE %s", name)).
+	err = db.QueryRow(fmt.Sprintf("EXISTS DATABASE %s", drv.quoteIdentifier(name))).
 		Scan(&exists)
 	if err == sql.ErrNoRows {
 		return false, nil
@@ -368,8 +368,18 @@ func (drv *Driver) HasChecksumColumn(db *sql.DB) (bool, error) {
 }
 
 func (drv *Driver) AddChecksumColumn(db *sql.DB) error {
-	_, err := db.Exec(fmt.Sprintf("ALTER TABLE %s.%s ADD COLUMN checksum String", drv.databaseName(), drv.migrationsTableName))
-	return err
+	qualifiedTableName := drv.quoteIdentifier(drv.databaseName()) + "." + drv.quotedMigrationsTableName()
+	query := fmt.Sprintf("ALTER TABLE %s%s ADD COLUMN checksum String", qualifiedTableName, drv.onClusterClause())
+	_, err := db.Exec(query)
+	if err != nil {
+		// If column already exists (duplicate column error), ignore it
+		// This can happen in cluster setups due to race conditions
+		if chErr, ok := err.(*clickhouse.Exception); ok && chErr.Code == 15 {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 // SelectMigrations returns a list of applied migrations
