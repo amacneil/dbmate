@@ -230,6 +230,7 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer dbutil.MustClose(rows)
 
 	migrations := [][]string{}
 	for rows.Next() {

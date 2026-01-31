@@ -207,19 +207,20 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB, buf *bytes.Buffer) error {
 	if err != nil {
 		return err
 	}
+	defer dbutil.MustClose(rows)
 
-	migrations := [][]string{}
+	type migration struct {
+		version string
+		checksum *string
+	}
+	migrations := []migration{}
 	for rows.Next() {
 		var version string
 		var checksum *string
 		if err := rows.Scan(&version, &checksum); err != nil {
 			return err
 		}
-		if checksum == nil {
-			migrations = append(migrations, []string{version, ""})
-		} else {
-			migrations = append(migrations, []string{version, *checksum})
-		}
+		migrations = append(migrations, migration{version, checksum})
 	}
 
 	if err := rows.Err(); err != nil {
@@ -227,24 +228,20 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB, buf *bytes.Buffer) error {
 	}
 
 	quoter := strings.NewReplacer(`\`, `\\`, `'`, `\'`)
-	for i := range migrations {
-		for j := range migrations[i] {
-			migrations[i][j] = "'" + quoter.Replace(migrations[i][j]) + "'"
-		}
-	}
-
 	// build schema migrations table data
 	buf.WriteString("\n--\n-- Dbmate schema migrations\n--\n\n")
 
 	if len(migrations) > 0 {
 		tuples := make([]string, 0, len(migrations))
 		for _, m := range migrations {
-			v := m[0]
-			c := m[1]
-			if c == "" {
-				tuples = append(tuples, fmt.Sprintf("(%s, NULL)", v))
+			// quote version (always non-NULL)
+			quotedVersion := "'" + quoter.Replace(m.version) + "'"
+
+			if m.checksum == nil {
+				tuples = append(tuples, fmt.Sprintf("(%s, NULL)", quotedVersion))
 			} else {
-				tuples = append(tuples, fmt.Sprintf("(%s, %s)", v, c))
+				quotedChecksum := "'" + quoter.Replace(*m.checksum) + "'"
+				tuples = append(tuples, fmt.Sprintf("(%s, %s)", quotedVersion, quotedChecksum))
 			}
 		}
 		buf.WriteString(
@@ -330,14 +327,16 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 }
 
 func (drv *Driver) HasChecksumColumn(db *sql.DB) (bool, error) {
-	exists := false
-	err := db.QueryRow(fmt.Sprintf("SHOW COLUMNS FROM %s.%s WHERE field = 'checksum'", drv.databaseName(), drv.migrationsTableName)).
-		Scan(&exists)
+	var dummy int
+	err := db.QueryRow(fmt.Sprintf("SELECT 1 FROM system.columns WHERE database = '%s' AND table = '%s' AND name = 'checksum'", drv.databaseName(), drv.migrationsTableName)).
+		Scan(&dummy)
 	if err == sql.ErrNoRows {
 		return false, nil
 	}
-
-	return exists, err
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (drv *Driver) AddChecksumColumn(db *sql.DB) error {

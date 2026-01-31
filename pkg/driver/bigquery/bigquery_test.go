@@ -368,8 +368,8 @@ func TestGoogleBigQueryDumpSchema(t *testing.T) {
 		require.Contains(t, string(schema), "\n--\n"+
 			"-- Dbmate schema migrations\n"+
 			"--\n\n"+
-			"INSERT INTO schema_migrations (version) VALUES\n"+
-			"    ('abc1', 'checksum1'),\n"+
-			"    ('abc2', 'checksum2');\n")
+			"INSERT INTO schema_migrations (version, checksum) VALUES\n"+
+			"    ('abc1','checksum1'),\n"+
+			"    ('abc2','checksum2');\n")
 	})
 }

@@ -274,7 +274,7 @@ func TestPostgresDumpSchema(t *testing.T) {
 		schema, err := drv.DumpSchema(db)
 		require.NoError(t, err)
 		require.Contains(t, string(schema), "CREATE TABLE public.schema_migrations")
-		
+
 		require.Contains(t, string(schema), "\n--\n"+
 			"-- PostgreSQL database dump complete\n"+
 			"--\n\n")
@@ -315,10 +315,11 @@ func TestPostgresDumpSchema(t *testing.T) {
 		require.Contains(t, string(schema), "\n--\n"+
 			"-- PostgreSQL database dump complete\n"+
 			"--\n\n")
-		require.Contains(t, string(schema),
+		require.Contains(t, string(schema), "-- Dbmate schema migrations\n"+
+			"--\n\n"+
 			"INSERT INTO \"camelSchema\".\"testMigrations\" (version, checksum) VALUES\n"+
-				"    ('abc1', 'checksum1'),\n"+
-				"    ('abc2', 'checksum2');\n")
+			"    ('abc1', 'checksum1'),\n"+
+			"    ('abc2', 'checksum2');\n")
 	})
 }
 
