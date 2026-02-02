@@ -1,25 +1,27 @@
 {
   "private": true,
-  "packageManager": "npm@11.7.0",
+  "type": "module",
+  "packageManager": "npm@11.8.0",
   "scripts": {
     "clean": "rimraf dist packages/dbmate/dist",
     "lint": "eslint --report-unused-disable-directives --fix .",
     "lint:ci": "eslint --report-unused-disable-directives .",
-    "generate": "ts-node generate.ts",
-    "publish": "ts-node publish.ts"
+    "generate": "tsx generate.ts",
+    "publish": "tsx publish.ts"
   },
   "devDependencies": {
-    "@actions/exec": "2.0.0",
+    "@actions/exec": "3.0.0",
     "@foxglove/eslint-plugin": "2.1.0",
-    "@foxglove/tsconfig": "2.0.0",
+    "@foxglove/tsconfig": "3.2.0",
+    "@types/node": "25.2.0",
     "eslint": "9.39.2",
     "handlebars": "4.7.8",
-    "npm-check-updates": "19.3.1",
-    "prettier": "3.7.4",
+    "npm-check-updates": "19.3.2",
+    "prettier": "3.8.1",
     "rimraf": "6.1.2",
-    "ts-node": "10.9.2",
-    "typescript-eslint": "8.52.0",
+    "tsx": "4.21.0",
     "typescript": "5.9.3",
+    "typescript-eslint": "8.54.0",
     "yaml": "2.8.2"
   }
 }
