@@ -6,6 +6,7 @@
     "clean": "rimraf dist packages/dbmate/dist",
     "lint": "eslint --report-unused-disable-directives --fix .",
     "lint:ci": "eslint --report-unused-disable-directives .",
+    "test": "mkdir -p dist/dbmate/node_modules && ln -sfn ../../@dbmate dist/dbmate/node_modules/@dbmate && node --input-type=module -e \"const { resolveBinary } = await import('./dist/dbmate/dist/index.js'); const bin = resolveBinary(); console.log('resolved binary:', bin);\"",
     "generate": "tsx generate.ts",
     "publish": "tsx publish.ts"
   },
