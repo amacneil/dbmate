@@ -159,8 +159,8 @@ func (drv *Driver) CreateDatabase() error {
 
 // DropDatabase drops the specified database (if it exists)
 func (drv *Driver) DropDatabase() error {
-	name := drv.databaseName()
-	fmt.Fprintf(drv.log, "Dropping: %s\n", name)
+	databaseName := drv.quotedDatabaseName()
+	fmt.Fprintf(drv.log, "Dropping: %s\n", databaseName)
 
 	db, err := drv.openClickHouseDB()
 	if err != nil {
@@ -168,7 +168,7 @@ func (drv *Driver) DropDatabase() error {
 	}
 	defer dbutil.MustClose(db)
 
-	q := fmt.Sprintf("DROP DATABASE IF EXISTS %s%s", drv.quoteIdentifier(name), drv.onClusterClause())
+	q := fmt.Sprintf("DROP DATABASE IF EXISTS %s%s", databaseName, drv.onClusterClause())
 
 	_, err = db.Exec(q)
 
