@@ -1,5 +1,5 @@
 import { exec } from "@actions/exec";
-import Handlebars from "handlebars";
+import * as Handlebars from "handlebars";
 import { readFile, writeFile, cp, chmod, mkdir } from "node:fs/promises";
 import { parse as parseYaml } from "yaml";
 
