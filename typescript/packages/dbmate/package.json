@@ -9,6 +9,7 @@
   "homepage": "https://github.com/amacneil/dbmate#readme",
   "author": "Adrian Macneil",
   "license": "MIT",
+  "type": "module",
   "keywords": [
     "clickhouse",
     "database",
