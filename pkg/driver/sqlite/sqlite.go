@@ -70,6 +70,11 @@ func ConnectionString(u *url.URL) string {
 	return str
 }
 
+// Filepath converts a URL into just the sqlite file path
+func Filepath(u *url.URL) string {
+	return u.Opaque
+}
+
 // Open creates a new database connection
 func (drv *Driver) Open() (*sql.DB, error) {
 	return sql.Open("sqlite3", ConnectionString(drv.databaseURL))
@@ -130,7 +135,7 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 
 // DumpSchema returns the current database schema
 func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
-	path := ConnectionString(drv.databaseURL)
+	path := Filepath(drv.databaseURL)
 	schema, err := dbutil.RunCommand("sqlite3", path, ".schema --nosys")
 	if err != nil {
 		return nil, err
@@ -147,7 +152,7 @@ func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
 
 // DatabaseExists determines whether the database exists
 func (drv *Driver) DatabaseExists() (bool, error) {
-	_, err := os.Stat(ConnectionString(drv.databaseURL))
+	_, err := os.Stat(Filepath(drv.databaseURL))
 	if os.IsNotExist(err) {
 		return false, nil
 	}
