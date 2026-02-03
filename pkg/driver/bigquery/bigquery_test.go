@@ -373,3 +373,22 @@ func TestGoogleBigQueryDumpSchema(t *testing.T) {
 			"    ('abc2');\n")
 	})
 }
+
+func TestGoogleBigQueryDumpSchemaNoMigrations(t *testing.T) {
+	t.Run("default migrations table", func(t *testing.T) {
+		drv := testGoogleBigQueryDriver(t)
+
+		// prepare database
+		db := prepTestGoogleBigQueryDB(t)
+		defer dbutil.MustClose(db)
+
+		// DumpSchema should return schema
+		config, err := drv.getConfig(db)
+		require.NoError(t, err)
+
+		schema, err := drv.DumpSchema(db)
+		require.NoError(t, err)
+		require.NotContains(t, string(schema), fmt.Sprintf("CREATE TABLE `%s.%s.schema_migrations`", config.projectID, config.dataSet))
+		require.NotContains(t, string(schema), "\n--\n-- Dbmate schema migrations\n")
+	})
+}

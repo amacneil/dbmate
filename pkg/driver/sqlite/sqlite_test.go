@@ -206,6 +206,26 @@ func TestSQLiteDumpSchema(t *testing.T) {
 	require.EqualError(t, err, "Error: unable to open database \"/.\": unable to open database file")
 }
 
+func TestSQLiteDumpSchemaNoMigrations(t *testing.T) {
+	drv := testSQLiteDriver(t)
+	drv.migrationsTableName = "test_migrations"
+
+	// prepare database
+	db := prepTestSQLiteDB(t)
+	defer dbutil.MustClose(db)
+
+	// create a table that will trigger `sqlite_sequence` system table
+	_, err := db.Exec("CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT)")
+	require.NoError(t, err)
+
+	// DumpSchema should return schema
+	schema, err := drv.DumpSchema(db)
+	require.NoError(t, err)
+	require.Contains(t, string(schema), "CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT)")
+	require.NotContains(t, string(schema), "CREATE TABLE IF NOT EXISTS \"test_migrations\"")
+	require.NotContains(t, string(schema), ");\n-- Dbmate schema migrations\n")
+}
+
 func TestSQLiteDatabaseExists(t *testing.T) {
 	drv := testSQLiteDriver(t)
 

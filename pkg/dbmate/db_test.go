@@ -135,6 +135,37 @@ func TestDumpSchema(t *testing.T) {
 	require.Contains(t, string(schema), "-- Dbmate schema migrations")
 }
 
+func TestDumpSchemaDoesNotCreateMigrationTable(t *testing.T) {
+	db := newTestDB(t, sqliteTestURL(t))
+
+	// create custom schema file directory
+	dir := t.TempDir()
+
+	// create schema.sql in subdirectory to test creating directory
+	db.SchemaFile = filepath.Join(dir, "/schema/schema.sql")
+
+	// drop database
+	err := db.Drop()
+	require.NoError(t, err)
+
+	// create and migrate
+	err = db.Create()
+	require.NoError(t, err)
+
+	// schema.sql should not exist
+	_, err = os.Stat(db.SchemaFile)
+	require.True(t, os.IsNotExist(err))
+
+	// dump schema
+	err = db.DumpSchema()
+	require.NoError(t, err)
+
+	// verify schema
+	schema, err := os.ReadFile(db.SchemaFile)
+	require.NoError(t, err)
+	require.NotContains(t, string(schema), "-- Dbmate schema migrations")
+}
+
 func TestAutoDumpSchema(t *testing.T) {
 	db := newTestDB(t, sqliteTestURL(t))
 	db.AutoDumpSchema = true

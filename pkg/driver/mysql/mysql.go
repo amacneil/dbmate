@@ -243,6 +243,14 @@ func (drv *Driver) mysqldumpArgs(ver *mysqldumpVersion) []string {
 }
 
 func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
+	exists, err := drv.MigrationsTableExists(db)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if migration table exists: %w", err)
+	}
+	if !exists {
+		return nil, nil
+	}
+
 	migrationsTable := drv.quotedMigrationsTableName()
 
 	// load applied migrations
