@@ -40,6 +40,8 @@ type DB struct {
 	AutoDumpSchema bool
 	// DatabaseURL is the database connection string
 	DatabaseURL *url.URL
+	// DriverName used to force specific driver (overrides deriving from url scheme)
+	DriverName string
 	// FS specifies the filesystem, or nil for OS filesystem
 	FS fs.FS
 	// Log is the interface to write stdout
@@ -92,9 +94,13 @@ func (db *DB) Driver() (Driver, error) {
 		return nil, ErrInvalidURL
 	}
 
-	driverFunc := drivers[db.DatabaseURL.Scheme]
+	driverName := db.DatabaseURL.Scheme
+	if db.DriverName != "" {
+		driverName = db.DriverName
+	}
+	driverFunc := drivers[driverName]
 	if driverFunc == nil {
-		return nil, fmt.Errorf("%w: %s", ErrUnsupportedDriver, db.DatabaseURL.Scheme)
+		return nil, fmt.Errorf("%w: %s", ErrUnsupportedDriver, driverName)
 	}
 
 	config := DriverConfig{

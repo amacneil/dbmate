@@ -13,15 +13,29 @@ import (
 )
 
 func TestGetDriver(t *testing.T) {
-	db := dbmate.New(dbtest.MustParseURL(t, "clickhouse://"))
-	drvInterface, err := db.Driver()
-	require.NoError(t, err)
+	cases := []string{
+		"clickhouse://",
+		"clickhouse+http://",
+		"clickhouse+https://",
+	}
+	for _, urlStr := range cases {
+		t.Run(urlStr, func(t *testing.T) {
+			u := dbtest.MustParseURL(t, urlStr)
+			db := dbmate.New(u)
 
-	// driver should have URL and default migrations table set
-	drv, ok := drvInterface.(*Driver)
-	require.True(t, ok)
-	require.Equal(t, db.DatabaseURL.String(), drv.databaseURL.String())
-	require.Equal(t, "schema_migrations", drv.migrationsTableName)
+			// Verify driver is found for the URL
+			drvInterface, err := db.Driver()
+			require.NoError(t, err)
+
+			// Verify we got the clickhouse driver
+			drv, ok := drvInterface.(*Driver)
+			require.True(t, ok, "driver should be of type *clickhouse.Driver")
+
+			// driver should have URL and default migrations table set
+			require.Equal(t, db.DatabaseURL.String(), drv.databaseURL.String())
+			require.Equal(t, "schema_migrations", drv.migrationsTableName)
+		})
+	}
 }
 
 func TestConnectionString(t *testing.T) {
@@ -43,6 +57,29 @@ func TestConnectionString(t *testing.T) {
 		{"clickhouse://aaa:111@myhost/mydb?username=bbb&password=222", "clickhouse://bbb:222@myhost:9000/mydb"},
 		// custom parameters
 		{"clickhouse://myhost/mydb?dial_timeout=200ms", "clickhouse://myhost:9000/mydb?dial_timeout=200ms"},
+
+		// --- NEW TESTS FOR HTTP/HTTPS SUPPORT ---
+
+		// http default port
+		{"http://myhost", "http://myhost:8123"},
+		// http custom port
+		{"http://myhost:1234", "http://myhost:1234"},
+		// clickhouse+http default port
+		{"clickhouse+http://myhost", "http://myhost:8123"},
+		// clickhouse+http custom port
+		{"clickhouse+http://myhost:1234", "http://myhost:1234"},
+		// https default port
+		{"https://myhost", "https://myhost:8443"},
+		// https custom port
+		{"https://myhost:1234", "https://myhost:1234"},
+		// clickhouse+https default port
+		{"clickhouse+https://myhost", "https://myhost:8443"},
+		// clickhouse+https custom port
+		{"clickhouse+https://myhost:1234", "https://myhost:1234"},
+		// tcp (alias)
+		{"tcp://myhost", "tcp://myhost:9000"},
+		// tcp (alias) custom port
+		{"tcp://myhost:1234", "tcp://myhost:1234"},
 	}
 
 	for _, c := range cases {

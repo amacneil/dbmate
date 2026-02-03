@@ -50,6 +50,11 @@ func NewApp() *cli.App {
 			Usage:   "specify the database URL",
 		},
 		&cli.StringFlag{
+			Name:    "driver",
+			EnvVars: []string{"DBMATE_DRIVER"},
+			Usage:   "specify the driver to use (instead of deriving from the database URL scheme)",
+		},
+		&cli.StringFlag{
 			Name:    "env",
 			Aliases: []string{"e"},
 			Value:   "DATABASE_URL",
@@ -287,23 +292,34 @@ func loadEnvFiles(args []string) error {
 // action wraps a cli.ActionFunc with dbmate initialization logic
 func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 	return func(c *cli.Context) error {
-		u, err := getDatabaseURL(c)
+		db, err := configureDB(c)
 		if err != nil {
 			return err
-		}
-		db := dbmate.New(u)
-		db.AutoDumpSchema = !c.Bool("no-dump-schema")
-		db.MigrationsDir = c.StringSlice("migrations-dir")
-		db.MigrationsTableName = c.String("migrations-table")
-		db.SchemaFile = c.String("schema-file")
-		db.WaitBefore = c.Bool("wait")
-		waitTimeout := c.Duration("wait-timeout")
-		if waitTimeout != 0 {
-			db.WaitTimeout = waitTimeout
 		}
 
 		return f(db, c)
 	}
+}
+
+func configureDB(c *cli.Context) (*dbmate.DB, error) {
+	u, err := getDatabaseURL(c)
+	if err != nil {
+		return nil, err
+	}
+
+	db := dbmate.New(u)
+	db.DriverName = c.String("driver")
+	db.AutoDumpSchema = !c.Bool("no-dump-schema")
+	db.MigrationsDir = c.StringSlice("migrations-dir")
+	db.MigrationsTableName = c.String("migrations-table")
+	db.SchemaFile = c.String("schema-file")
+	db.WaitBefore = c.Bool("wait")
+	waitTimeout := c.Duration("wait-timeout")
+	if waitTimeout != 0 {
+		db.WaitTimeout = waitTimeout
+	}
+
+	return db, nil
 }
 
 // getDatabaseURL returns the current database url from cli flag or environment variable

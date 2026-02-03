@@ -58,6 +58,7 @@ func TestNew(t *testing.T) {
 	require.False(t, db.WaitBefore)
 	require.Equal(t, time.Second, db.WaitInterval)
 	require.Equal(t, 60*time.Second, db.WaitTimeout)
+	require.Empty(t, db.DriverName)
 }
 
 func TestGetDriver(t *testing.T) {
@@ -79,6 +80,28 @@ func TestGetDriver(t *testing.T) {
 		db := dbmate.New(dbtest.MustParseURL(t, "foo://bar"))
 		drv, err := db.Driver()
 		require.EqualError(t, err, "unsupported driver: foo")
+		require.Nil(t, drv)
+	})
+
+	t.Run("driver name override", func(t *testing.T) {
+		// URL has invalid scheme "foo", but we force "sqlite" via DriverName
+		db := dbmate.New(dbtest.MustParseURL(t, "foo:dbmate_test.sqlite3"))
+		db.DriverName = "sqlite"
+
+		drv, err := db.Driver()
+		require.NoError(t, err)
+		require.NotNil(t, drv)
+		// Verify actual scheme is not changed
+		require.Equal(t, db.DatabaseURL.Scheme, "foo")
+	})
+
+	t.Run("driver name override with invalid driver", func(t *testing.T) {
+		// URL is valid sqlite, but we force a non-existent driver
+		db := dbmate.New(dbtest.MustParseURL(t, "sqlite:dbmate_test.sqlite3"))
+		db.DriverName = "notadriver"
+
+		drv, err := db.Driver()
+		require.EqualError(t, err, "unsupported driver: notadriver")
 		require.Nil(t, drv)
 	})
 }

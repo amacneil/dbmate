@@ -130,6 +130,7 @@ dbmate wait      # wait for the database server to become available
 The following options are available with all commands. You must use command line arguments in the order `dbmate [global options] command [command options]`. Most options can also be configured via environment variables (and loaded from your `.env` file, which is helpful to share configuration between team members).
 
 - `--url, -u "protocol://host:port/dbname"` - specify the database url directly. _(env: `DATABASE_URL`)_
+- `--driver "driver_name"` - specify the driver to use (if empty, the driver is derived from database URL scheme). _(env: `DBMATE_DRIVER`)_
 - `--env, -e "DATABASE_URL"` - specify an environment variable to read the database connection URL from.
 - `--env-file ".env"` - specify an alternate environment variables file(s) to load.
 - `--migrations-dir, -d "./db/migrations"` - where to keep the migration files. _(env: `DBMATE_MIGRATIONS_DIR`)_
@@ -255,8 +256,40 @@ Otherwise the migration will fail with "Error: cannot change into wal mode from 
 
 #### ClickHouse
 
+Dbmate supports connecting to ClickHouse using native TCP (default) or HTTP/HTTPS.
+
+##### Native (TCP)
+
+By default, the `clickhouse://` scheme uses the native protocol on port `9000`.
+
 ```sh
 DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name"
+```
+
+##### HTTP / HTTPS
+
+You can use `clickhouse+http://` (deafult port 8123) or `clickhouse+https://` (default port 8443).
+
+```sh
+# HTTP (Defaults to port 8123)
+DATABASE_URL="clickhouse+http://username:password@127.0.0.1:8123/database_name"
+
+# HTTPS (Defaults to port 8443)
+DATABASE_URL="clickhouse+https://username:password@127.0.0.1:8443/database_name"
+```
+
+##### Using the --driver flag
+
+You can use the ClickHouse driver with a standard http/https/tcp URL by providing the --driver flag
+
+```sh
+# Connect via HTTP using generic URL syntax
+dbmate --driver clickhouse --url "http://username:password@127.0.0.1:8123/database_name" status
+
+dbmate --driver clickhouse --url "https://username:password@127.0.0.1:8443/database_name" status
+
+# Better to rely on the standard clickhouse:// scheme, but this is supported
+dbmate --driver clickhouse --url "tcp://username:password@127.0.0.1:9000/database_name" status
 ```
 
 To work with ClickHouse cluster, there are 4 connection query parameters that can be supplied:
