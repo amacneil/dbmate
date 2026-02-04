@@ -831,6 +831,34 @@ func TestMigrateWithSetRoleAndNonTransactionalMigration(t *testing.T) {
 	require.Contains(t, err.Error(), "001_no_transaction.sql")
 }
 
+func TestRollbackWithSetRoleAndNonTransactionalMigration(t *testing.T) {
+	db := newTestDB(t, sqliteTestURL(t))
+
+	err := db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
+
+	// First apply a migration without --set-role (transactional up, non-transactional down)
+	db.FS = fstest.MapFS{
+		"db/migrations/001_test.sql": {
+			Data: []byte("-- migrate:up\nCREATE TABLE test1 (id INT);\n-- migrate:down transaction:false\nDROP TABLE test1;"),
+		},
+	}
+
+	err = db.Migrate()
+	require.NoError(t, err)
+
+	// Now try to rollback with --set-role
+	role := "test_role"
+	db.DatabaseRole = &role
+
+	err = db.Rollback()
+	require.Error(t, err)
+	require.ErrorIs(t, err, dbmate.ErrSetRoleWithNoTransaction)
+	require.Contains(t, err.Error(), "001_test.sql")
+}
+
 func TestMigrationContents(t *testing.T) {
 	// ensure Windows CR/LF line endings in migration files work
 	testEachURL(t, func(t *testing.T, u *url.URL) {
