@@ -344,7 +344,7 @@ func (*Driver) QueryError(query string, err error) error {
 	return &dbmate.QueryError{Err: err, Query: query}
 }
 
-func (*Driver) PrepareTransaction(db dbutil.Transaction) error {
+func (*Driver) PrepareTransaction(_ dbutil.Transaction) error {
 	return nil
 }
 
