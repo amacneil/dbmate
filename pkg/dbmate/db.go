@@ -592,6 +592,15 @@ func (db *DB) Rollback() error {
 		return err
 	}
 
+	// Check for incompatible non-transactional rollback when using --set-role
+	if db.DatabaseRole != nil {
+		for _, section := range parsedSections {
+			if !section.DownOptions.Transaction() {
+				return fmt.Errorf("%w: %s", ErrSetRoleWithNoTransaction, latest.FileName)
+			}
+		}
+	}
+
 	for _, migrationSection := range parsedSections {
 		execMigration := func(tx dbutil.Transaction) error {
 			if err := drv.PrepareTransaction(tx); err != nil {
