@@ -836,3 +836,133 @@ func TestPostgresMigrationsTableExists(t *testing.T) {
 		require.Equal(t, true, exists)
 	})
 }
+
+// setupTestRole creates a test role that is different from the connection user.
+// This allows testing that SET ROLE actually changes the effective user.
+func setupTestRole(t *testing.T, db *sql.DB) string {
+	t.Helper()
+	role := "dbmate_test_role"
+
+	// Clean up from any previous test run (ignore errors)
+	_, _ = db.Exec("REASSIGN OWNED BY " + role + " TO CURRENT_USER")
+	_, _ = db.Exec("DROP OWNED BY " + role)
+	_, _ = db.Exec("DROP ROLE IF EXISTS " + role)
+
+	// Create role
+	_, err := db.Exec("CREATE ROLE " + role)
+	require.NoError(t, err)
+
+	// Grant role to current user so we can SET ROLE to it
+	_, err = db.Exec("GRANT " + role + " TO CURRENT_USER")
+	require.NoError(t, err)
+
+	return role
+}
+
+// cleanupTestRole removes the test role created by setupTestRole.
+func cleanupTestRole(db *sql.DB, role string) {
+	_, _ = db.Exec("REASSIGN OWNED BY " + role + " TO CURRENT_USER")
+	_, _ = db.Exec("DROP OWNED BY " + role)
+	_, _ = db.Exec("DROP ROLE IF EXISTS " + role)
+}
+
+func TestPostgresMigrateWithRole(t *testing.T) {
+	u := dbtest.GetenvURLOrSkip(t, "POSTGRES_TEST_URL")
+
+	// Create dbmate instance and prepare database
+	db := dbmate.New(u)
+	db.AutoDumpSchema = false
+	db.MigrationsDir = []string{"../../../testdata/db/migrations"}
+
+	err := db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
+
+	// Open connection to set up the test role
+	drv, err := db.Driver()
+	require.NoError(t, err)
+	sqlDB, err := drv.Open()
+	require.NoError(t, err)
+	defer dbutil.MustClose(sqlDB)
+
+	// Create test role and configure dbmate to use it
+	role := setupTestRole(t, sqlDB)
+	defer cleanupTestRole(sqlDB, role)
+	db.DatabaseRole = &role
+
+	// Run migrations
+	err = db.Migrate()
+	require.NoError(t, err)
+
+	// Verify all tables are owned by the test role (not connection user)
+	for _, tableName := range []string{"schema_migrations", "users", "posts"} {
+		var tableOwner string
+		err = sqlDB.QueryRow(`
+			SELECT tableowner
+			FROM pg_tables
+			WHERE schemaname = 'public' AND tablename = $1
+		`, tableName).Scan(&tableOwner)
+		require.NoError(t, err)
+		require.Equal(t, role, tableOwner, "table %s should be owned by %s", tableName, role)
+	}
+}
+
+func TestPostgresRollbackWithRole(t *testing.T) {
+	u := dbtest.GetenvURLOrSkip(t, "POSTGRES_TEST_URL")
+
+	// Create dbmate instance and prepare database
+	db := dbmate.New(u)
+	db.AutoDumpSchema = false
+	db.MigrationsDir = []string{"../../../testdata/db/migrations"}
+
+	err := db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
+
+	// Open connection to set up the test role
+	drv, err := db.Driver()
+	require.NoError(t, err)
+	sqlDB, err := drv.Open()
+	require.NoError(t, err)
+	defer dbutil.MustClose(sqlDB)
+
+	// Create test role and configure dbmate to use it
+	role := setupTestRole(t, sqlDB)
+	defer cleanupTestRole(sqlDB, role)
+	db.DatabaseRole = &role
+
+	// Run migrations
+	err = db.Migrate()
+	require.NoError(t, err)
+
+	// Verify posts table exists and is owned by test role
+	var tableOwner string
+	err = sqlDB.QueryRow(`
+		SELECT tableowner
+		FROM pg_tables
+		WHERE schemaname = 'public' AND tablename = 'posts'
+	`).Scan(&tableOwner)
+	require.NoError(t, err)
+	require.Equal(t, role, tableOwner)
+
+	// Rollback
+	err = db.Rollback()
+	require.NoError(t, err)
+
+	// Verify posts table was dropped
+	var count int
+	err = sqlDB.QueryRow("SELECT count(*) FROM posts").Scan(&count)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "does not exist")
+
+	// Verify users table still exists and is still owned by test role
+	err = sqlDB.QueryRow(`
+		SELECT tableowner
+		FROM pg_tables
+		WHERE schemaname = 'public' AND tablename = 'users'
+	`).Scan(&tableOwner)
+	require.NoError(t, err)
+	require.Equal(t, role, tableOwner)
+}
