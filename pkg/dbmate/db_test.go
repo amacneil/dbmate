@@ -1012,11 +1012,12 @@ func TestRollbackWithRole(t *testing.T) {
 func TestAllOperationsWithRole(t *testing.T) {
 	u := dbtest.GetenvURLOrSkip(t, "POSTGRES_TEST_URL")
 	db := newTestDB(t, u)
-	drv, err := db.Driver()
-	require.NoError(t, err)
 
 	role := "postgres"
 	db.DatabaseRole = &role
+
+	drv, err := db.Driver()
+	require.NoError(t, err)
 
 	err = db.Drop()
 	require.NoError(t, err)
