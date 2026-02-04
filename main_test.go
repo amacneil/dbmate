@@ -62,25 +62,16 @@ func TestRedactLogString(t *testing.T) {
 
 func TestLoadEnvFiles(t *testing.T) {
 	setup := func(t *testing.T) {
-		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-
 		env := os.Environ()
+
+		// t.Chdir automatically restores the original directory when the test completes
+		t.Chdir("fixtures/loadEnvFiles")
+
+		// Clear environment after t.Chdir because t.Chdir sets PWD
 		os.Clearenv()
 
-		err = os.Chdir("fixtures/loadEnvFiles")
-		if err != nil {
-			t.Fatal(err)
-		}
-
+		// Restore environment variables when test completes
 		t.Cleanup(func() {
-			err := os.Chdir(cwd)
-			if err != nil {
-				t.Fatal(err)
-			}
-
 			os.Clearenv()
 
 			for _, e := range env {

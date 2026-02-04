@@ -2,7 +2,12 @@
   "name": "{{name}}",
   "version": "{{version}}",
   "description": "The {{jsOS}} {{jsArch}} binary for dbmate",
-  "repository": "https://github.com/amacneil/dbmate",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amacneil/dbmate.git"
+  },
+  "homepage": "https://github.com/amacneil/dbmate#readme",
+  "author": "Adrian Macneil",
   "license": "MIT",
   "preferUnplugged": true,
   "os": [
