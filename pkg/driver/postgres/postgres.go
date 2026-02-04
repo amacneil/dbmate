@@ -98,6 +98,10 @@ func (drv *Driver) setRole(db dbutil.Transaction) error {
 	return err
 }
 
+func (drv *Driver) PrepareTransaction(db dbutil.Transaction) error {
+	return drv.setRole(db)
+}
+
 func connectionString(u *url.URL) string {
 	hostname := u.Hostname()
 	port := u.Port()
@@ -470,6 +474,11 @@ func (drv *Driver) Ping() error {
 	defer dbutil.MustClose(db)
 
 	if err := drv.setRole(db); err != nil {
+		// ignore 'database does not exist' error
+		pqErr, ok := err.(*pq.Error)
+		if ok && pqErr.Code == "3D000" {
+			return nil
+		}
 		return err
 	}
 
