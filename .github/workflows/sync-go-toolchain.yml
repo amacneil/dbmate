@@ -1,0 +1,54 @@
+name: Sync Go Toolchain
+
+on:
+  pull_request:
+    paths:
+      - "Dockerfile"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Extract Go version from Dockerfile
+        id: dockerfile
+        run: |
+          VERSION=$(sed -n 's/^FROM golang:\([0-9.]*\).*/\1/p' Dockerfile | head -1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Dockerfile Go version: $VERSION"
+
+      - name: Extract current toolchain from go.mod
+        id: gomod
+        run: |
+          TOOLCHAIN=$(go mod edit -json | jq -r '.Toolchain // empty')
+          echo "toolchain=$TOOLCHAIN" >> $GITHUB_OUTPUT
+          echo "Current go.mod toolchain: $TOOLCHAIN"
+
+      - name: Update go.mod toolchain if needed
+        if: steps.gomod.outputs.toolchain != format('go{0}', steps.dockerfile.outputs.version)
+        env:
+          NEW_VERSION: ${{ steps.dockerfile.outputs.version }}
+        run: |
+          echo "Updating toolchain to go${NEW_VERSION}"
+          go mod edit -toolchain="go${NEW_VERSION}"
+
+      - name: Commit and push changes
+        if: steps.gomod.outputs.toolchain != format('go{0}', steps.dockerfile.outputs.version)
+        env:
+          NEW_VERSION: ${{ steps.dockerfile.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add go.mod
+          git commit -m "Sync go.mod toolchain with Dockerfile (go${NEW_VERSION})"
+          git push
