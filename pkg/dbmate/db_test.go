@@ -808,6 +808,29 @@ func TestMigrateQueryErrorMessage(t *testing.T) {
 	})
 }
 
+func TestMigrateWithSetRoleAndNonTransactionalMigration(t *testing.T) {
+	db := newTestDB(t, sqliteTestURL(t))
+
+	err := db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
+
+	role := "test_role"
+	db.DatabaseRole = &role
+
+	db.FS = fstest.MapFS{
+		"db/migrations/001_no_transaction.sql": {
+			Data: []byte("-- migrate:up transaction:false\nCREATE TABLE test1 (id INT);\n-- migrate:down\nDROP TABLE test1;"),
+		},
+	}
+
+	err = db.Migrate()
+	require.Error(t, err)
+	require.ErrorIs(t, err, dbmate.ErrSetRoleWithNoTransaction)
+	require.Contains(t, err.Error(), "001_no_transaction.sql")
+}
+
 func TestMigrationContents(t *testing.T) {
 	// ensure Windows CR/LF line endings in migration files work
 	testEachURL(t, func(t *testing.T, u *url.URL) {
