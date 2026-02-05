@@ -953,4 +953,3 @@ func TestMigrationsWithRole(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, role, tableOwner)
 }
-
