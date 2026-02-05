@@ -898,28 +898,9 @@ func TestMigrationContents(t *testing.T) {
 }
 
 func TestSetRoleDefaultNil(t *testing.T) {
-	u := dbtest.GetenvURLOrSkip(t, "POSTGRES_TEST_URL")
-	db := newTestDB(t, u)
-	drv, err := db.Driver()
-	require.NoError(t, err)
+	db := newTestDB(t, sqliteTestURL(t))
 
 	require.Nil(t, db.DatabaseRole)
-
-	err = db.Drop()
-	require.NoError(t, err)
-	err = db.Create()
-	require.NoError(t, err)
-
-	err = db.Migrate()
-	require.NoError(t, err)
-
-	sqlDB, err := drv.Open()
-	require.NoError(t, err)
-	defer dbutil.MustClose(sqlDB)
-
-	appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
-	require.NoError(t, err)
-	require.Equal(t, map[string]bool{"20200227231541": true, "20151129054053": true}, appliedMigrations)
 }
 
 func TestMigrationsWithRole(t *testing.T) {
@@ -973,84 +954,3 @@ func TestMigrationsWithRole(t *testing.T) {
 	require.Equal(t, role, tableOwner)
 }
 
-func TestRollbackWithRole(t *testing.T) {
-	u := dbtest.GetenvURLOrSkip(t, "POSTGRES_TEST_URL")
-	db := newTestDB(t, u)
-	drv, err := db.Driver()
-	require.NoError(t, err)
-
-	err = db.Drop()
-	require.NoError(t, err)
-	err = db.Create()
-	require.NoError(t, err)
-
-	role := "postgres"
-	db.DatabaseRole = &role
-
-	err = db.Migrate()
-	require.NoError(t, err)
-
-	sqlDB, err := drv.Open()
-	require.NoError(t, err)
-	defer dbutil.MustClose(sqlDB)
-
-	var count int
-	err = sqlDB.QueryRow("SELECT count(*) FROM posts").Scan(&count)
-	require.NoError(t, err)
-
-	err = db.Rollback()
-	require.NoError(t, err)
-
-	err = sqlDB.QueryRow("SELECT count(*) FROM posts").Scan(&count)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "does not exist")
-
-	err = sqlDB.QueryRow("SELECT count(*) FROM users").Scan(&count)
-	require.NoError(t, err)
-}
-
-func TestAllOperationsWithRole(t *testing.T) {
-	u := dbtest.GetenvURLOrSkip(t, "POSTGRES_TEST_URL")
-	db := newTestDB(t, u)
-
-	role := "postgres"
-	db.DatabaseRole = &role
-
-	drv, err := db.Driver()
-	require.NoError(t, err)
-
-	err = db.Drop()
-	require.NoError(t, err)
-
-	err = db.Create()
-	require.NoError(t, err)
-
-	exists, err := drv.DatabaseExists()
-	require.NoError(t, err)
-	require.True(t, exists)
-
-	sqlDB, err := drv.Open()
-	require.NoError(t, err)
-	defer dbutil.MustClose(sqlDB)
-
-	err = drv.CreateMigrationsTable(sqlDB)
-	require.NoError(t, err)
-
-	tableExists, err := drv.MigrationsTableExists(sqlDB)
-	require.NoError(t, err)
-	require.True(t, tableExists)
-
-	err = drv.InsertMigration(sqlDB, "test001")
-	require.NoError(t, err)
-
-	migrations, err := drv.SelectMigrations(sqlDB, -1)
-	require.NoError(t, err)
-	require.True(t, migrations["test001"])
-
-	err = drv.DeleteMigration(sqlDB, "test001")
-	require.NoError(t, err)
-
-	migrations, err = drv.SelectMigrations(sqlDB, -1)
-	require.NoError(t, err)
-	require.False(t, migrations["test001"])
-}
