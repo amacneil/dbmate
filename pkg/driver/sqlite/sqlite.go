@@ -248,6 +248,10 @@ func (drv *Driver) QueryError(query string, err error) error {
 	return &dbmate.QueryError{Err: err, Query: query}
 }
 
+func (*Driver) PrepareTransaction(_ dbutil.Transaction) error {
+	return nil
+}
+
 func (drv *Driver) quotedMigrationsTableName() string {
 	return drv.quoteIdentifier(drv.migrationsTableName)
 }

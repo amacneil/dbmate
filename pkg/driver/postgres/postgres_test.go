@@ -836,3 +836,114 @@ func TestPostgresMigrationsTableExists(t *testing.T) {
 		require.Equal(t, true, exists)
 	})
 }
+
+func setupTestRole(t *testing.T, db *sql.DB) string {
+	t.Helper()
+	role := "dbmate_test_role"
+
+	_, _ = db.Exec("REASSIGN OWNED BY " + role + " TO CURRENT_USER")
+	_, _ = db.Exec("DROP OWNED BY " + role)
+	_, _ = db.Exec("DROP ROLE IF EXISTS " + role)
+
+	_, err := db.Exec("CREATE ROLE " + role)
+	require.NoError(t, err)
+
+	_, err = db.Exec("GRANT " + role + " TO CURRENT_USER")
+	require.NoError(t, err)
+
+	return role
+}
+
+func cleanupTestRole(db *sql.DB, role string) {
+	_, _ = db.Exec("REASSIGN OWNED BY " + role + " TO CURRENT_USER")
+	_, _ = db.Exec("DROP OWNED BY " + role)
+	_, _ = db.Exec("DROP ROLE IF EXISTS " + role)
+}
+
+func TestPostgresMigrateWithRole(t *testing.T) {
+	u := dbtest.GetenvURLOrSkip(t, "POSTGRES_TEST_URL")
+
+	db := dbmate.New(u)
+	db.AutoDumpSchema = false
+	db.MigrationsDir = []string{"../../../testdata/db/migrations"}
+
+	err := db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
+
+	drv, err := db.Driver()
+	require.NoError(t, err)
+	sqlDB, err := drv.Open()
+	require.NoError(t, err)
+	defer dbutil.MustClose(sqlDB)
+
+	role := setupTestRole(t, sqlDB)
+	defer cleanupTestRole(sqlDB, role)
+	db.DatabaseRole = &role
+
+	err = db.Migrate()
+	require.NoError(t, err)
+
+	for _, tableName := range []string{"schema_migrations", "users", "posts"} {
+		var tableOwner string
+		err = sqlDB.QueryRow(`
+			SELECT tableowner
+			FROM pg_tables
+			WHERE schemaname = 'public' AND tablename = $1
+		`, tableName).Scan(&tableOwner)
+		require.NoError(t, err)
+		require.Equal(t, role, tableOwner, "table %s should be owned by %s", tableName, role)
+	}
+}
+
+func TestPostgresRollbackWithRole(t *testing.T) {
+	u := dbtest.GetenvURLOrSkip(t, "POSTGRES_TEST_URL")
+
+	db := dbmate.New(u)
+	db.AutoDumpSchema = false
+	db.MigrationsDir = []string{"../../../testdata/db/migrations"}
+
+	err := db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
+
+	drv, err := db.Driver()
+	require.NoError(t, err)
+	sqlDB, err := drv.Open()
+	require.NoError(t, err)
+	defer dbutil.MustClose(sqlDB)
+
+	role := setupTestRole(t, sqlDB)
+	defer cleanupTestRole(sqlDB, role)
+	db.DatabaseRole = &role
+
+	err = db.Migrate()
+	require.NoError(t, err)
+
+	var tableOwner string
+	err = sqlDB.QueryRow(`
+		SELECT tableowner
+		FROM pg_tables
+		WHERE schemaname = 'public' AND tablename = 'posts'
+	`).Scan(&tableOwner)
+	require.NoError(t, err)
+	require.Equal(t, role, tableOwner)
+
+	err = db.Rollback()
+	require.NoError(t, err)
+
+	var count int
+	err = sqlDB.QueryRow("SELECT count(*) FROM posts").Scan(&count)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "does not exist")
+
+	err = sqlDB.QueryRow(`
+		SELECT tableowner
+		FROM pg_tables
+		WHERE schemaname = 'public' AND tablename = 'users'
+	`).Scan(&tableOwner)
+	require.NoError(t, err)
+	require.Equal(t, role, tableOwner)
+}

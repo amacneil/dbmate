@@ -23,6 +23,7 @@ type Driver interface {
 	DeleteMigration(dbutil.Transaction, string) error
 	Ping() error
 	QueryError(string, error) error
+	PrepareTransaction(dbutil.Transaction) error
 }
 
 // DriverConfig holds configuration passed to driver constructors
@@ -30,6 +31,7 @@ type DriverConfig struct {
 	DatabaseURL         *url.URL
 	Log                 io.Writer
 	MigrationsTableName string
+	DatabaseRole        *string
 }
 
 // DriverFunc represents a driver constructor

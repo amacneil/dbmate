@@ -808,6 +808,57 @@ func TestMigrateQueryErrorMessage(t *testing.T) {
 	})
 }
 
+func TestMigrateWithSetRoleAndNonTransactionalMigration(t *testing.T) {
+	db := newTestDB(t, sqliteTestURL(t))
+
+	err := db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
+
+	role := "test_role"
+	db.DatabaseRole = &role
+
+	db.FS = fstest.MapFS{
+		"db/migrations/001_no_transaction.sql": {
+			Data: []byte("-- migrate:up transaction:false\nCREATE TABLE test1 (id INT);\n-- migrate:down\nDROP TABLE test1;"),
+		},
+	}
+
+	err = db.Migrate()
+	require.Error(t, err)
+	require.ErrorIs(t, err, dbmate.ErrSetRoleWithNoTransaction)
+	require.Contains(t, err.Error(), "001_no_transaction.sql")
+}
+
+func TestRollbackWithSetRoleAndNonTransactionalMigration(t *testing.T) {
+	db := newTestDB(t, sqliteTestURL(t))
+
+	err := db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
+
+	// First apply a migration without --set-role (transactional up, non-transactional down)
+	db.FS = fstest.MapFS{
+		"db/migrations/001_test.sql": {
+			Data: []byte("-- migrate:up\nCREATE TABLE test1 (id INT);\n-- migrate:down transaction:false\nDROP TABLE test1;"),
+		},
+	}
+
+	err = db.Migrate()
+	require.NoError(t, err)
+
+	// Now try to rollback with --set-role
+	role := "test_role"
+	db.DatabaseRole = &role
+
+	err = db.Rollback()
+	require.Error(t, err)
+	require.ErrorIs(t, err, dbmate.ErrSetRoleWithNoTransaction)
+	require.Contains(t, err.Error(), "001_test.sql")
+}
+
 func TestMigrationContents(t *testing.T) {
 	// ensure Windows CR/LF line endings in migration files work
 	testEachURL(t, func(t *testing.T, u *url.URL) {
@@ -844,4 +895,61 @@ func TestMigrationContents(t *testing.T) {
 		err = db.Rollback()
 		require.NoError(t, err)
 	})
+}
+
+func TestSetRoleDefaultNil(t *testing.T) {
+	db := newTestDB(t, sqliteTestURL(t))
+
+	require.Nil(t, db.DatabaseRole)
+}
+
+func TestMigrationsWithRole(t *testing.T) {
+	u := dbtest.GetenvURLOrSkip(t, "POSTGRES_TEST_URL")
+	db := newTestDB(t, u)
+	drv, err := db.Driver()
+	require.NoError(t, err)
+
+	err = db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
+
+	sqlDB, err := drv.Open()
+	require.NoError(t, err)
+	defer dbutil.MustClose(sqlDB)
+
+	role := "postgres"
+	db.DatabaseRole = &role
+
+	err = db.Migrate()
+	require.NoError(t, err)
+
+	appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
+	require.NoError(t, err)
+	require.Equal(t, map[string]bool{"20200227231541": true, "20151129054053": true}, appliedMigrations)
+
+	var tableOwner string
+	err = sqlDB.QueryRow(`
+		SELECT tableowner
+		FROM pg_tables
+		WHERE schemaname = 'public' AND tablename = 'schema_migrations'
+	`).Scan(&tableOwner)
+	require.NoError(t, err)
+	require.Equal(t, role, tableOwner)
+
+	err = sqlDB.QueryRow(`
+		SELECT tableowner
+		FROM pg_tables
+		WHERE schemaname = 'public' AND tablename = 'users'
+	`).Scan(&tableOwner)
+	require.NoError(t, err)
+	require.Equal(t, role, tableOwner)
+
+	err = sqlDB.QueryRow(`
+		SELECT tableowner
+		FROM pg_tables
+		WHERE schemaname = 'public' AND tablename = 'posts'
+	`).Scan(&tableOwner)
+	require.NoError(t, err)
+	require.Equal(t, role, tableOwner)
 }

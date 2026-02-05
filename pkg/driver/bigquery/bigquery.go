@@ -344,6 +344,10 @@ func (*Driver) QueryError(query string, err error) error {
 	return &dbmate.QueryError{Err: err, Query: query}
 }
 
+func (*Driver) PrepareTransaction(_ dbutil.Transaction) error {
+	return nil
+}
+
 func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
 	config, err := drv.getConfig(db)
 	if err != nil {
