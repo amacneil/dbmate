@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.head_ref }}
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - uses: actions/setup-go@v6
         with:
@@ -43,7 +43,7 @@ jobs:
           go mod edit -toolchain="go${NEW_VERSION}"
 
       - name: Commit and push changes
-        if: steps.gomod.outputs.toolchain != format('go{0}', steps.dockerfile.outputs.version)
+        if: steps.gomod.outputs.toolchain != format('go{0}', steps.dockerfile.outputs.version) && github.event.pull_request.head.repo.full_name == github.repository
         env:
           NEW_VERSION: ${{ steps.dockerfile.outputs.version }}
         run: |

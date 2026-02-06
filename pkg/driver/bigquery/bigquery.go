@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -97,8 +98,114 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 					Name: "version",
 					Type: bigquery.StringFieldType,
 				},
+				&bigquery.FieldSchema{
+					Name:     "checksum",
+					Type:     bigquery.StringFieldType,
+					Required: false,
+				},
 			},
 		})
+	})
+}
+
+func (drv *Driver) HasChecksumColumn(db *sql.DB) (bool, error) {
+	ctx := context.Background()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer conn.Close()
+
+	err = conn.Raw(func(driverConn any) error {
+		client := getClient(driverConn)
+		config := getConfig(driverConn)
+		table := client.Dataset(config.dataSet).Table(drv.migrationsTableName)
+		meta, err := table.Metadata(context.Background())
+		if err != nil {
+			return err
+		}
+
+		for _, field := range meta.Schema {
+			if field.Name == "checksum" {
+				return nil
+			}
+		}
+
+		return errors.New("column not found in table")
+	})
+
+	if err != nil {
+		if err.Error() != "column not found in table" {
+			return false, err
+		}
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func (drv *Driver) AddChecksumColumn(db *sql.DB) error {
+	ctx := context.Background()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	return conn.Raw(func(driverConn any) error {
+		client := getClient(driverConn)
+		config := getConfig(driverConn)
+
+		exists, err := tableExists(client, config.dataSet, drv.migrationsTableName)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return errors.New("migrations table not found")
+		}
+
+		table := client.Dataset(config.dataSet).Table(drv.migrationsTableName)
+
+		meta, err := table.Metadata(context.Background())
+		if err != nil {
+			return fmt.Errorf("failed to get table metadata: %w", err)
+		}
+
+		for _, f := range meta.Schema {
+			if strings.EqualFold(f.Name, "checksum") {
+				return nil
+			}
+		}
+
+		checksumField := &bigquery.FieldSchema{
+			Name:     "checksum",
+			Type:     bigquery.StringFieldType,
+			Required: false,
+		}
+
+		newSchema := append(meta.Schema, checksumField)
+		_, err = table.Update(ctx, bigquery.TableMetadataToUpdate{Schema: newSchema}, meta.ETag)
+		if err != nil {
+			return fmt.Errorf("table update failed: %w", err)
+		}
+
+		meta2, merr := client.Dataset(config.dataSet).Table(drv.migrationsTableName).Metadata(ctx)
+		if merr == nil {
+			for _, f := range meta2.Schema {
+				if strings.EqualFold(f.Name, "checksum") {
+					return nil // success
+				}
+			}
+			return errors.New("new column not found")
+		}
+
+		// Verification failed, but table update succeeded.
+		// Log success message with warning about verification failure.
+		if drv.log != nil {
+			fmt.Fprintf(drv.log, "Column %q added successfully to table %s.%s (verification failed: %v)\n",
+				checksumField.Name, config.dataSet, drv.migrationsTableName, merr)
+		}
+		return nil
 	})
 }
 
@@ -223,10 +330,51 @@ func (drv *Driver) schemaDump(db *sql.DB) ([]byte, error) {
 func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 	migrationsTable := drv.migrationsTableName
 
-	// load applied migrations
-	migrations, err := dbutil.QueryColumn(db,
-		fmt.Sprintf("select version from %s order by version asc", migrationsTable))
+	// check if checksum column exists
+	hasChecksumColumn, err := drv.HasChecksumColumn(db)
 	if err != nil {
+		return nil, err
+	}
+
+	// build query based on column existence
+	var query string
+	if hasChecksumColumn {
+		query = fmt.Sprintf("select version, checksum from %s order by version asc", migrationsTable)
+	} else {
+		query = fmt.Sprintf("select version from %s order by version asc", migrationsTable)
+	}
+
+	// load applied migrations
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer dbutil.MustClose(rows)
+
+	migrations := [][]string{}
+	for rows.Next() {
+		if hasChecksumColumn {
+			var version string
+			var checksum *string
+			if err := rows.Scan(&version, &checksum); err != nil {
+				return nil, err
+			}
+
+			if checksum == nil {
+				migrations = append(migrations, []string{version, ""})
+			} else {
+				migrations = append(migrations, []string{version, *checksum})
+			}
+		} else {
+			var version string
+			if err := rows.Scan(&version); err != nil {
+				return nil, err
+			}
+			migrations = append(migrations, []string{version})
+		}
+	}
+
+	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
@@ -235,10 +383,28 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 	buf.WriteString("\n--\n-- Dbmate schema migrations\n--\n\n")
 
 	if len(migrations) > 0 {
+		tuples := make([]string, 0, len(migrations))
+		for _, m := range migrations {
+			v := m[0]
+			if hasChecksumColumn {
+				c := m[1]
+				if c == "" {
+					tuples = append(tuples, fmt.Sprintf("('%s', NULL)", v))
+				} else {
+					tuples = append(tuples, fmt.Sprintf("('%s','%s')", v, c))
+				}
+			} else {
+				tuples = append(tuples, fmt.Sprintf("('%s')", v))
+			}
+		}
+		columns := "version"
+		if hasChecksumColumn {
+			columns = "version, checksum"
+		}
 		buf.WriteString(
-			fmt.Sprintf("INSERT INTO %s (version) VALUES\n    ('", migrationsTable) +
-				strings.Join(migrations, "'),\n    ('") +
-				"');\n")
+			fmt.Sprintf("INSERT INTO %s (%s) VALUES\n    ", migrationsTable, columns) +
+				strings.Join(tuples, ",\n    ") +
+				";\n")
 	}
 
 	return buf.Bytes(), nil
@@ -304,7 +470,7 @@ func (drv *Driver) DeleteMigration(util dbutil.Transaction, version string) erro
 	return nil
 }
 
-func (drv *Driver) InsertMigration(_ dbutil.Transaction, version string) error {
+func (drv *Driver) InsertMigration(_ dbutil.Transaction, version string, checksum string) error {
 	db, err := drv.Open()
 	if err != nil {
 		return err
@@ -316,9 +482,9 @@ func (drv *Driver) InsertMigration(_ dbutil.Transaction, version string) error {
 		return err
 	}
 
-	queryTemplate := `INSERT INTO %s.%s (version) VALUES ('%s');`
-	queryString := fmt.Sprintf(queryTemplate, config.dataSet, drv.migrationsTableName, version)
-	_, err = db.Exec(queryString, version)
+	queryTemplate := `INSERT INTO %s.%s (version, checksum) VALUES (?, ?);`
+	queryString := fmt.Sprintf(queryTemplate, config.dataSet, drv.migrationsTableName)
+	_, err = db.Exec(queryString, version, checksum)
 	if err != nil {
 		return err
 	}
@@ -344,13 +510,13 @@ func (*Driver) QueryError(query string, err error) error {
 	return &dbmate.QueryError{Err: err, Query: query}
 }
 
-func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
+func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]*string, error) {
 	config, err := drv.getConfig(db)
 	if err != nil {
 		return nil, err
 	}
 
-	query := fmt.Sprintf("SELECT version FROM %s.%s ORDER BY version DESC", config.dataSet, drv.migrationsTableName)
+	query := fmt.Sprintf("SELECT version, checksum FROM %s.%s ORDER BY version DESC", config.dataSet, drv.migrationsTableName)
 	if limit >= 0 {
 		query = fmt.Sprintf("%s limit %d", query, limit)
 	}
@@ -360,14 +526,19 @@ func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, err
 	}
 	defer dbutil.MustClose(rows)
 
-	migrations := map[string]bool{}
+	migrations := map[string]*string{}
 	for rows.Next() {
 		var version string
-		if err := rows.Scan(&version); err != nil {
+		var checksum *string
+		if err := rows.Scan(&version, &checksum); err != nil {
 			return nil, err
 		}
 
-		migrations[version] = true
+		if checksum == nil {
+			empty := ""
+			checksum = &empty
+		}
+		migrations[version] = checksum
 	}
 
 	if err = rows.Err(); err != nil {

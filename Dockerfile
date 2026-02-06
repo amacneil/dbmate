@@ -6,14 +6,14 @@ RUN git config --global --add safe.directory /src
 
 # install development tools
 RUN apt-get update \
-  && apt-get install -qq --no-install-recommends \
+  && apt-get -y install -qq --no-install-recommends \
     curl \
     file \
     mariadb-client \
-    postgresql-client \
-    sqlite3 \
     nodejs \
     npm \
+    postgresql-client \
+    sqlite3 \
   && rm -rf /var/lib/apt/lists/*
 
 # golangci-lint

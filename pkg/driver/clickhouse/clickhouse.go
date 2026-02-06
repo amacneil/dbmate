@@ -199,28 +199,82 @@ func (drv *Driver) schemaDump(db *sql.DB, buf *bytes.Buffer) error {
 func (drv *Driver) schemaMigrationsDump(db *sql.DB, buf *bytes.Buffer) error {
 	migrationsTable := drv.quotedMigrationsTableName()
 
-	// load applied migrations
-	migrations, err := dbutil.QueryColumn(db,
-		fmt.Sprintf("select version from %s final ", migrationsTable)+
-			"where applied order by version asc",
-	)
+	// check if checksum column exists
+	hasChecksumColumn, err := drv.HasChecksumColumn(db)
 	if err != nil {
 		return err
 	}
 
-	quoter := strings.NewReplacer(`\`, `\\`, `'`, `\'`)
-	for i := range migrations {
-		migrations[i] = "'" + quoter.Replace(migrations[i]) + "'"
+	// build query based on column existence
+	var query string
+	if hasChecksumColumn {
+		query = fmt.Sprintf("select version, checksum from %s final ", migrationsTable) +
+			"where applied order by version asc"
+	} else {
+		query = fmt.Sprintf("select version from %s final ", migrationsTable) +
+			"where applied order by version asc"
 	}
 
+	// load applied migrations
+	rows, err := db.Query(query)
+	if err != nil {
+		return err
+	}
+	defer dbutil.MustClose(rows)
+
+	type migration struct {
+		version  string
+		checksum *string
+	}
+	migrations := []migration{}
+	for rows.Next() {
+		if hasChecksumColumn {
+			var version string
+			var checksum *string
+			if err := rows.Scan(&version, &checksum); err != nil {
+				return err
+			}
+			migrations = append(migrations, migration{version, checksum})
+		} else {
+			var version string
+			if err := rows.Scan(&version); err != nil {
+				return err
+			}
+			migrations = append(migrations, migration{version, nil})
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	quoter := strings.NewReplacer(`\`, `\\`, `'`, `\'`)
 	// build schema migrations table data
 	buf.WriteString("\n--\n-- Dbmate schema migrations\n--\n\n")
 
 	if len(migrations) > 0 {
+		tuples := make([]string, 0, len(migrations))
+		for _, m := range migrations {
+			// quote version (always non-NULL)
+			quotedVersion := "'" + quoter.Replace(m.version) + "'"
+
+			if !hasChecksumColumn {
+				tuples = append(tuples, fmt.Sprintf("(%s)", quotedVersion))
+			} else if m.checksum == nil {
+				tuples = append(tuples, fmt.Sprintf("(%s, NULL)", quotedVersion))
+			} else {
+				quotedChecksum := "'" + quoter.Replace(*m.checksum) + "'"
+				tuples = append(tuples, fmt.Sprintf("(%s, %s)", quotedVersion, quotedChecksum))
+			}
+		}
+		columns := "version"
+		if hasChecksumColumn {
+			columns = "version, checksum"
+		}
 		buf.WriteString(
-			fmt.Sprintf("INSERT INTO %s.%s (version) VALUES\n    (", drv.quotedDatabaseName(), migrationsTable) +
-				strings.Join(migrations, "),\n    (") +
-				");\n")
+			fmt.Sprintf("INSERT INTO %s.%s (%s) VALUES\n    ", drv.quotedDatabaseName(), migrationsTable, columns) +
+				strings.Join(tuples, ",\n    ") +
+				";\n")
 	}
 
 	return nil
@@ -255,7 +309,7 @@ func (drv *Driver) DatabaseExists() (bool, error) {
 	defer dbutil.MustClose(db)
 
 	exists := false
-	err = db.QueryRow("SELECT 1 FROM system.databases where name = ?", name).
+	err = db.QueryRow(fmt.Sprintf("EXISTS DATABASE %s", drv.quoteIdentifier(name))).
 		Scan(&exists)
 	if err == sql.ErrNoRows {
 		return false, nil
@@ -288,6 +342,7 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 	_, err := db.Exec(fmt.Sprintf(`
 		create table if not exists %s%s (
 			version String,
+			checksum String,
 			ts DateTime default now(),
 			applied UInt8 default 1
 		) engine = %s
@@ -298,10 +353,39 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 	return err
 }
 
+func (drv *Driver) HasChecksumColumn(db *sql.DB) (bool, error) {
+	var dummy int
+	err := db.QueryRow("SELECT 1 FROM system.columns WHERE database = ? AND table = ? AND name = 'checksum'",
+		drv.databaseName(), drv.migrationsTableName).
+		Scan(&dummy)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (drv *Driver) AddChecksumColumn(db *sql.DB) error {
+	qualifiedTableName := drv.quoteIdentifier(drv.databaseName()) + "." + drv.quotedMigrationsTableName()
+	query := fmt.Sprintf("ALTER TABLE %s%s ADD COLUMN checksum String", qualifiedTableName, drv.onClusterClause())
+	_, err := db.Exec(query)
+	if err != nil {
+		// If column already exists (duplicate column error), ignore it
+		// This can happen in cluster setups due to race conditions
+		if chErr, ok := err.(*clickhouse.Exception); ok && chErr.Code == 15 {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
 // SelectMigrations returns a list of applied migrations
 // with an optional limit (in descending order)
-func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, error) {
-	query := fmt.Sprintf("select version from %s final where applied order by version desc",
+func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]*string, error) {
+	query := fmt.Sprintf("select version, checksum from %s final where applied order by version desc",
 		drv.quotedMigrationsTableName())
 
 	if limit >= 0 {
@@ -314,14 +398,20 @@ func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, err
 
 	defer dbutil.MustClose(rows)
 
-	migrations := map[string]bool{}
+	migrations := map[string]*string{}
 	for rows.Next() {
 		var version string
-		if err := rows.Scan(&version); err != nil {
+		var checksum *string
+		if err := rows.Scan(&version, &checksum); err != nil {
 			return nil, err
 		}
 
-		migrations[version] = true
+		if checksum == nil {
+			empty := ""
+			checksum = &empty
+		}
+
+		migrations[version] = checksum
 	}
 
 	if err = rows.Err(); err != nil {
@@ -332,10 +422,10 @@ func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, err
 }
 
 // InsertMigration adds a new migration record
-func (drv *Driver) InsertMigration(db dbutil.Transaction, version string) error {
+func (drv *Driver) InsertMigration(db dbutil.Transaction, version string, checksum string) error {
 	_, err := db.Exec(
-		fmt.Sprintf("insert into %s (version) values (?)", drv.quotedMigrationsTableName()),
-		version)
+		fmt.Sprintf("insert into %s (version, checksum) values (?, ?)", drv.quotedMigrationsTableName()),
+		version, checksum)
 
 	return err
 }

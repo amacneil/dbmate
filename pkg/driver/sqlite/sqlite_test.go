@@ -176,9 +176,9 @@ func TestSQLiteDumpSchema(t *testing.T) {
 	require.NoError(t, err)
 
 	// insert migration
-	err = drv.InsertMigration(db, "abc1")
+	err = drv.InsertMigration(db, "abc1", "checksum1")
 	require.NoError(t, err)
-	err = drv.InsertMigration(db, "abc2")
+	err = drv.InsertMigration(db, "abc2", "checksum2")
 	require.NoError(t, err)
 
 	// create a table that will trigger `sqlite_sequence` system table
@@ -191,9 +191,9 @@ func TestSQLiteDumpSchema(t *testing.T) {
 	require.Contains(t, string(schema), "CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT)")
 	require.Contains(t, string(schema), "CREATE TABLE IF NOT EXISTS \"test_migrations\"")
 	require.Contains(t, string(schema), ");\n-- Dbmate schema migrations\n"+
-		"INSERT INTO \"test_migrations\" (version) VALUES\n"+
-		"  ('abc1'),\n"+
-		"  ('abc2');\n")
+		"INSERT INTO \"test_migrations\" (version, checksum) VALUES\n"+
+		"  ('abc1', 'checksum1'),\n"+
+		"  ('abc2', 'checksum2');\n")
 
 	// sqlite_* tables should not be present in the dump (.schema --nosys)
 	require.NotContains(t, string(schema), "sqlite_")
@@ -290,22 +290,22 @@ func TestSQLiteSelectMigrations(t *testing.T) {
 	err := drv.CreateMigrationsTable(db)
 	require.NoError(t, err)
 
-	_, err = db.Exec(`insert into test_migrations (version)
-		values ('abc2'), ('abc1'), ('abc3')`)
+	_, err = db.Exec(`insert into test_migrations (version, checksum)
+		values ('abc2', null), ('abc1', null), ('abc3', 'checksum3')`)
 	require.NoError(t, err)
 
 	migrations, err := drv.SelectMigrations(db, -1)
 	require.NoError(t, err)
-	require.Equal(t, true, migrations["abc1"])
-	require.Equal(t, true, migrations["abc2"])
-	require.Equal(t, true, migrations["abc2"])
+	require.Equal(t, "", *migrations["abc1"])
+	require.Equal(t, "", *migrations["abc2"])
+	require.Equal(t, "checksum3", *migrations["abc3"])
 
 	// test limit param
 	migrations, err = drv.SelectMigrations(db, 1)
 	require.NoError(t, err)
-	require.Equal(t, true, migrations["abc3"])
-	require.Equal(t, false, migrations["abc1"])
-	require.Equal(t, false, migrations["abc2"])
+	require.Equal(t, "checksum3", *migrations["abc3"])
+	require.Equal(t, (*string)(nil), migrations["abc1"])
+	require.Equal(t, (*string)(nil), migrations["abc2"])
 }
 
 func TestSQLiteInsertMigration(t *testing.T) {
@@ -324,7 +324,7 @@ func TestSQLiteInsertMigration(t *testing.T) {
 	require.Equal(t, 0, count)
 
 	// insert migration
-	err = drv.InsertMigration(db, "abc1")
+	err = drv.InsertMigration(db, "abc1", "checksum1")
 	require.NoError(t, err)
 
 	err = db.QueryRow("select count(*) from test_migrations where version = 'abc1'").
