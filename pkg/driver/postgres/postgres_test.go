@@ -250,7 +250,7 @@ func TestPostgresCreateDropDatabase(t *testing.T) {
 
 		err = db.Ping()
 		require.Error(t, err)
-		require.Equal(t, "pq: database \"dbmate_test\" does not exist", err.Error())
+		require.Equal(t, "pq: database \"dbmate_test\" does not exist (3D000)", err.Error())
 	}()
 }
 
@@ -351,7 +351,7 @@ func TestPostgresDatabaseExists_Error(t *testing.T) {
 
 	exists, err := drv.DatabaseExists()
 	require.Error(t, err)
-	require.Equal(t, "pq: password authentication failed for user \"invalid\"", err.Error())
+	require.Equal(t, "pq: password authentication failed for user \"invalid\" (28P01)", err.Error())
 	require.Equal(t, false, exists)
 }
 
@@ -365,7 +365,7 @@ func TestPostgresCreateMigrationsTable(t *testing.T) {
 		count := 0
 		err := db.QueryRow("select count(*) from public.schema_migrations").Scan(&count)
 		require.Error(t, err)
-		require.Equal(t, "pq: relation \"public.schema_migrations\" does not exist", err.Error())
+		require.Equal(t, "pq: relation \"public.schema_migrations\" does not exist at column 22 (42P01)", err.Error())
 
 		// create table
 		err = drv.CreateMigrationsTable(db)
@@ -403,10 +403,10 @@ func TestPostgresCreateMigrationsTable(t *testing.T) {
 		count := 0
 		err = db.QueryRow("select count(*) from \"camelFoo\".\"testMigrations\"").Scan(&count)
 		require.Error(t, err)
-		require.Equal(t, "pq: relation \"camelFoo.testMigrations\" does not exist", err.Error())
+		require.Equal(t, "pq: relation \"camelFoo.testMigrations\" does not exist at column 22 (42P01)", err.Error())
 		err = db.QueryRow("select count(*) from public.\"testMigrations\"").Scan(&count)
 		require.Error(t, err)
-		require.Equal(t, "pq: relation \"public.testMigrations\" does not exist", err.Error())
+		require.Equal(t, "pq: relation \"public.testMigrations\" does not exist at column 22 (42P01)", err.Error())
 
 		// create table
 		err = drv.CreateMigrationsTable(db)
@@ -417,7 +417,7 @@ func TestPostgresCreateMigrationsTable(t *testing.T) {
 		require.NoError(t, err)
 		err = db.QueryRow("select count(*) from public.\"testMigrations\"").Scan(&count)
 		require.Error(t, err)
-		require.Equal(t, "pq: relation \"public.testMigrations\" does not exist", err.Error())
+		require.Equal(t, "pq: relation \"public.testMigrations\" does not exist at column 22 (42P01)", err.Error())
 
 		// create table should be idempotent
 		err = drv.CreateMigrationsTable(db)
@@ -445,7 +445,7 @@ func TestPostgresCreateMigrationsTable(t *testing.T) {
 		count := 0
 		err = db.QueryRow("select count(*) from \"camelSchema\".\"testMigrations\"").Scan(&count)
 		require.Error(t, err)
-		require.Equal(t, "pq: relation \"camelSchema.testMigrations\" does not exist", err.Error())
+		require.Equal(t, "pq: relation \"camelSchema.testMigrations\" does not exist at column 22 (42P01)", err.Error())
 
 		// create table
 		err = drv.CreateMigrationsTable(db)
@@ -458,7 +458,7 @@ func TestPostgresCreateMigrationsTable(t *testing.T) {
 		// schema specified with migrations table name takes priority over search path
 		err = db.QueryRow("select count(*) from foo.\"testMigrations\"").Scan(&count)
 		require.Error(t, err)
-		require.Equal(t, "pq: relation \"foo.testMigrations\" does not exist", err.Error())
+		require.Equal(t, "pq: relation \"foo.testMigrations\" does not exist at column 22 (42P01)", err.Error())
 
 		// create table should be idempotent
 		err = drv.CreateMigrationsTable(db)

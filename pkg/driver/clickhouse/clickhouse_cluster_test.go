@@ -121,7 +121,7 @@ func TestClickHouseDumpSchemaOnCluster(t *testing.T) {
 	require.Contains(t, string(schema), "--\n"+
 		"-- Dbmate schema migrations\n"+
 		"--\n\n"+
-		"INSERT INTO test_migrations (version, checksum) VALUES\n"+
+		"INSERT INTO "+drv.databaseName()+".test_migrations (version, checksum) VALUES\n"+
 		"    ('abc1', 'checksum1'),\n"+
 		"    ('abc2', 'checksum2');\n")
 
