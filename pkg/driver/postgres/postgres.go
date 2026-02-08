@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"fmt"
 	"io"
@@ -77,6 +78,8 @@ type Driver struct {
 	migrationsTableName string
 	databaseURL         *url.URL
 	log                 io.Writer
+
+	migrationLockTx *sql.Tx
 }
 
 // NewDriver initializes the driver
@@ -514,4 +517,49 @@ func (drv *Driver) quotedMigrationsTableNameParts(db dbutil.Transaction) (string
 
 	// if more than one part, we already have a schema
 	return quotedNameParts[0], strings.Join(quotedNameParts[1:], "."), nil
+}
+
+const lockKey = 48372615
+
+func (drv *Driver) Lock() error {
+	if drv.migrationLockTx != nil {
+		return fmt.Errorf("already locked")
+	}
+
+	db, err := drv.Open()
+	if err != nil {
+		return err
+	}
+
+	tx, err := db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return err
+	}
+
+	drv.migrationLockTx = tx
+
+	_, err = tx.Exec("SELECT pg_advisory_xact_lock($1)", lockKey)
+	if err != nil {
+		return fmt.Errorf("failed to acquire lock: %w", err)
+	}
+
+	return nil
+}
+
+func (drv *Driver) Unlock() error {
+	if drv.migrationLockTx == nil {
+		return fmt.Errorf("not locked")
+	}
+
+	if err := drv.migrationLockTx.Rollback(); err != nil {
+		return err
+	}
+
+	drv.migrationLockTx = nil
+
+	return nil
+}
+
+func (drv *Driver) IsLocked() bool {
+	return drv.migrationLockTx != nil
 }
