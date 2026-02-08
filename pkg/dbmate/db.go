@@ -600,6 +600,21 @@ func (db *DB) Rollback() error {
 	return nil
 }
 
+// RollbackAll rolls back all migrations
+func (db *DB) RollbackAll() error {
+	for {
+		err := db.Rollback()
+		switch {
+		case err == nil:
+			continue
+		case errors.Is(err, ErrNoRollback):
+			return nil
+		case err != nil:
+			return err
+		}
+	}
+}
+
 // Status shows the status of all migrations
 func (db *DB) Status(quiet bool) (int, error) {
 	results, err := db.FindMigrations()
