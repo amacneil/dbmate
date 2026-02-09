@@ -4,6 +4,9 @@ go 1.24.1
 
 toolchain go1.25.5
 
+// lib/pq v1.11.1 breaks connection to supavisor, pin to v1.10.9 until fixed (#746)
+replace github.com/lib/pq => github.com/lib/pq v1.10.9
+
 require (
 	cloud.google.com/go/bigquery v1.72.0
 	github.com/ClickHouse/clickhouse-go/v2 v2.43.0
