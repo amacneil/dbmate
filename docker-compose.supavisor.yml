@@ -5,8 +5,11 @@ services:
         condition: service_healthy
       supavisor:
         condition: service_healthy
+      supavisor-create-tenant:
+        condition: service_completed_successfully
     environment:
-      SUPAVISOR_TEST_URL: postgres://postgres.dev_tenant:postgres@supavisor:6543/dbmate_test?sslmode=disable
+      SUPAVISOR_SESSION_TEST_URL: postgres://postgres.dev_tenant:postgres@supavisor:5452/dbmate_test?sslmode=disable
+      SUPAVISOR_TRANSACTION_TEST_URL: postgres://postgres.dev_tenant:postgres@supavisor:6543/dbmate_test?sslmode=disable
 
   supavisor-db:
     image: supabase/postgres:15.1.0.148
