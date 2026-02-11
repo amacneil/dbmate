@@ -1,19 +1,29 @@
 services:
   dev:
     depends_on:
-      - supavisor
-      - supavisor-db
+      supavisor-db:
+        condition: service_healthy
+      supavisor:
+        condition: service_healthy
     environment:
       SUPAVISOR_TEST_URL: postgres://postgres.dev_tenant:postgres@supavisor:6543/dbmate_test?sslmode=disable
 
   supavisor-db:
     image: supabase/postgres:15.1.0.148
+    shm_size: 128mb
     environment:
       POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 5s
 
   supavisor:
     depends_on:
-      - supavisor-db
+      supavisor-db:
+        condition: service_healthy
     image: supabase/supavisor:2.7.4
     command: sh -c "/app/bin/migrate && /app/bin/server"
     environment:
@@ -28,14 +38,22 @@ services:
       METRICS_JWT_SECRET: "dev"
       REGION: "local"
       ERL_AFLAGS: -proto_dist inet_tcp
+      DB_POOL_SIZE: 50
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/api/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 5s
 
   supavisor-create-tenant:
     depends_on:
-      - supavisor
+      supavisor:
+        condition: service_healthy
     image: supabase/supavisor:2.7.4
     command: |-
       sh -c '
-        curl -X PUT \
+        curl -sX PUT \
           "http://supavisor:4000/api/tenants/dev_tenant" \
           --header "Accept: */*" \
           --header "User-Agent: Thunder Client (https://www.thunderclient.com)" \
@@ -61,5 +79,6 @@ services:
               ]
             }
           }'\''
+
         psql postgres://postgres:postgres@supavisor-db:5432/postgres -c "create database dbmate_test"
       '
