@@ -40,8 +40,7 @@ func newTestDB(t *testing.T, u *url.URL) *dbmate.DB {
 		require.NoError(t, err)
 	}
 
-	err = os.Chdir(rootDir + "/testdata")
-	require.NoError(t, err)
+	t.Chdir(rootDir + "/testdata")
 
 	db := dbmate.New(u)
 	db.AutoDumpSchema = false
