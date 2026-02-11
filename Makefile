@@ -8,10 +8,10 @@ OUTPUT ?= dbmate
 GOOS := $(shell go env GOOS)
 ifeq ($(GOOS),linux)
 	# statically link binaries to support alpine linux
-	override FLAGS := -tags netgo,osusergo,sqlite_omit_load_extension,sqlite_json -ldflags '-s -extldflags "-static"' $(FLAGS)
+	override FLAGS := -tags netgo,osusergo,sqlite_omit_load_extension,sqlite_fts5,sqlite_json -ldflags '-s -extldflags "-static"' $(FLAGS)
 else
 	# strip binaries
-	override FLAGS := -tags sqlite_omit_load_extension,sqlite_json -ldflags '-s' $(FLAGS)
+	override FLAGS := -tags sqlite_omit_load_extension,sqlite_fts5,sqlite_json -ldflags '-s' $(FLAGS)
 endif
 ifeq ($(GOOS),darwin)
 	export SDKROOT ?= $(shell xcrun --sdk macosx --show-sdk-path)
@@ -64,17 +64,18 @@ update-deps:
 	cd typescript && \
 		rm -f package-lock.json && \
 		./node_modules/.bin/npm-check-updates --upgrade && \
-		npm install
+		npm install && \
+		npm dedupe
 
 .PHONY: docker-build
 docker-build:
 	docker compose pull --ignore-buildable
-	docker compose build
+	docker compose build dev
 
 .PHONY: docker-all
 docker-all: docker-build
 	docker compose run --rm dev make all
 
-.PHONY: docker-dev
-docker-dev:
+.PHONY: docker-sh
+docker-sh:
 	-docker compose run --rm dev

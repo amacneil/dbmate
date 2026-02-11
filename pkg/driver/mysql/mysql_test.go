@@ -2,7 +2,9 @@ package mysql
 
 import (
 	"database/sql"
+	"fmt"
 	"net/url"
+	"os/exec"
 	"testing"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
@@ -11,6 +13,14 @@ import (
 
 	"github.com/stretchr/testify/require"
 )
+
+type mockExecCmd struct {
+	output string
+}
+
+func (m *mockExecCmd) Output() ([]byte, error) {
+	return []byte(m.output), nil
+}
 
 func testMySQLDriver(t *testing.T) *Driver {
 	u := dbtest.GetenvURLOrSkip(t, "MYSQL_TEST_URL")
@@ -145,40 +155,103 @@ func TestMySQLCreateDropDatabase(t *testing.T) {
 	}()
 }
 
+func TestMysqldumpVersion(t *testing.T) {
+	cases := []struct {
+		name     string
+		command  string
+		version  string
+		expected *mysqldumpVersion
+	}{
+		{"MySQL 5.7.44", "mysqldump", "mysqldump  Ver 10.13 Distrib 5.7.44, for Linux (x86_64)", &mysqldumpVersion{DbType: "mysql", Version: 5.7, Command: "mysqldump"}},
+		{"MySQL 8.3.0", "mysqldump", "mysqldump  Ver 8.3.0 for macos13.6 on x86_64 (Homebrew)", &mysqldumpVersion{DbType: "mysql", Version: 8.3, Command: "mysqldump"}},
+		{"MySQL 8.4.7", "mysqldump", "mysqldump  Ver 8.4.7 for Linux on x86_64 (MySQL Community Server - GPL)", &mysqldumpVersion{DbType: "mysql", Version: 8.4, Command: "mysqldump"}},
+		{"MySQL 9.6.0", "mysqldump", "mysqldump  Ver 9.6.0 for macos26.2 on arm64 (Homebrew)", &mysqldumpVersion{DbType: "mysql", Version: 9.6, Command: "mysqldump"}},
+		{"MariaDB 10.11.15", "mysqldump", "mysqldump  Ver 10.19 Distrib 10.11.15-MariaDB, for debian-linux-gnu (x86_64)", &mysqldumpVersion{DbType: "mariadb", Version: 10.11, Command: "mysqldump"}},
+		{"MariaDB 11.8.5", "mariadb-dump", "mariadb-dump from 11.8.5-MariaDB, client 10.19 for debian-linux-gnu (x86_64)", &mysqldumpVersion{DbType: "mariadb", Version: 11.8, Command: "mariadb-dump"}},
+		{"MariaDB 12.0.2", "mariadb-dump", "mariadb-dump from 12.0.2-MariaDB, client 10.19 for debian-linux-gnu (x86_64)", &mysqldumpVersion{DbType: "mariadb", Version: 12.0, Command: "mariadb-dump"}},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			origExecCommand := execCommand
+			execCommand = func(_ string, _ ...string) execCmd {
+				return &mockExecCmd{
+					output: c.version,
+				}
+			}
+			origExecLookPath := execLookPath
+			execLookPath = func(file string) (string, error) {
+				if file == c.command {
+					return file, nil
+				}
+				return file, exec.ErrNotFound
+			}
+			defer func() {
+				execCommand = origExecCommand
+				execLookPath = origExecLookPath
+			}()
+
+			actual := getMysqldumpVersion()
+			require.Equal(t, c.expected, actual)
+		})
+	}
+}
+
 func TestMySQLDumpArgs(t *testing.T) {
-	drv := testMySQLDriver(t)
-	drv.databaseURL = dbtest.MustParseURL(t, "mysql://bob/mydb")
+	cases := []struct {
+		name     string
+		command  string
+		version  string
+		url      string
+		expected []string
+	}{
+		// mysql://bob/mydb
+		{"MySQL 5.7.44", "mysqldump", "mysqldump  Ver 10.13 Distrib 5.7.44, for Linux (x86_64)", "mysql://bob/mydb", []string{"--opt", "--routines", "--no-data", "--skip-dump-date", "--skip-add-drop-table", "--ssl=false", "--host=bob", "mydb"}},
+		{"MySQL 8.4.7", "mysqldump", "mysqldump  Ver 8.4.7 for Linux on x86_64 (MySQL Community Server - GPL)", "mysql://bob/mydb", []string{"--opt", "--routines", "--no-data", "--skip-dump-date", "--skip-add-drop-table", "--ssl-mode=DISABLED", "--host=bob", "mydb"}},
+		{"MySQL 9.6.0", "mysqldump", "mysqldump  Ver 9.6.0 for macos26.2 on arm64 (Homebrew)", "mysql://bob/mydb", []string{"--opt", "--routines", "--no-data", "--skip-dump-date", "--skip-add-drop-table", "--ssl-mode=DISABLED", "--host=bob", "mydb"}},
 
-	require.Equal(t, []string{"--opt",
-		"--routines",
-		"--no-data",
-		"--skip-dump-date",
-		"--skip-add-drop-table",
-		"--host=bob",
-		"mydb"}, drv.mysqldumpArgs())
+		// mysql://alice:pw@bob:5678/mydb
+		{"MySQL 5.7.44", "mysqldump", "mysqldump  Ver 10.13 Distrib 5.7.44, for Linux (x86_64)", "mysql://alice:pw@bob:5678/mydb", []string{"--opt", "--routines", "--no-data", "--skip-dump-date", "--skip-add-drop-table", "--ssl=false", "--host=bob", "--port=5678", "--user=alice", "--password=pw", "mydb"}},
+		{"MySQL 8.4.7", "mysqldump", "mysqldump  Ver 8.4.7 for Linux on x86_64 (MySQL Community Server - GPL)", "mysql://alice:pw@bob:5678/mydb", []string{"--opt", "--routines", "--no-data", "--skip-dump-date", "--skip-add-drop-table", "--ssl-mode=DISABLED", "--host=bob", "--port=5678", "--user=alice", "--password=pw", "mydb"}},
 
-	drv.databaseURL = dbtest.MustParseURL(t, "mysql://alice:pw@bob:5678/mydb")
-	require.Equal(t, []string{"--opt",
-		"--routines",
-		"--no-data",
-		"--skip-dump-date",
-		"--skip-add-drop-table",
-		"--host=bob",
-		"--port=5678",
-		"--user=alice",
-		"--password=pw",
-		"mydb"}, drv.mysqldumpArgs())
+		// mysql://alice:pw@bob:5678/mydb?tls=skip-verify
+		{"MySQL 5.7.44", "mysqldump", "mysqldump  Ver 10.13 Distrib 5.7.44, for Linux (x86_64)", "mysql://alice:pw@bob:5678/mydb?tls=skip-verify", []string{"--opt", "--routines", "--no-data", "--skip-dump-date", "--skip-add-drop-table", "--ssl-verify-server-cert=false", "--host=bob", "--port=5678", "--user=alice", "--password=pw", "mydb"}},
+		{"MySQL 8.4.7", "mysqldump", "mysqldump  Ver 8.4.7 for Linux on x86_64 (MySQL Community Server - GPL)", "mysql://alice:pw@bob:5678/mydb?tls=skip-verify", []string{"--opt", "--routines", "--no-data", "--skip-dump-date", "--skip-add-drop-table", "--ssl-mode=PREFERRED", "--host=bob", "--port=5678", "--user=alice", "--password=pw", "mydb"}},
 
-	drv.databaseURL = dbtest.MustParseURL(t, "mysql://alice:pw@bob:5678/mydb?socket=/var/run/mysqld/mysqld.sock")
-	require.Equal(t, []string{"--opt",
-		"--routines",
-		"--no-data",
-		"--skip-dump-date",
-		"--skip-add-drop-table",
-		"--socket=/var/run/mysqld/mysqld.sock",
-		"--user=alice",
-		"--password=pw",
-		"mydb"}, drv.mysqldumpArgs())
+		// mysql://alice:pw@bob:5678/mydb?socket=/var/run/mysqld/mysqld.sock
+		{"MySQL 5.7.44", "mysqldump", "mysqldump  Ver 10.13 Distrib 5.7.44, for Linux (x86_64)", "mysql://alice:pw@bob:5678/mydb?socket=/var/run/mysqld/mysqld.sock", []string{"--opt", "--routines", "--no-data", "--skip-dump-date", "--skip-add-drop-table", "--ssl=false", "--socket=/var/run/mysqld/mysqld.sock", "--user=alice", "--password=pw", "mydb"}},
+		{"MySQL 8.4.7", "mysqldump", "mysqldump  Ver 8.4.7 for Linux on x86_64 (MySQL Community Server - GPL)", "mysql://alice:pw@bob:5678/mydb?socket=/var/run/mysqld/mysqld.sock", []string{"--opt", "--routines", "--no-data", "--skip-dump-date", "--skip-add-drop-table", "--ssl-mode=DISABLED", "--socket=/var/run/mysqld/mysqld.sock", "--user=alice", "--password=pw", "mydb"}},
+	}
+
+	for _, c := range cases {
+		t.Run(fmt.Sprintf("%s__%s", c.name, c.url), func(t *testing.T) {
+			origExecCommand := execCommand
+			execCommand = func(_ string, _ ...string) execCmd {
+				return &mockExecCmd{
+					output: c.version,
+				}
+			}
+			origExecLookPath := execLookPath
+			execLookPath = func(file string) (string, error) {
+				if file == c.command {
+					return file, nil
+				}
+				return file, exec.ErrNotFound
+			}
+			defer func() {
+				execCommand = origExecCommand
+				execLookPath = origExecLookPath
+			}()
+
+			ver := getMysqldumpVersion()
+
+			drv := testMySQLDriver(t)
+			drv.databaseURL = dbtest.MustParseURL(t, c.url)
+
+			actual := drv.mysqldumpArgs(ver)
+			require.Equal(t, c.expected, actual)
+		})
+	}
 }
 
 func TestMySQLDumpSchema(t *testing.T) {

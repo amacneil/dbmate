@@ -8,12 +8,14 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v2"
+
+	"github.com/amacneil/dbmate/v2/pkg/dbmate"
 )
 
 func TestGetDatabaseUrl(t *testing.T) {
 	// set environment variables
-	require.NoError(t, os.Setenv("DATABASE_URL", "foo://example.org/one"))
-	require.NoError(t, os.Setenv("CUSTOM_URL", "foo://example.org/two"))
+	t.Setenv("DATABASE_URL", "foo://example.org/one")
+	t.Setenv("CUSTOM_URL", "foo://example.org/two")
 
 	app := NewApp()
 	flagset := flag.NewFlagSet(app.Name, flag.ContinueOnError)
@@ -62,30 +64,21 @@ func TestRedactLogString(t *testing.T) {
 
 func TestLoadEnvFiles(t *testing.T) {
 	setup := func(t *testing.T) {
-		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-
 		env := os.Environ()
+
+		// t.Chdir automatically restores the original directory when the test completes
+		t.Chdir("fixtures/loadEnvFiles")
+
+		// Clear environment after t.Chdir because t.Chdir sets PWD
 		os.Clearenv()
 
-		err = os.Chdir("fixtures/loadEnvFiles")
-		if err != nil {
-			t.Fatal(err)
-		}
-
+		// Restore environment variables when test completes
 		t.Cleanup(func() {
-			err := os.Chdir(cwd)
-			if err != nil {
-				t.Fatal(err)
-			}
-
 			os.Clearenv()
 
 			for _, e := range env {
 				pair := strings.SplitN(e, "=", 2)
-				os.Setenv(pair[0], pair[1])
+				t.Setenv(pair[0], pair[1])
 			}
 		})
 	}
@@ -131,7 +124,7 @@ func TestLoadEnvFiles(t *testing.T) {
 		setup(t)
 
 		// we do not load values over existing values
-		os.Setenv("FIRST", "not one")
+		t.Setenv("FIRST", "not one")
 
 		err := loadEnvFiles([]string{"--env-file", "first.txt"})
 		require.NoError(t, err)
@@ -176,5 +169,46 @@ func TestLoadEnvFiles(t *testing.T) {
 		// files after an invalid file should not get loaded
 		require.Equal(t, 1, len(os.Environ()))
 		require.Equal(t, "one", os.Getenv("FIRST"))
+	})
+}
+
+func TestConfigureDB_Driver(t *testing.T) {
+	var configuredDB *dbmate.DB
+
+	app := NewApp()
+	app.Commands = []*cli.Command{
+		{
+			Name: "test-config",
+			Action: func(c *cli.Context) error {
+				var err error
+				configuredDB, err = configureDB(c)
+				return err
+			},
+		},
+	}
+
+	t.Run("default is empty", func(t *testing.T) {
+		configuredDB = nil
+		err := app.Run([]string{"dbmate", "test-config"})
+		require.NoError(t, err)
+		require.Empty(t, configuredDB.DriverName)
+	})
+
+	t.Run("from env variable", func(t *testing.T) {
+		configuredDB = nil
+		t.Setenv("DBMATE_DRIVER", "postgres")
+
+		err := app.Run([]string{"dbmate", "test-config"})
+		require.NoError(t, err)
+		require.Equal(t, "postgres", configuredDB.DriverName)
+	})
+
+	t.Run("flag overrides env variable", func(t *testing.T) {
+		configuredDB = nil
+		t.Setenv("DBMATE_DRIVER", "postgres")
+
+		err := app.Run([]string{"dbmate", "--driver", "clickhouse", "test-config"})
+		require.NoError(t, err)
+		require.Equal(t, "clickhouse", configuredDB.DriverName)
 	})
 }

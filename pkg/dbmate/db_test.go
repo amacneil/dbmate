@@ -40,8 +40,7 @@ func newTestDB(t *testing.T, u *url.URL) *dbmate.DB {
 		require.NoError(t, err)
 	}
 
-	err = os.Chdir(rootDir + "/testdata")
-	require.NoError(t, err)
+	t.Chdir(rootDir + "/testdata")
 
 	db := dbmate.New(u)
 	db.AutoDumpSchema = false
@@ -59,6 +58,7 @@ func TestNew(t *testing.T) {
 	require.False(t, db.WaitBefore)
 	require.Equal(t, time.Second, db.WaitInterval)
 	require.Equal(t, 60*time.Second, db.WaitTimeout)
+	require.Empty(t, db.DriverName)
 }
 
 func TestGetDriver(t *testing.T) {
@@ -80,6 +80,28 @@ func TestGetDriver(t *testing.T) {
 		db := dbmate.New(dbtest.MustParseURL(t, "foo://bar"))
 		drv, err := db.Driver()
 		require.EqualError(t, err, "unsupported driver: foo")
+		require.Nil(t, drv)
+	})
+
+	t.Run("driver name override", func(t *testing.T) {
+		// URL has invalid scheme "foo", but we force "sqlite" via DriverName
+		db := dbmate.New(dbtest.MustParseURL(t, "foo:dbmate_test.sqlite3"))
+		db.DriverName = "sqlite"
+
+		drv, err := db.Driver()
+		require.NoError(t, err)
+		require.NotNil(t, drv)
+		// Verify actual scheme is not changed
+		require.Equal(t, db.DatabaseURL.Scheme, "foo")
+	})
+
+	t.Run("driver name override with invalid driver", func(t *testing.T) {
+		// URL is valid sqlite, but we force a non-existent driver
+		db := dbmate.New(dbtest.MustParseURL(t, "sqlite:dbmate_test.sqlite3"))
+		db.DriverName = "notadriver"
+
+		drv, err := db.Driver()
+		require.EqualError(t, err, "unsupported driver: notadriver")
 		require.Nil(t, drv)
 	})
 }
@@ -109,15 +131,13 @@ func TestDumpSchema(t *testing.T) {
 	db := newTestDB(t, sqliteTestURL(t))
 
 	// create custom schema file directory
-	dir, err := os.MkdirTemp("", "dbmate")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	// create schema.sql in subdirectory to test creating directory
 	db.SchemaFile = filepath.Join(dir, "/schema/schema.sql")
 
 	// drop database
-	err = db.Drop()
+	err := db.Drop()
 	require.NoError(t, err)
 
 	// create and migrate
@@ -143,15 +163,13 @@ func TestAutoDumpSchema(t *testing.T) {
 	db.AutoDumpSchema = true
 
 	// create custom schema file directory
-	dir, err := os.MkdirTemp("", "dbmate")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	// create schema.sql in subdirectory to test creating directory
 	db.SchemaFile = filepath.Join(dir, "/schema/schema.sql")
 
 	// drop database
-	err = db.Drop()
+	err := db.Drop()
 	require.NoError(t, err)
 
 	// schema.sql should not exist
@@ -187,9 +205,7 @@ func TestLoadSchema(t *testing.T) {
 	require.NoError(t, err)
 
 	// create custom schema file directory
-	dir, err := os.MkdirTemp("", "dbmate")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	// create schema.sql in subdirectory to test creating directory
 	db.SchemaFile = filepath.Join(dir, "/schema/schema.sql")
@@ -556,9 +572,7 @@ func TestFindMigrationsAbsolute(t *testing.T) {
 	})
 
 	t.Run("absolute path", func(t *testing.T) {
-		dir, err := os.MkdirTemp("", "dbmate")
-		require.NoError(t, err)
-		defer os.RemoveAll(dir)
+		dir := t.TempDir()
 		require.True(t, filepath.IsAbs(dir))
 
 		file, err := os.Create(filepath.Join(dir, "1234_example.sql"))
@@ -626,8 +640,10 @@ drop table users;
 	require.Equal(t, false, actual[2].Applied)
 
 	// test parsing first migration
-	parsed, err := actual[0].Parse()
+	parsedSections, err := actual[0].Parse()
 	require.Nil(t, err)
+
+	parsed := parsedSections[0]
 	require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);\n", parsed.Up)
 	require.True(t, parsed.UpOptions.Transaction())
 	require.Equal(t, "-- migrate:down\ndrop table users;\n", parsed.Down)

@@ -1,4 +1,7 @@
+import { createRequire } from "node:module";
 import { arch, platform } from "node:process";
+
+const require = createRequire(import.meta.url);
 
 /**
  * Resolve path to dbmate for the current platform

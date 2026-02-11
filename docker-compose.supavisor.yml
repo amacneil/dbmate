@@ -1,0 +1,87 @@
+services:
+  dev:
+    depends_on:
+      supavisor-db:
+        condition: service_healthy
+      supavisor:
+        condition: service_healthy
+      supavisor-create-tenant:
+        condition: service_completed_successfully
+    environment:
+      SUPAVISOR_SESSION_TEST_URL: postgres://postgres.dev_tenant:postgres@supavisor:5452/dbmate_test?sslmode=disable
+      SUPAVISOR_TRANSACTION_TEST_URL: postgres://postgres.dev_tenant:postgres@supavisor:6543/dbmate_test?sslmode=disable
+
+  supavisor-db:
+    image: supabase/postgres:15.1.0.148
+    shm_size: 128mb
+    environment:
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 5s
+
+  supavisor:
+    depends_on:
+      supavisor-db:
+        condition: service_healthy
+    image: supabase/supavisor:2.7.4
+    command: sh -c "/app/bin/migrate && /app/bin/server"
+    environment:
+      PORT: 4000
+      PROXY_PORT_SESSION: 5452
+      PROXY_PORT_TRANSACTION: 6543
+      CLUSTER_POSTGRES: "true"
+      DATABASE_URL: "ecto://postgres:postgres@supavisor-db:5432/postgres"
+      SECRET_KEY_BASE: "12345678901234567890121234567890123456789012345678903212345678901234567890123456789032123456789012345678901234567890323456789032"
+      VAULT_ENC_KEY: "12345678901234567890123456789032"
+      API_JWT_SECRET: "dev"
+      METRICS_JWT_SECRET: "dev"
+      REGION: "local"
+      ERL_AFLAGS: -proto_dist inet_tcp
+      DB_POOL_SIZE: 50
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/api/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 5s
+
+  supavisor-create-tenant:
+    depends_on:
+      supavisor:
+        condition: service_healthy
+    image: supabase/supavisor:2.7.4
+    command: |-
+      sh -c '
+        curl -sX PUT \
+          "http://supavisor:4000/api/tenants/dev_tenant" \
+          --header "Accept: */*" \
+          --header "User-Agent: Thunder Client (https://www.thunderclient.com)" \
+          --header "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNjQ1MTkyODI0LCJleHAiOjE5NjA3Njg4MjR9.M9jrxyvPLkUxWgOYSf5dNdJ8v_eRrq810ShFRT8N-6M" \
+          --header "Content-Type: application/json" \
+          --data-raw '\''{
+            "tenant": {
+              "db_host": "supavisor-db",
+              "db_port": 5432,
+              "db_database": "postgres",
+              "ip_version": "auto",
+              "enforce_ssl": false,
+              "require_user": false,
+              "auth_query": "SELECT rolname, rolpassword FROM pg_authid WHERE rolname=$1;",
+              "users": [
+                {
+                  "db_user": "postgres",
+                  "db_password": "postgres",
+                  "pool_size": 20,
+                  "mode_type": "transaction",
+                  "is_manager": true
+                }
+              ]
+            }
+          }'\''
+
+        psql postgres://postgres:postgres@supavisor-db:5432/postgres -c "create database dbmate_test"
+      '

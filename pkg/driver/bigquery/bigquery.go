@@ -93,7 +93,7 @@ func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
 
 		return client.Dataset(config.dataSet).Table(drv.migrationsTableName).Create(ctx, &bigquery.TableMetadata{
 			Schema: bigquery.Schema{
-				{
+				&bigquery.FieldSchema{
 					Name: "version",
 					Type: bigquery.StringFieldType,
 				},

@@ -1,4 +1,4 @@
-name: Release
+name: Post Release
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
 
 jobs:
   homebrew:
-    name: Bump Homebrew formula
+    name: Bump Homebrew Formula
     runs-on: ubuntu-latest
     steps:
       - uses: mislav/bump-homebrew-formula-action@v3

@@ -60,8 +60,8 @@ For a comparison between dbmate and other popular database schema migration tool
 Install using [NPM](https://www.npmjs.com/):
 
 ```sh
-$ npm install --save-dev dbmate
-$ npx dbmate --help
+npm install --save-dev dbmate
+npx dbmate --help
 ```
 
 **macOS**
@@ -69,7 +69,8 @@ $ npx dbmate --help
 Install using [Homebrew](https://brew.sh/):
 
 ```sh
-$ brew install dbmate
+brew install dbmate
+dbmate --help
 ```
 
 **Linux**
@@ -77,8 +78,9 @@ $ brew install dbmate
 Install the binary directly:
 
 ```sh
-$ sudo curl -fsSL -o /usr/local/bin/dbmate https://github.com/amacneil/dbmate/releases/latest/download/dbmate-linux-amd64
-$ sudo chmod +x /usr/local/bin/dbmate
+sudo curl -fsSL -o /usr/local/bin/dbmate https://github.com/amacneil/dbmate/releases/latest/download/dbmate-linux-amd64
+sudo chmod +x /usr/local/bin/dbmate
+/usr/local/bin/dbmate --help
 ```
 
 **Windows**
@@ -86,7 +88,8 @@ $ sudo chmod +x /usr/local/bin/dbmate
 Install using [Scoop](https://scoop.sh)
 
 ```pwsh
-$ scoop install dbmate
+scoop install dbmate
+dbmate --help
 ```
 
 **Docker**
@@ -96,13 +99,13 @@ Docker images are published to GitHub Container Registry ([`ghcr.io/amacneil/dbm
 Remember to set `--network=host` or see [this comment](https://github.com/amacneil/dbmate/issues/128#issuecomment-615924611) for more tips on using dbmate with docker networking):
 
 ```sh
-$ docker run --rm -it --network=host ghcr.io/amacneil/dbmate --help
+docker run --rm -it --network=host ghcr.io/amacneil/dbmate --help
 ```
 
 If you wish to create or apply migrations, you will need to use Docker's [bind mount](https://docs.docker.com/storage/bind-mounts/) feature to make your local working directory (`pwd`) available inside the dbmate container:
 
 ```sh
-$ docker run --rm -it --network=host -v "$(pwd)/db:/db" ghcr.io/amacneil/dbmate new create_users_table
+docker run --rm -it --network=host -v "$(pwd)/db:/db" ghcr.io/amacneil/dbmate new create_users_table
 ```
 
 ## Commands
@@ -127,6 +130,7 @@ dbmate wait      # wait for the database server to become available
 The following options are available with all commands. You must use command line arguments in the order `dbmate [global options] command [command options]`. Most options can also be configured via environment variables (and loaded from your `.env` file, which is helpful to share configuration between team members).
 
 - `--url, -u "protocol://host:port/dbname"` - specify the database url directly. _(env: `DATABASE_URL`)_
+- `--driver "driver_name"` - specify the driver to use (if empty, the driver is derived from database URL scheme). _(env: `DBMATE_DRIVER`)_
 - `--env, -e "DATABASE_URL"` - specify an environment variable to read the database connection URL from.
 - `--env-file ".env"` - specify an alternate environment variables file(s) to load.
 - `--migrations-dir, -d "./db/migrations"` - where to keep the migration files. _(env: `DBMATE_MIGRATIONS_DIR`)_
@@ -241,10 +245,51 @@ To specify an absolute path, add a forward slash to the path. The following will
 DATABASE_URL="sqlite:/tmp/database.sqlite3"
 ```
 
+Note that for some common [settings](https://sqlite.org/pragma.html) like `journal_mode` to improve performance, transactions need to be disabled for that migration file, e.g.
+
+```sql
+-- migrate:up transaction:false
+PRAGMA journal_mode = WAL;
+```
+
+Otherwise the migration will fail with "Error: cannot change into wal mode from within a transaction".
+
 #### ClickHouse
+
+Dbmate supports connecting to ClickHouse using native TCP (default) or HTTP/HTTPS.
+
+##### Native (TCP)
+
+By default, the `clickhouse://` scheme uses the native protocol on port `9000`.
 
 ```sh
 DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name"
+```
+
+##### HTTP / HTTPS
+
+You can use `clickhouse+http://` (deafult port 8123) or `clickhouse+https://` (default port 8443).
+
+```sh
+# HTTP (Defaults to port 8123)
+DATABASE_URL="clickhouse+http://username:password@127.0.0.1:8123/database_name"
+
+# HTTPS (Defaults to port 8443)
+DATABASE_URL="clickhouse+https://username:password@127.0.0.1:8443/database_name"
+```
+
+##### Using the --driver flag
+
+You can use the ClickHouse driver with a standard http/https/tcp URL by providing the --driver flag
+
+```sh
+# Connect via HTTP using generic URL syntax
+dbmate --driver clickhouse --url "http://username:password@127.0.0.1:8123/database_name" status
+
+dbmate --driver clickhouse --url "https://username:password@127.0.0.1:8443/database_name" status
+
+# Better to rely on the standard clickhouse:// scheme, but this is supported
+dbmate --driver clickhouse --url "tcp://username:password@127.0.0.1:9000/database_name" status
 ```
 
 To work with ClickHouse cluster, there are 4 connection query parameters that can be supplied:
@@ -350,6 +395,22 @@ create table users (
 -- migrate:down
 ```
 
+For related changes, it is possible to include multiple migrations in a single file using additional `migrate:up` and `migrate:down` sections. Migration file either succeeds or fails as a whole.
+
+```sql
+-- migrate:up
+CREATE TABLE users (id SERIAL PRIMARY KEY);
+
+-- migrate:down
+DROP TABLE users;
+
+-- migrate:up
+ALTER TABLE users ADD COLUMN email VARCHAR;
+
+-- migrate:down
+ALTER TABLE users DROP COLUMN email;
+```
+
 > Note: Migration files are named in the format `[version]_[description].sql`. Only the version (defined as all leading numeric characters in the file name) is recorded in the database, so you can safely rename a migration file without having any effect on its current application state.
 
 ### Running Migrations
@@ -401,7 +462,7 @@ dbmate supports options passed to a migration block in the form of `key:value` p
 
 **transaction**
 
-`transaction` is useful if you need to run some SQL which cannot be executed from within a transaction. For example, in Postgres, you would need to disable transactions for migrations that alter an enum type to add a value:
+`transaction` is useful if you do not want to run SQL inside a transaction:
 
 ```sql
 -- migrate:up transaction:false

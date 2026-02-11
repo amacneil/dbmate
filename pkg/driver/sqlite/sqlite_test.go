@@ -405,3 +405,12 @@ func TestSQLiteQuotedMigrationsTableName(t *testing.T) {
 		require.Equal(t, `"fooMigrations"`, name)
 	})
 }
+
+func TestSQLiteFTS5Available(t *testing.T) {
+	db := prepTestSQLiteDB(t)
+	defer dbutil.MustClose(db)
+
+	// this only passes if the FTS5 module is statically compiled in to the SQLite driver
+	_, err := db.Exec("CREATE VIRTUAL TABLE a USING fts5(b, c)")
+	require.NoError(t, err)
+}

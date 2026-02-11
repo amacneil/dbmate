@@ -72,4 +72,4 @@ services:
       --project=test --dataset=dbmate_test
 
   spanner-emulator:
-    image: gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator
+    image: gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator:v0.48.3

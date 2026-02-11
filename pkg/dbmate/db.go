@@ -40,6 +40,8 @@ type DB struct {
 	AutoDumpSchema bool
 	// DatabaseURL is the database connection string
 	DatabaseURL *url.URL
+	// DriverName used to force specific driver (overrides deriving from url scheme)
+	DriverName string
 	// FS specifies the filesystem, or nil for OS filesystem
 	FS fs.FS
 	// Log is the interface to write stdout
@@ -92,9 +94,13 @@ func (db *DB) Driver() (Driver, error) {
 		return nil, ErrInvalidURL
 	}
 
-	driverFunc := drivers[db.DatabaseURL.Scheme]
+	driverName := db.DatabaseURL.Scheme
+	if db.DriverName != "" {
+		driverName = db.DriverName
+	}
+	driverFunc := drivers[driverName]
 	if driverFunc == nil {
-		return nil, fmt.Errorf("%w: %s", ErrUnsupportedDriver, db.DatabaseURL.Scheme)
+		return nil, fmt.Errorf("%w: %s", ErrUnsupportedDriver, driverName)
 	}
 
 	config := DriverConfig{
@@ -247,6 +253,13 @@ func (db *DB) LoadSchema() error {
 		return err
 	}
 
+	// Strip psql meta-commands (e.g., \restrict, \unrestrict) that cannot be
+	// executed directly against the database server.
+	bytes, err = dbutil.StripPsqlMetaCommands(bytes)
+	if err != nil {
+		return err
+	}
+
 	result, err := sqlDB.Exec(string(bytes))
 	if err != nil {
 		return err
@@ -384,32 +397,34 @@ func (db *DB) Migrate() error {
 			return err
 		}
 
-		execMigration := func(tx dbutil.Transaction) error {
-			// run actual migration
-			result, err := tx.Exec(parsed.Up)
-			if err != nil {
-				return drv.QueryError(parsed.Up, err)
-			} else if db.Verbose {
-				db.printVerbose(result)
+		for _, migrationSection := range parsed {
+			execMigration := func(tx dbutil.Transaction) error {
+				// run actual migration
+				result, err := tx.Exec(migrationSection.Up)
+				if err != nil {
+					return drv.QueryError(migrationSection.Up, err)
+				} else if db.Verbose {
+					db.printVerbose(result)
+				}
+
+				// record migration
+				return drv.InsertMigration(tx, migration.Version)
 			}
 
-			// record migration
-			return drv.InsertMigration(tx, migration.Version)
-		}
+			if migrationSection.UpOptions.Transaction() {
+				// begin transaction
+				err = doTransaction(sqlDB, execMigration)
+			} else {
+				// run outside of transaction
+				err = execMigration(sqlDB)
+			}
 
-		if parsed.UpOptions.Transaction() {
-			// begin transaction
-			err = doTransaction(sqlDB, execMigration)
-		} else {
-			// run outside of transaction
-			err = execMigration(sqlDB)
-		}
+			elapsed := time.Since(start)
+			fmt.Fprintf(db.Log, "Applied: %s in %s\n", migration.FileName, elapsed)
 
-		elapsed := time.Since(start)
-		fmt.Fprintf(db.Log, "Applied: %s in %s\n", migration.FileName, elapsed)
-
-		if err != nil {
-			return err
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -548,42 +563,44 @@ func (db *DB) Rollback() error {
 
 	start := time.Now()
 
-	parsed, err := latest.Parse()
+	parsedSections, err := latest.Parse()
 	if err != nil {
 		return err
 	}
 
-	execMigration := func(tx dbutil.Transaction) error {
-		// rollback migration
-		result, err := tx.Exec(parsed.Down)
-		if err != nil {
-			return drv.QueryError(parsed.Down, err)
-		} else if db.Verbose {
-			db.printVerbose(result)
+	for _, migrationSection := range parsedSections {
+		execMigration := func(tx dbutil.Transaction) error {
+			// rollback migration
+			result, err := tx.Exec(migrationSection.Down)
+			if err != nil {
+				return drv.QueryError(migrationSection.Down, err)
+			} else if db.Verbose {
+				db.printVerbose(result)
+			}
+
+			// remove migration record
+			return drv.DeleteMigration(tx, latest.Version)
 		}
 
-		// remove migration record
-		return drv.DeleteMigration(tx, latest.Version)
-	}
+		if migrationSection.DownOptions.Transaction() {
+			// begin transaction
+			err = doTransaction(sqlDB, execMigration)
+		} else {
+			// run outside of transaction
+			err = execMigration(sqlDB)
+		}
 
-	if parsed.DownOptions.Transaction() {
-		// begin transaction
-		err = doTransaction(sqlDB, execMigration)
-	} else {
-		// run outside of transaction
-		err = execMigration(sqlDB)
-	}
+		elapsed := time.Since(start)
+		fmt.Fprintf(db.Log, "Rolled back: %s in %s\n", latest.FileName, elapsed)
 
-	elapsed := time.Since(start)
-	fmt.Fprintf(db.Log, "Rolled back: %s in %s\n", latest.FileName, elapsed)
+		if err != nil {
+			return err
+		}
 
-	if err != nil {
-		return err
-	}
-
-	// automatically update schema file, silence errors
-	if db.AutoDumpSchema {
-		_ = db.DumpSchema()
+		// automatically update schema file, silence errors
+		if db.AutoDumpSchema {
+			_ = db.DumpSchema()
+		}
 	}
 
 	return nil
