@@ -2,6 +2,7 @@ package clickhouse
 
 import (
 	"database/sql"
+	"fmt"
 	"testing"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
@@ -101,13 +102,13 @@ func TestClickHouseDumpSchemaOnCluster(t *testing.T) {
 	// insert migration
 	tx, err := db.Begin()
 	require.NoError(t, err)
-	err = drv.InsertMigration(tx, "abc1")
+	err = drv.InsertMigration(tx, "abc1", "checksum1")
 	require.NoError(t, err)
 	err = tx.Commit()
 	require.NoError(t, err)
 	tx, err = db.Begin()
 	require.NoError(t, err)
-	err = drv.InsertMigration(tx, "abc2")
+	err = drv.InsertMigration(tx, "abc2", "checksum2")
 	require.NoError(t, err)
 	err = tx.Commit()
 	require.NoError(t, err)
@@ -120,9 +121,9 @@ func TestClickHouseDumpSchemaOnCluster(t *testing.T) {
 	require.Contains(t, string(schema), "--\n"+
 		"-- Dbmate schema migrations\n"+
 		"--\n\n"+
-		"INSERT INTO "+drv.databaseName()+".test_migrations (version) VALUES\n"+
-		"    ('abc1'),\n"+
-		"    ('abc2');\n")
+		"INSERT INTO "+drv.databaseName()+".test_migrations (version, checksum) VALUES\n"+
+		"    ('abc1', 'checksum1'),\n"+
+		"    ('abc2', 'checksum2');\n")
 
 	// DumpSchema should return error if command fails
 	drv.databaseURL.Path = "/fakedb"
@@ -215,43 +216,43 @@ func TestClickHouseSelectMigrationsOnCluster(t *testing.T) {
 
 	tx, err := db01.Begin()
 	require.NoError(t, err)
-	stmt, err := tx.Prepare("insert into test_migrations (version) values (?)")
+	stmt, err := tx.Prepare("insert into test_migrations (version, checksum) values (?, ?)")
 	require.NoError(t, err)
-	_, err = stmt.Exec("abc2")
+	_, err = stmt.Exec("abc2", nil)
 	require.NoError(t, err)
-	_, err = stmt.Exec("abc1")
+	_, err = stmt.Exec("abc1", "checksum1")
 	require.NoError(t, err)
-	_, err = stmt.Exec("abc3")
+	_, err = stmt.Exec("abc3", "checksum3")
 	require.NoError(t, err)
 	err = tx.Commit()
 	require.NoError(t, err)
 
 	migrations01, err := drv01.SelectMigrations(db01, -1)
 	require.NoError(t, err)
-	require.Equal(t, true, migrations01["abc1"])
-	require.Equal(t, true, migrations01["abc2"])
-	require.Equal(t, true, migrations01["abc3"])
+	require.Equal(t, "checksum1", *migrations01["abc1"])
+	require.Equal(t, "", *migrations01["abc2"])
+	require.Equal(t, "checksum3", *migrations01["abc3"])
 
 	// Assert select on other node
 	migrations02, err := drv02.SelectMigrations(db02, -1)
 	require.NoError(t, err)
-	require.Equal(t, true, migrations02["abc1"])
-	require.Equal(t, true, migrations02["abc2"])
-	require.Equal(t, true, migrations02["abc3"])
+	require.Equal(t, "checksum1", *migrations02["abc1"])
+	require.Equal(t, "", *migrations02["abc2"])
+	require.Equal(t, "checksum3", *migrations02["abc3"])
 
 	// test limit param
 	migrations01, err = drv01.SelectMigrations(db01, 1)
 	require.NoError(t, err)
-	require.Equal(t, true, migrations01["abc3"])
-	require.Equal(t, false, migrations01["abc1"])
-	require.Equal(t, false, migrations01["abc2"])
+	require.Equal(t, "checksum3", *migrations01["abc3"])
+	require.Equal(t, (*string)(nil), migrations01["abc2"])
+	require.Equal(t, (*string)(nil), migrations01["abc1"])
 
 	// test limit param on other node
 	migrations02, err = drv02.SelectMigrations(db02, 1)
 	require.NoError(t, err)
-	require.Equal(t, true, migrations02["abc3"])
-	require.Equal(t, false, migrations02["abc1"])
-	require.Equal(t, false, migrations02["abc2"])
+	require.Equal(t, "checksum3", *migrations02["abc3"])
+	require.Equal(t, (*string)(nil), migrations02["abc2"])
+	require.Equal(t, (*string)(nil), migrations02["abc1"])
 }
 
 func TestClickHouseInsertMigrationOnCluster(t *testing.T) {
@@ -282,7 +283,7 @@ func TestClickHouseInsertMigrationOnCluster(t *testing.T) {
 	// insert migration
 	tx, err := db01.Begin()
 	require.NoError(t, err)
-	err = drv01.InsertMigration(tx, "abc1")
+	err = drv01.InsertMigration(tx, "abc1", "checksum1")
 	require.NoError(t, err)
 	err = tx.Commit()
 	require.NoError(t, err)
@@ -338,4 +339,65 @@ func TestClickHouseDeleteMigrationOnCluster(t *testing.T) {
 	err = db02.QueryRow("select count(*) from test_migrations final where applied").Scan(&count02)
 	require.NoError(t, err)
 	require.Equal(t, 1, count02)
+}
+
+func TestClickHouseAddChecksumColumnOnClusterNonReplicated(t *testing.T) {
+	drv01 := testClickHouseDriverCluster01(t)
+	drv02 := testClickHouseDriverCluster02(t)
+	// Use a distinct table name to avoid collisions
+	tableName := "test_migrations_nonrepl"
+	drv01.migrationsTableName = tableName
+	drv02.migrationsTableName = tableName
+
+	db01 := prepTestClickHouseDB(t, drv01)
+	defer dbutil.MustClose(db01)
+
+	db02 := prepTestClickHouseDB(t, drv02)
+	defer dbutil.MustClose(db02)
+
+	// Create migrations table WITHOUT checksum column, using non-replicated engine
+	// Even though OnCluster is true, we use ReplacingMergeTree (non-replicated)
+	// to test that ON CLUSTER clause is needed for DDL propagation across nodes.
+	engineClause := "ReplacingMergeTree(ts)"
+	createTableSQL := fmt.Sprintf(`
+		create table if not exists %s%s (
+			version String,
+			ts DateTime default now(),
+			applied UInt8 default 1
+		) engine = %s
+		primary key version
+		order by version
+	`, drv01.quotedMigrationsTableName(), drv01.onClusterClause(), engineClause)
+	_, err := db01.Exec(createTableSQL)
+	require.NoError(t, err)
+
+	// verify table exists on both nodes (because of ON CLUSTER clause)
+	exists, err := drv01.MigrationsTableExists(db01)
+	require.NoError(t, err)
+	require.True(t, exists)
+	exists, err = drv02.MigrationsTableExists(db02)
+	require.NoError(t, err)
+	require.True(t, exists)
+
+	// verify checksum column does not exist initially
+	hasChecksum, err := drv01.HasChecksumColumn(db01)
+	require.NoError(t, err)
+	require.False(t, hasChecksum)
+	hasChecksum, err = drv02.HasChecksumColumn(db02)
+	require.NoError(t, err)
+	require.False(t, hasChecksum)
+
+	// add checksum column
+	err = drv01.AddChecksumColumn(db01)
+	require.NoError(t, err)
+
+	// verify checksum column exists on node1 (where ALTER TABLE executed)
+	hasChecksum, err = drv01.HasChecksumColumn(db01)
+	require.NoError(t, err)
+	require.True(t, hasChecksum, "checksum column should exist on node1")
+
+	// verify checksum column exists on node2 (because of ON CLUSTER clause)
+	hasChecksum, err = drv02.HasChecksumColumn(db02)
+	require.NoError(t, err)
+	require.True(t, hasChecksum, "checksum column should exist on node2")
 }

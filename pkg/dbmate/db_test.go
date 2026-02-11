@@ -1,8 +1,11 @@
 package dbmate_test
 
 import (
+	"bytes"
+	"fmt"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -228,7 +231,10 @@ func TestLoadSchema(t *testing.T) {
 	// check applied migrations
 	appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
 	require.NoError(t, err)
-	require.Equal(t, map[string]bool{"20200227231541": true, "20151129054053": true}, appliedMigrations)
+	require.NotNil(t, appliedMigrations["20200227231541"])
+	require.NotNil(t, appliedMigrations["20151129054053"])
+	require.Equal(t, "f42c561983eab69a6d69984db98b23b432326acbd938d896687529933e29c54c", *appliedMigrations["20200227231541"])
+	require.Equal(t, "96df8abff6662d519c1a6993483d36e2d35955fd557f25e903abe7bd3dc113f1", *appliedMigrations["20151129054053"])
 
 	// users and posts tables have been created
 	var count int
@@ -367,7 +373,10 @@ func TestMigrate(t *testing.T) {
 		// check applied migrations
 		appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
 		require.NoError(t, err)
-		require.Equal(t, map[string]bool{"20200227231541": true, "20151129054053": true}, appliedMigrations)
+		require.NotNil(t, appliedMigrations["20200227231541"])
+		require.NotNil(t, appliedMigrations["20151129054053"])
+		require.Equal(t, "f42c561983eab69a6d69984db98b23b432326acbd938d896687529933e29c54c", *appliedMigrations["20200227231541"])
+		require.Equal(t, "96df8abff6662d519c1a6993483d36e2d35955fd557f25e903abe7bd3dc113f1", *appliedMigrations["20151129054053"])
 
 		// users table have records
 		count := 0
@@ -399,7 +408,10 @@ func TestUp(t *testing.T) {
 		// check applied migrations
 		appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
 		require.NoError(t, err)
-		require.Equal(t, map[string]bool{"20200227231541": true, "20151129054053": true}, appliedMigrations)
+		require.NotNil(t, appliedMigrations["20200227231541"])
+		require.NotNil(t, appliedMigrations["20151129054053"])
+		require.Equal(t, "f42c561983eab69a6d69984db98b23b432326acbd938d896687529933e29c54c", *appliedMigrations["20200227231541"])
+		require.Equal(t, "96df8abff6662d519c1a6993483d36e2d35955fd557f25e903abe7bd3dc113f1", *appliedMigrations["20151129054053"])
 
 		// users table have records
 		count := 0
@@ -438,7 +450,10 @@ func TestRollback(t *testing.T) {
 		// check applied migrations
 		appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
 		require.NoError(t, err)
-		require.Equal(t, map[string]bool{"20200227231541": true, "20151129054053": true}, appliedMigrations)
+		require.NotNil(t, appliedMigrations["20200227231541"])
+		require.NotNil(t, appliedMigrations["20151129054053"])
+		require.Equal(t, "f42c561983eab69a6d69984db98b23b432326acbd938d896687529933e29c54c", *appliedMigrations["20200227231541"])
+		require.Equal(t, "96df8abff6662d519c1a6993483d36e2d35955fd557f25e903abe7bd3dc113f1", *appliedMigrations["20151129054053"])
 
 		// users and posts tables have been created
 		var count int
@@ -657,6 +672,144 @@ func TestFindMigrationsFSMultipleDirs(t *testing.T) {
 	require.Equal(t, "db/migrations_b/004_test_migration_b.sql", actual[3].FilePath)
 	require.Equal(t, "db/migrations_a/005_test_migration_a.sql", actual[4].FilePath)
 	require.Equal(t, "db/migrations_c/006_test_migration_c.sql", actual[5].FilePath)
+}
+
+func TestFindMigrationsChecksum(t *testing.T) {
+	testEachURL(t, func(t *testing.T, u *url.URL) {
+		db := dbmate.New(u)
+		db.AutoDumpSchema = false
+		drv, err := db.Driver()
+		require.NoError(t, err)
+
+		db.ChecksumMode = dbmate.ChecksumLenient
+
+		// prepare
+		relDir := "migrations"
+		fileName := "20250101000000_create_foo.sql"
+		fullKey := path.Join(relDir, fileName)
+
+		// Original file content that will be used to compute the DB-stored checksum.
+		upSQLOriginal := `-- migrate:up
+CREATE TABLE foo (id INTEGER PRIMARY KEY);
+
+-- migrate:down
+DROP TABLE foo;
+`
+
+		mfs := fstest.MapFS{
+			fullKey: &fstest.MapFile{Data: []byte(upSQLOriginal)},
+		}
+
+		db.FS = mfs
+		db.MigrationsDir = []string{relDir}
+
+		// drop, recreate, and migrate database
+		err = db.Drop()
+		require.NoError(t, err)
+		err = db.Create()
+		require.NoError(t, err)
+
+		// verify migration
+		sqlDB, err := drv.Open()
+		require.NoError(t, err)
+		defer dbutil.MustClose(sqlDB)
+
+		// one pending
+		results, err := db.FindMigrations()
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		require.False(t, results[0].Applied)
+		migrationsTableExists, err := drv.MigrationsTableExists(sqlDB)
+		require.NoError(t, err)
+		require.False(t, migrationsTableExists)
+
+		// run migrations
+		err = db.Migrate()
+		require.NoError(t, err)
+
+		// one applied
+		results, err = db.FindMigrations()
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		require.True(t, results[0].Applied)
+
+		// Different content to simulate a modified file (triggers mismatch)
+		upSQLModified := `-- migrate:up
+CREATE TABLE foo (id INTEGER);
+
+-- migrate:down
+DROP TABLE foo;
+`
+
+		mfs = fstest.MapFS{
+			fullKey: &fstest.MapFile{Data: []byte(upSQLModified)},
+		}
+
+		db.FS = mfs
+
+		// capture logs
+		buf := &bytes.Buffer{}
+		db.Log = buf
+
+		err = db.Migrate()
+		require.NoError(t, err)
+
+		out := buf.String()
+		require.Contains(t, out, "Warning: The migration file `20250101000000_create_foo.sql` has been modified since it was applied.")
+
+		appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
+		require.NoError(t, err)
+		// It should keep the original checksum
+		require.Equal(t, dbmate.ComputeChecksum([]byte(upSQLOriginal)), *appliedMigrations["20250101000000"])
+
+		// Test Strict mode
+		db.ChecksumMode = dbmate.ChecksumStrict
+
+		err = db.Migrate()
+		require.Error(t, err)
+	})
+}
+
+func TestChecksumFeatureRetroCompatibility(t *testing.T) {
+	testEachURL(t, func(t *testing.T, u *url.URL) {
+		db := newTestDB(t, u)
+		db.AutoDumpSchema = false
+
+		drv, err := db.Driver()
+		require.NoError(t, err)
+
+		// drop, recreate, and migrate database
+		err = db.Drop()
+		require.NoError(t, err)
+		err = db.Create()
+		require.NoError(t, err)
+
+		// verify migration
+		sqlDB, err := drv.Open()
+		require.NoError(t, err)
+		defer dbutil.MustClose(sqlDB)
+
+		err = drv.CreateMigrationsTable(sqlDB)
+		require.NoError(t, err)
+
+		err = db.Migrate()
+		require.NoError(t, err)
+
+		_, err = sqlDB.Exec(fmt.Sprintf("alter table %s drop column checksum", db.MigrationsTableName))
+		require.NoError(t, err)
+
+		pending, err := db.Status(false)
+		require.NoError(t, err)
+		require.Equal(t, 0, pending)
+
+		migrations, err := drv.SelectMigrations(sqlDB, -1)
+		require.NoError(t, err)
+		require.NotNil(t, migrations["20200227231541"])
+		require.NotNil(t, migrations["20151129054053"])
+		// old migrations have no checksum set
+		require.Equal(t, "", *migrations["20200227231541"])
+		require.Equal(t, "", *migrations["20151129054053"])
+	})
 }
 
 func TestMigrateUnrestrictedOrder(t *testing.T) {

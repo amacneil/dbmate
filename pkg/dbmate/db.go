@@ -60,6 +60,8 @@ type DB struct {
 	WaitInterval time.Duration
 	// WaitTimeout specifies maximum time for connection attempts
 	WaitTimeout time.Duration
+	// ChecksumMode sepcifies migration checksum validation mode
+	ChecksumMode ChecksumMode
 }
 
 // StatusResult represents an available migration status
@@ -83,6 +85,7 @@ func New(databaseURL *url.URL) *DB {
 		WaitBefore:          false,
 		WaitInterval:        time.Second,
 		WaitTimeout:         60 * time.Second,
+		ChecksumMode:        ChecksumLenient,
 	}
 }
 
@@ -402,7 +405,7 @@ func (db *DB) Migrate() error {
 				}
 
 				// record migration
-				return drv.InsertMigration(tx, migration.Version)
+				return drv.InsertMigration(tx, migration.Version, migration.Checksum)
 			}
 
 			if migrationSection.UpOptions.Transaction() {
@@ -468,13 +471,25 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 	defer dbutil.MustClose(sqlDB)
 
 	// find applied migrations
-	appliedMigrations := map[string]bool{}
+	appliedMigrations := map[string]*string{}
 	migrationsTableExists, err := drv.MigrationsTableExists(sqlDB)
 	if err != nil {
 		return nil, err
 	}
 
 	if migrationsTableExists {
+		hasChecksumColumn, err := drv.HasChecksumColumn(sqlDB)
+		if err != nil {
+			return nil, err
+		}
+
+		if !hasChecksumColumn {
+			err = drv.AddChecksumColumn(sqlDB)
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		appliedMigrations, err = drv.SelectMigrations(sqlDB, -1)
 		if err != nil {
 			return nil, err
@@ -505,9 +520,30 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 				FilePath: path.Join(dir, matches[0]),
 				FS:       db.FS,
 				Version:  matches[1],
+				Checksum: "",
 			}
-			if ok := appliedMigrations[migration.Version]; ok {
+
+			contents, err := migration.readFile()
+			if err != nil {
+				return nil, err
+			}
+
+			migration.Checksum = ComputeChecksum([]byte(contents))
+
+			if checksum, ok := appliedMigrations[migration.Version]; ok {
 				migration.Applied = true
+
+				if db.ChecksumMode != ChecksumNone && checksum != nil && *checksum != "" && migration.Checksum != *checksum {
+					errMsg := fmt.Sprintf("The migration file `%s` has been modified since it was applied. Please ensure that the applied migrations are not modified afterwards.", migration.FileName)
+
+					if db.ChecksumMode == ChecksumStrict {
+						return nil, fmt.Errorf("%s%s%s", "\x1b[31m", errMsg, "\x1b[0m")
+					}
+
+					if db.ChecksumMode == ChecksumLenient {
+						fmt.Fprintf(db.Log, "%sWarning: %s%s\n", "\x1b[33m", errMsg, "\x1b[0m")
+					}
+				}
 			}
 
 			migrations = append(migrations, migration)
