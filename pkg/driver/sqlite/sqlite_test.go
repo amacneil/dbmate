@@ -184,7 +184,6 @@ func TestSQLiteDumpSchema(t *testing.T) {
 
 func TestSQLiteDatabaseExists(t *testing.T) {
 	drv := testSQLiteDriver(t)
-	defer drv.DropDatabase()
 
 	// drop any existing database
 	err := drv.DropDatabase()
