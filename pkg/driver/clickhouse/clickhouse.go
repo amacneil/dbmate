@@ -211,6 +211,14 @@ func (drv *Driver) schemaDump(db *sql.DB, buf *bytes.Buffer) error {
 }
 
 func (drv *Driver) schemaMigrationsDump(db *sql.DB, buf *bytes.Buffer) error {
+	exists, err := drv.MigrationsTableExists(db)
+	if err != nil {
+		return fmt.Errorf("failed to check if migration table exists: %w", err)
+	}
+	if !exists {
+		return nil
+	}
+
 	migrationsTable := drv.quotedMigrationsTableName()
 
 	// load applied migrations

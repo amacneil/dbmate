@@ -320,6 +320,23 @@ func TestMySQLDumpSchemaContainsNoAutoIncrement(t *testing.T) {
 	require.NotContains(t, string(schema), "AUTO_INCREMENT=")
 }
 
+func TestMySQLDumpSchemaDoesNotCreateMigrationsTable(t *testing.T) {
+	drv := testMySQLDriver(t)
+	drv.migrationsTableName = "test_migrations"
+
+	// prepare database
+	db := prepTestMySQLDB(t)
+	defer dbutil.MustClose(db)
+	_, err := db.Exec(`create table foo_table (id int not null primary key)`)
+	require.NoError(t, err)
+
+	// DumpSchema should return schema
+	schema, err := drv.DumpSchema(db)
+	require.NoError(t, err)
+	require.NotContains(t, string(schema), "CREATE TABLE `test_migrations`")
+	require.Contains(t, string(schema), "CREATE TABLE `foo_table`")
+}
+
 func TestMySQLDatabaseExists(t *testing.T) {
 	drv := testMySQLDriver(t)
 
