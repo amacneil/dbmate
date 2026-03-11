@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
@@ -165,7 +166,7 @@ func TestSQLiteDumpSchema(t *testing.T) {
 	schema, err := drv.DumpSchema(db)
 	require.NoError(t, err)
 	require.Contains(t, string(schema), "CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT)")
-	require.Contains(t, string(schema), "CREATE TABLE IF NOT EXISTS \"test_migrations\"")
+	require.Regexp(t, regexp.MustCompile("CREATE TABLE (IF NOT EXISTS )?\"test_migrations\""), string(schema))
 	require.Contains(t, string(schema), ");\n-- Dbmate schema migrations\n"+
 		"INSERT INTO \"test_migrations\" (version) VALUES\n"+
 		"  ('abc1'),\n"+
