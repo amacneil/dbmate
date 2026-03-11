@@ -66,6 +66,9 @@ jobs:
       - name: Setup environment
         run: ${{ matrix.setup }}
 
+      - name: Check sqlite3 version
+        run: sqlite3 --version
+
       - run: go mod download
 
       - run: make build ls
