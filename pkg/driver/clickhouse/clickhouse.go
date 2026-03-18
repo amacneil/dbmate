@@ -18,6 +18,8 @@ import (
 
 func init() {
 	dbmate.RegisterDriver(NewDriver, "clickhouse")
+	dbmate.RegisterDriver(NewDriver, "clickhouse+http")
+	dbmate.RegisterDriver(NewDriver, "clickhouse+https")
 }
 
 // Driver provides top level database functions
@@ -42,11 +44,23 @@ func connectionString(initialURL *url.URL) string {
 	// clone url
 	u, _ := url.Parse(initialURL.String())
 
-	host := u.Host
-	if u.Port() == "" {
-		host = fmt.Sprintf("%s:9000", host)
+	// Default TCP port for Clickhouse (works both for tcp and clickhouse scheme)
+	defaultPort := "9000"
+
+	// Update scheme and default port based on variant
+	switch u.Scheme {
+	case "clickhouse+http", "http":
+		u.Scheme = "http"
+		defaultPort = "8123"
+	case "clickhouse+https", "https":
+		u.Scheme = "https"
+		defaultPort = "8443"
 	}
-	u.Host = host
+
+	// Set default port if not specified
+	if u.Port() == "" {
+		u.Host = fmt.Sprintf("%s:%s", u.Host, defaultPort)
+	}
 
 	query := u.Query()
 	username := u.User.Username()
@@ -141,8 +155,8 @@ func (drv *Driver) escapeString(str string) string {
 
 // CreateDatabase creates the specified database
 func (drv *Driver) CreateDatabase() error {
-	name := drv.databaseName()
-	fmt.Fprintf(drv.log, "Creating: %s\n", name)
+	databaseName := drv.quotedDatabaseName()
+	fmt.Fprintf(drv.log, "Creating: %s\n", databaseName)
 
 	db, err := drv.openClickHouseDB()
 	if err != nil {
@@ -150,7 +164,7 @@ func (drv *Driver) CreateDatabase() error {
 	}
 	defer dbutil.MustClose(db)
 
-	q := fmt.Sprintf("CREATE DATABASE %s%s", drv.quoteIdentifier(name), drv.onClusterClause())
+	q := fmt.Sprintf("CREATE DATABASE %s%s", databaseName, drv.onClusterClause())
 
 	_, err = db.Exec(q)
 
@@ -159,8 +173,8 @@ func (drv *Driver) CreateDatabase() error {
 
 // DropDatabase drops the specified database (if it exists)
 func (drv *Driver) DropDatabase() error {
-	name := drv.databaseName()
-	fmt.Fprintf(drv.log, "Dropping: %s\n", name)
+	databaseName := drv.quotedDatabaseName()
+	fmt.Fprintf(drv.log, "Dropping: %s\n", databaseName)
 
 	db, err := drv.openClickHouseDB()
 	if err != nil {
@@ -168,16 +182,16 @@ func (drv *Driver) DropDatabase() error {
 	}
 	defer dbutil.MustClose(db)
 
-	q := fmt.Sprintf("DROP DATABASE IF EXISTS %s%s", drv.quoteIdentifier(name), drv.onClusterClause())
+	q := fmt.Sprintf("DROP DATABASE IF EXISTS %s%s", databaseName, drv.onClusterClause())
 
 	_, err = db.Exec(q)
 
 	return err
 }
 
-func (drv *Driver) schemaDump(db *sql.DB, buf *bytes.Buffer, databaseName string) error {
+func (drv *Driver) schemaDump(db *sql.DB, buf *bytes.Buffer) error {
 	buf.WriteString("\n--\n-- Database schema\n--\n\n")
-	fmt.Fprintf(buf, "CREATE DATABASE IF NOT EXISTS %s%s;\n\n", drv.quoteIdentifier(databaseName), drv.onClusterClause())
+	fmt.Fprintf(buf, "CREATE DATABASE IF NOT EXISTS %s%s;\n\n", drv.quotedDatabaseName(), drv.onClusterClause())
 
 	tables, err := dbutil.QueryColumn(db, "show tables")
 	if err != nil {
@@ -218,7 +232,7 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB, buf *bytes.Buffer) error {
 
 	if len(migrations) > 0 {
 		buf.WriteString(
-			fmt.Sprintf("INSERT INTO %s (version) VALUES\n    (", migrationsTable) +
+			fmt.Sprintf("INSERT INTO %s.%s (version) VALUES\n    (", drv.quotedDatabaseName(), migrationsTable) +
 				strings.Join(migrations, "),\n    (") +
 				");\n")
 	}
@@ -227,11 +241,11 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB, buf *bytes.Buffer) error {
 }
 
 // DumpSchema returns the current database schema
-func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
+func (drv *Driver) DumpSchema(db *sql.DB, _ ...string) ([]byte, error) {
 	var buf bytes.Buffer
 	var err error
 
-	err = drv.schemaDump(db, &buf, drv.databaseName())
+	err = drv.schemaDump(db, &buf)
 	if err != nil {
 		return nil, err
 	}
@@ -385,4 +399,8 @@ func (*Driver) PrepareTransaction(_ dbutil.Transaction) error {
 
 func (drv *Driver) quotedMigrationsTableName() string {
 	return drv.quoteIdentifier(drv.migrationsTableName)
+}
+
+func (drv *Driver) quotedDatabaseName() string {
+	return drv.quoteIdentifier(drv.databaseName())
 }

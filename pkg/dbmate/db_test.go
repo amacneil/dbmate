@@ -31,6 +31,16 @@ func sqliteBrokenTestURL(t *testing.T) *url.URL {
 	return dbtest.MustParseURL(t, "sqlite:/doesnotexist/dbmate_test.sqlite3")
 }
 
+func mysqlTestURL(t *testing.T) *url.URL {
+	u := dbtest.GetenvURLOrSkip(t, "MYSQL_TEST_URL")
+	return dbtest.MustParseURL(t, u.String())
+}
+
+func postgresTestURL(t *testing.T) *url.URL {
+	u := dbtest.GetenvURLOrSkip(t, "POSTGRES_TEST_URL")
+	return dbtest.MustParseURL(t, u.String())
+}
+
 func newTestDB(t *testing.T, u *url.URL) *dbmate.DB {
 	var err error
 
@@ -58,6 +68,7 @@ func TestNew(t *testing.T) {
 	require.False(t, db.WaitBefore)
 	require.Equal(t, time.Second, db.WaitInterval)
 	require.Equal(t, 60*time.Second, db.WaitTimeout)
+	require.Empty(t, db.DriverName)
 }
 
 func TestGetDriver(t *testing.T) {
@@ -79,6 +90,28 @@ func TestGetDriver(t *testing.T) {
 		db := dbmate.New(dbtest.MustParseURL(t, "foo://bar"))
 		drv, err := db.Driver()
 		require.EqualError(t, err, "unsupported driver: foo")
+		require.Nil(t, drv)
+	})
+
+	t.Run("driver name override", func(t *testing.T) {
+		// URL has invalid scheme "foo", but we force "sqlite" via DriverName
+		db := dbmate.New(dbtest.MustParseURL(t, "foo:dbmate_test.sqlite3"))
+		db.DriverName = "sqlite"
+
+		drv, err := db.Driver()
+		require.NoError(t, err)
+		require.NotNil(t, drv)
+		// Verify actual scheme is not changed
+		require.Equal(t, db.DatabaseURL.Scheme, "foo")
+	})
+
+	t.Run("driver name override with invalid driver", func(t *testing.T) {
+		// URL is valid sqlite, but we force a non-existent driver
+		db := dbmate.New(dbtest.MustParseURL(t, "sqlite:dbmate_test.sqlite3"))
+		db.DriverName = "notadriver"
+
+		drv, err := db.Driver()
+		require.EqualError(t, err, "unsupported driver: notadriver")
 		require.Nil(t, drv)
 	})
 }
@@ -133,6 +166,48 @@ func TestDumpSchema(t *testing.T) {
 	schema, err := os.ReadFile(db.SchemaFile)
 	require.NoError(t, err)
 	require.Contains(t, string(schema), "-- Dbmate schema migrations")
+}
+
+// TestDumpSchemaExtraArgs test that extra arguments are received by DumpSchema by passing undefined arguments
+func TestDumpSchemaExtraArgs(t *testing.T) {
+	t.Run("MySQL", func(t *testing.T) {
+		db := newTestDB(t, mysqlTestURL(t))
+
+		// drop database
+		err := db.Drop()
+		require.NoError(t, err)
+
+		// create and migrate
+		err = db.CreateAndMigrate()
+		require.NoError(t, err)
+
+		// Dump schema passing the undefined extra args
+		db.Args = []string{"--non-existing-argument"}
+		err = db.DumpSchema()
+
+		// assert error is returned and contains the invalid argument
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "unknown option '--non-existing-argument'")
+	})
+	t.Run("PostgresSQL", func(t *testing.T) {
+		db := newTestDB(t, postgresTestURL(t))
+
+		// drop database
+		err := db.Drop()
+		require.NoError(t, err)
+
+		// create and migrate
+		err = db.CreateAndMigrate()
+		require.NoError(t, err)
+
+		// Dump schema passing the undefined extra args
+		db.Args = []string{"--non-existing-argument"}
+		err = db.DumpSchema()
+
+		// assert error is returned and contains the invalid argument
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "unrecognized option '--non-existing-argument'")
+	})
 }
 
 func TestAutoDumpSchema(t *testing.T) {

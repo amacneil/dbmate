@@ -244,7 +244,7 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
+func (drv *Driver) DumpSchema(db *sql.DB, _ ...string) ([]byte, error) {
 	schema, err := drv.schemaDump(db)
 	if err != nil {
 		return nil, err

@@ -4,9 +4,12 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    ignore:
-      - dependency-name: golang
-        versions: ["*rc*"]
+    # Ignore RC versions of golang - commented out due to invalid syntax.
+    # Docker ignore conditions don't support glob patterns in versions.
+    # See: https://github.com/dependabot/dependabot-core/issues/8677
+    # ignore:
+    #   - dependency-name: golang
+    #     versions: ["*rc*"]
 
   - package-ecosystem: github-actions
     directory: /

@@ -189,7 +189,7 @@ func getMysqldumpVersion() *mysqldumpVersion {
 	return ver
 }
 
-func (drv *Driver) mysqldumpArgs(ver *mysqldumpVersion) []string {
+func (drv *Driver) mysqldumpArgs(ver *mysqldumpVersion, userArgs ...string) []string {
 	// generate CLI arguments
 	args := []string{"--opt", "--routines", "--no-data",
 		"--skip-dump-date", "--skip-add-drop-table"}
@@ -236,9 +236,8 @@ func (drv *Driver) mysqldumpArgs(ver *mysqldumpVersion) []string {
 		args = append(args, "--password="+password)
 	}
 
-	// add database name
+	args = append(args, userArgs...)
 	args = append(args, dbutil.DatabaseName(drv.databaseURL))
-
 	return args
 }
 
@@ -270,9 +269,10 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 }
 
 // DumpSchema returns the current database schema
-func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
+func (drv *Driver) DumpSchema(db *sql.DB, extraArgs ...string) ([]byte, error) {
 	ver := getMysqldumpVersion()
-	schema, err := dbutil.RunCommand(ver.Command, drv.mysqldumpArgs(ver)...)
+
+	schema, err := dbutil.RunCommand(ver.Command, drv.mysqldumpArgs(ver, extraArgs...)...)
 	if err != nil {
 		return nil, err
 	}

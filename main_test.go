@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v2"
+
+	"github.com/amacneil/dbmate/v2/pkg/dbmate"
 )
 
 func TestGetDatabaseUrl(t *testing.T) {
@@ -167,5 +169,46 @@ func TestLoadEnvFiles(t *testing.T) {
 		// files after an invalid file should not get loaded
 		require.Equal(t, 1, len(os.Environ()))
 		require.Equal(t, "one", os.Getenv("FIRST"))
+	})
+}
+
+func TestConfigureDB_Driver(t *testing.T) {
+	var configuredDB *dbmate.DB
+
+	app := NewApp()
+	app.Commands = []*cli.Command{
+		{
+			Name: "test-config",
+			Action: func(c *cli.Context) error {
+				var err error
+				configuredDB, err = configureDB(c)
+				return err
+			},
+		},
+	}
+
+	t.Run("default is empty", func(t *testing.T) {
+		configuredDB = nil
+		err := app.Run([]string{"dbmate", "test-config"})
+		require.NoError(t, err)
+		require.Empty(t, configuredDB.DriverName)
+	})
+
+	t.Run("from env variable", func(t *testing.T) {
+		configuredDB = nil
+		t.Setenv("DBMATE_DRIVER", "postgres")
+
+		err := app.Run([]string{"dbmate", "test-config"})
+		require.NoError(t, err)
+		require.Equal(t, "postgres", configuredDB.DriverName)
+	})
+
+	t.Run("flag overrides env variable", func(t *testing.T) {
+		configuredDB = nil
+		t.Setenv("DBMATE_DRIVER", "postgres")
+
+		err := app.Run([]string{"dbmate", "--driver", "clickhouse", "test-config"})
+		require.NoError(t, err)
+		require.Equal(t, "clickhouse", configuredDB.DriverName)
 	})
 }
