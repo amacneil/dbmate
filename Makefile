@@ -63,7 +63,7 @@ update-deps:
 	go mod verify
 	cd typescript && \
 		rm -f package-lock.json && \
-		./node_modules/.bin/npm-check-updates --upgrade && \
+		./node_modules/.bin/npm-check-updates --upgrade --peer && \
 		npm install && \
 		npm dedupe
 
