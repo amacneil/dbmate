@@ -219,7 +219,6 @@ func TestNewMigrationTemplate(t *testing.T) {
 	})
 }
 
-
 func TestWait(t *testing.T) {
 	db := newTestDB(t, sqliteTestURL(t))
 
