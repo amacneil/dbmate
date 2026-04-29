@@ -25,6 +25,7 @@ For a comparison between dbmate and other popular database schema migration tool
     - [BigQuery](#bigquery)
     - [Spanner](#spanner)
   - [Creating Migrations](#creating-migrations)
+    - [Migration templates](#migration-templates)
   - [Running Migrations](#running-migrations)
   - [Rolling Back Migrations](#rolling-back-migrations)
   - [Migration Options](#migration-options)
@@ -136,6 +137,8 @@ The following options are available with all commands. You must use command line
 - `--env-file ".env"` - specify an alternate environment variables file(s) to load.
 - `--migrations-dir, -d "./db/migrations"` - where to keep the migration files. _(env: `DBMATE_MIGRATIONS_DIR`)_
 - `--migrations-table "schema_migrations"` - database table to record migrations in. _(env: `DBMATE_MIGRATIONS_TABLE`)_
+- `--templates-dir "./db/migration_templates"` - directory containing `.sql` files used as migration templates by `dbmate new`. _(env: `DBMATE_TEMPLATES_DIR`)_
+- `--template-default "baseline"` - default template name (filename without `.sql`) when `dbmate new` is run without `--template`. _(env: `DBMATE_TEMPLATE_DEFAULT`)_
 - `--schema-file, -s "./db/schema.sql"` - a path to keep the schema.sql file. _(env: `DBMATE_SCHEMA_FILE`)_
 - `--no-dump-schema` - don't auto-update the schema.sql file on migrate/rollback _(env: `DBMATE_NO_DUMP_SCHEMA`)_
 - `--strict` - fail if migrations would be applied out of order _(env: `DBMATE_STRICT`)_
@@ -395,6 +398,18 @@ To create a new migration, run `dbmate new create_users_table`. You can name the
 -- migrate:down
 ```
 
+#### Migration templates
+
+By default, `dbmate new` uses the built-in skeleton above. You can instead generate a file from your own templates: add one or more `.sql` files to a directory, point dbmate at that directory with `--templates-dir` or `DBMATE_TEMPLATES_DIR`, then pass the template basename (without `.sql`) to `dbmate new`:
+
+```sh
+dbmate --templates-dir ./db/migration_templates new --template create_table create_widgets_table
+```
+
+That reads `./db/migration_templates/create_table.sql` and writes a new timestamped migration whose initial contents match the template file.
+
+If you set `--template-default` or `DBMATE_TEMPLATE_DEFAULT` to a template name, `dbmate new my_migration` uses that template when you omit `--template`. Using a template requires `DBMATE_TEMPLATES_DIR` (or `--templates-dir`) to be set; otherwise dbmate exits with an error.
+
 To write a migration, simply add your SQL to the `migrate:up` section:
 
 ```sql
@@ -546,7 +561,7 @@ mysqldump [default_options] [your_arguments_go_here] dbname
 for pg_dump:
 ```sh
 pg_dump [default_options] [your_arguments_go_here] dbname
-``` 
+```
 
 > Note: The `schema.sql` file will contain a complete schema for your database, even if some tables or columns were created outside of dbmate migrations.
 
@@ -628,7 +643,7 @@ func main() {
 
 ### Migration files
 
-Migration files are very simple, and are stored in `./db/migrations` by default. You can create a new migration file named `[date]_create_users.sql` by running `dbmate new create_users`.
+Migration files are very simple, and are stored in `./db/migrations` by default. You can create a new migration file named `[date]_create_users.sql` by running `dbmate new create_users`. Optional [migration templates](#migration-templates) let you start from shared `.sql` snippets instead of the default skeleton.
 Here is an example:
 
 ```sql
