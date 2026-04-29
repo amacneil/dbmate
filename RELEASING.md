@@ -10,11 +10,6 @@ Create a PR titled `vX.Y.Z` ([example](https://github.com/amacneil/dbmate/pull/6
 
 - Update [version.go](/pkg/dbmate/version.go) with new version number
 
-**Commit 2: `Upgrade dependencies`**
-
-- Update `Dockerfile` with the latest stable release of [golangci-lint](https://github.com/golangci/golangci-lint/releases)
-- Run `make update-deps` to update all Go and TypeScript dependencies
-
 ## 2. Create GitHub Release
 
 After the PR is merged, create a new release titled `vX.Y.Z` on the [releases page](https://github.com/amacneil/dbmate/releases) and write release notes.
