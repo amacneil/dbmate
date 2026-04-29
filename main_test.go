@@ -58,6 +58,9 @@ func TestRedactLogString(t *testing.T) {
 		// password containing @ sign - should redact entire password
 		{"parse \"postgres://username:oRAND44@W)£+@1.1.1.1:5432/db_name\": invalid",
 			"parse \"postgres://username:********@1.1.1.1:5432/db_name\": invalid"},
+		// @ signs in query values are not part of the password
+		{"parse \"postgresql://user:password@host:5432/mydb?foo=b@r\": invalid",
+			"parse \"postgresql://user:********@host:5432/mydb?foo=b@r\": invalid"},
 	}
 
 	for _, ex := range examples {
