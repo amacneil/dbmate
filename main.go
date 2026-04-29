@@ -343,7 +343,7 @@ func getDatabaseURL(c *cli.Context) (u *url.URL, err error) {
 
 // redactLogString attempts to redact passwords from errors
 func redactLogString(in string) string {
-	re := regexp.MustCompile("([a-zA-Z]+://[^:]+:).+@")
+	re := regexp.MustCompile(`([a-zA-Z]+://[^:]+:)[^\s?#]+@`)
 
 	return re.ReplaceAllString(in, "${1}********@")
 }
