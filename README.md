@@ -20,6 +20,7 @@ For a comparison between dbmate and other popular database schema migration tool
   - [Connecting to the Database](#connecting-to-the-database)
     - [PostgreSQL](#postgresql)
     - [MySQL](#mysql)
+    - [MariaDB](#mariadb)
     - [SQLite](#sqlite)
     - [ClickHouse](#clickhouse)
     - [BigQuery](#bigquery)
@@ -42,7 +43,7 @@ For a comparison between dbmate and other popular database schema migration tool
 
 ## Features
 
-- Supports MySQL, PostgreSQL, SQLite, and ClickHouse
+- Supports MySQL, MariaDB, PostgreSQL, SQLite, and ClickHouse
 - Uses plain SQL for writing schema migrations
 - Migrations are timestamp-versioned, to avoid version number conflicts with multiple developers
 - Migrations are run atomically inside a transaction
@@ -243,6 +244,10 @@ A `socket` parameter can be specified to connect through a unix socket:
 ```sh
 DATABASE_URL="mysql://username:password@/database_name?socket=/var/run/mysqld/mysqld.sock"
 ```
+
+#### MariaDB
+
+MariaDB is supported using the same `mysql://` connection URLs as MySQL. The Docker image includes `mariadb-client` for schema dumps; `mariadb-dump` is used when available.
 
 #### SQLite
 
