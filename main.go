@@ -68,6 +68,11 @@ func NewApp() *cli.App {
 			Usage:   "specify the directory containing migration files",
 		},
 		&cli.StringFlag{
+			Name:    "migrations-url",
+			EnvVars: []string{"DBMATE_MIGRATIONS_URL"},
+			Usage:   "specify a database URL to read migrations from (sync only). If set, sync reads migrations from this DB instead of filesystem",
+		},
+		&cli.StringFlag{
 			Name:    "migrations-table",
 			EnvVars: []string{"DBMATE_MIGRATIONS_TABLE"},
 			Value:   defaultDB.MigrationsTableName,
@@ -184,8 +189,8 @@ func NewApp() *cli.App {
 			}),
 		},
 		{
-			Name:    "sync",
-			Usage:   "Strips eventual later migrations or migrate up in case the database is older",
+			Name:  "sync",
+			Usage: "Strips eventual later migrations or migrate up in case the database is older. Uses filesystem migrations by default; if --migrations-url is set, reads migrations from that database.",
 			Flags: []cli.Flag{
 				&cli.BoolFlag{
 					Name:    "verbose",
@@ -196,6 +201,12 @@ func NewApp() *cli.App {
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
 				db.Verbose = c.Bool("verbose")
+
+				// check ambiguità
+				if db.MigrationsUrl != "" && c.IsSet("migrations-dir") {
+					return fmt.Errorf("cannot use both --migrations-url and --migrations-dir with sync: choose one source")
+				}
+
 				return db.Synchronize()
 			}),
 		},
@@ -314,8 +325,14 @@ func action(f func(*dbmate.DB, *cli.Context) error) cli.ActionFunc {
 		db.SchemaFile = c.String("schema-file")
 		db.WaitBefore = c.Bool("wait")
 		waitTimeout := c.Duration("wait-timeout")
+		db.MigrationsUrl = c.String("migrations-url") // ✅ AGGIUNTO
+
 		if waitTimeout != 0 {
 			db.WaitTimeout = waitTimeout
+		}
+
+		if c.String("migrations-url") != "" && c.Command.Name != "sync" {
+			return fmt.Errorf("--migrations-url is supported only for the sync command")
 		}
 
 		return f(db, c)

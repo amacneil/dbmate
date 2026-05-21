@@ -15,6 +15,7 @@ type Migration struct {
 	FilePath string
 	FS       fs.FS
 	Version  string
+	Dump	 string
 }
 
 func (m *Migration) readFile() (string, error) {
@@ -29,12 +30,16 @@ func (m *Migration) readFile() (string, error) {
 
 // Parse a migration
 func (m *Migration) Parse() (*ParsedMigration, error) {
-	contents, err := m.readFile()
-	if err != nil {
-		return nil, err
-	}
+    if m.Dump != "" {
+        return parseMigrationContents(m.Dump)
+    }
 
-	return parseMigrationContents(contents)
+    contents, err := m.readFile()
+    if err != nil {
+        return nil, err
+    }
+
+    return parseMigrationContents(contents)
 }
 
 // ParsedMigration contains the migration contents and options
@@ -43,6 +48,7 @@ type ParsedMigration struct {
 	UpOptions   ParsedMigrationOptions
 	Down        string
 	DownOptions ParsedMigrationOptions
+	Full		string
 }
 
 // ParsedMigrationOptions is an interface for accessing migration options
@@ -76,38 +82,34 @@ var (
 	ErrParseUnexpectedStmt = errors.New("dbmate does not support statements preceding the '-- migrate:up' block")
 )
 
-// parseMigrationContents parses the string contents of a migration.
-// It will return two Migration objects, the first representing the "up"
-// block and the second representing the "down" block. This function
-// requires that at least an up block was defined and will otherwise
-// return an error.
 func parseMigrationContents(contents string) (*ParsedMigration, error) {
-	upDirectiveStart, hasDefinedUpBlock := getMatchPosition(contents, upRegExp)
-	downDirectiveStart, hasDefinedDownBlock := getMatchPosition(contents, downRegExp)
+    upDirectiveStart, hasDefinedUpBlock := getMatchPosition(contents, upRegExp)
+    downDirectiveStart, hasDefinedDownBlock := getMatchPosition(contents, downRegExp)
 
-	if !hasDefinedUpBlock {
-		return nil, ErrParseMissingUp
-	}
-	if !hasDefinedDownBlock {
-		return nil, ErrParseMissingDown
-	}
-	if upDirectiveStart > downDirectiveStart {
-		return nil, ErrParseWrongOrder
-	}
-	if statementsPrecedeMigrateBlocks(contents, upDirectiveStart) {
-		return nil, ErrParseUnexpectedStmt
-	}
+    if !hasDefinedUpBlock {
+        return nil, ErrParseMissingUp
+    }
+    if !hasDefinedDownBlock {
+        return nil, ErrParseMissingDown
+    }
+    if upDirectiveStart > downDirectiveStart {
+        return nil, ErrParseWrongOrder
+    }
+    if statementsPrecedeMigrateBlocks(contents, upDirectiveStart) {
+        return nil, ErrParseUnexpectedStmt
+    }
 
-	upBlock := substring(contents, upDirectiveStart, downDirectiveStart)
-	downBlock := substring(contents, downDirectiveStart, len(contents))
+    upBlock := substring(contents, upDirectiveStart, downDirectiveStart)
+    downBlock := substring(contents, downDirectiveStart, len(contents))
 
-	parsed := ParsedMigration{
-		Up:          upBlock,
-		UpOptions:   parseMigrationOptions(upBlock),
-		Down:        downBlock,
-		DownOptions: parseMigrationOptions(downBlock),
-	}
-	return &parsed, nil
+    parsed := ParsedMigration{
+        Up:          upBlock,
+        UpOptions:   parseMigrationOptions(upBlock),
+        Down:        downBlock,
+        DownOptions: parseMigrationOptions(downBlock),
+        Full: 		 contents,
+    }
+    return &parsed, nil
 }
 
 // parseMigrationOptions parses the migration options out of a block
@@ -148,6 +150,38 @@ func parseMigrationOptions(contents string) ParsedMigrationOptions {
 	}
 
 	return options
+}
+
+func dumpHasUpDown(dump string) bool {
+    upStart, hasUp := getMatchPosition(dump, upRegExp)
+    downStart, hasDown := getMatchPosition(dump, downRegExp)
+    return hasUp && hasDown && upStart < downStart
+}
+
+func dumpHasOnlyDown(dump string) bool {
+    _, hasUp := getMatchPosition(dump, upRegExp)
+    _, hasDown := getMatchPosition(dump, downRegExp)
+    return !hasUp && hasDown
+}
+
+func extractDown(dump string) string {
+    // se non c’è il marker down, assume che dump sia già "down-only"
+    downStart, hasDown := getMatchPosition(dump, downRegExp)
+    if !hasDown {
+        return dump
+    }
+
+    // prendi la riga del direttivo "-- migrate:down ..." e poi tutto quello che segue
+    // trova fine riga dopo downStart
+    i := downStart
+    for i < len(dump) && dump[i] != '\n' && dump[i] != '\r' {
+        i++
+    }
+    // salta \r\n o \n
+    for i < len(dump) && (dump[i] == '\n' || dump[i] == '\r') {
+        i++
+    }
+    return dump[i:]
 }
 
 // statementsPrecedeMigrateBlocks inspects the contents between the first character

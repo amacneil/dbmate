@@ -46,6 +46,8 @@ type DB struct {
 	Log io.Writer
 	// MigrationsDir specifies the directory or directories to find migration files
 	MigrationsDir []string
+	// MigrationsUrl specifies the db url to find migrations table
+	MigrationsUrl string
 	// MigrationsTableName specifies the database table to record migrations in
 	MigrationsTableName string
 	// SchemaFile specifies the location for schema.sql file
@@ -332,6 +334,25 @@ func (db *DB) openDatabaseForMigration(drv Driver) (*sql.DB, error) {
 	return sqlDB, nil
 }
 
+func (db *DB) EnsureDumpColumnEncoding(sqlDB *sql.DB) error {
+    query := fmt.Sprintf(`
+        ALTER TABLE %s
+        MODIFY dump LONGTEXT
+        CHARACTER SET utf8mb4
+        COLLATE utf8mb4_unicode_ci
+    `, db.MigrationsTableName)
+
+    _, err := sqlDB.Exec(query)
+    if err != nil {
+        // non bloccare se già ok o se non serve
+        fmt.Fprintf(db.Log, "Warning: cannot alter dump column charset: %v\n", err)
+        return nil
+    }
+
+    fmt.Fprintf(db.Log, "Dump column charset ensured (utf8mb4)\n")
+    return nil
+}
+
 // Migrate migrates database to the latest version
 func (db *DB) Migrate() error {
 	drv, err := db.Driver()
@@ -394,7 +415,7 @@ func (db *DB) Migrate() error {
 			}
 
 			// record migration
-			return drv.InsertMigration(tx, migration.Version, parsed.Down)
+			return drv.InsertMigration(tx, migration.Version, parsed.Full)
 		}
 
 		if parsed.UpOptions.Transaction() {
@@ -514,94 +535,228 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 	return migrations, nil
 }
 
-// UpdateEmptyDumps lists all available migrations
-func (db *DB) UpdateEmptyDumps() (error) {
-	drv, err := db.Driver()
-	if err != nil {
-		return err
-	}
+// FindMigrationsFromDB lists all available migrations reading them from a DB specified by db.MigrationsUrl.
+// It marks migrations as Applied based on the target database (db.DatabaseURL), exactly like FindMigrations().
+func (db *DB) FindMigrationsFromDB() ([]Migration, error) {
+    // migrations-url must be provided
+    if db.MigrationsUrl == "" {
+        return db.FindMigrations()
+    }
 
-	sqlDB, err := drv.Open()
-	if err != nil {
-		return err
-	}
-	defer dbutil.MustClose(sqlDB)
+    // ------------------------------------------------------------
+    // 1) Open TARGET DB (where we apply migrations) to know what is already applied
+    // ------------------------------------------------------------
+    drv, err := db.Driver()
+    if err != nil {
+        return nil, err
+    }
 
-	// find applied migrations
-	migrationsTableExists, err := drv.MigrationsTableExists(sqlDB)
-	if err != nil {
-		return err
-	}
+    targetSQL, err := drv.Open()
+    if err != nil {
+        return nil, err
+    }
+    defer dbutil.MustClose(targetSQL)
 
-	// Get all migrations dump from database.
-	dumpMigrations := map[string]string{}
-	if migrationsTableExists {
-		dumpMigrations, err = drv.SelectMigrationsFromVersion(sqlDB, "")
-		if err != nil {
-			return err
-		}
-	}
+    // find applied migrations on TARGET
+    appliedMigrations := map[string]bool{}
+    migrationsTableExists, err := drv.MigrationsTableExists(targetSQL)
+    if err != nil {
+        return nil, err
+    }
+    if migrationsTableExists {
+        appliedMigrations, err = drv.SelectMigrations(targetSQL, -1)
+        if err != nil {
+            return nil, err
+        }
+    }
 
-	// Get all migrations dump from database.
-	appliedMigrations := map[string]bool{}
-	if migrationsTableExists {
-		appliedMigrations, err = drv.SelectMigrations(sqlDB, -1)
-		if err != nil {
-			return err
-		}
-	}
+    // ------------------------------------------------------------
+    // 2) Open SOURCE DB (db.MigrationsUrl) to read available migrations + their dumps
+    // ------------------------------------------------------------
+    migURL, err := url.Parse(db.MigrationsUrl)
+    if err != nil {
+        return nil, fmt.Errorf("invalid migrations-url: %w", err)
+    }
 
-	for _, dir := range db.MigrationsDir {
-		// find filesystem migrations
-		files, err := db.readMigrationsDir(dir)
-		if err != nil {
-			return fmt.Errorf("%w `%s`", ErrMigrationDirNotFound, dir)
-		}
+    // Create a lightweight DB instance for SOURCE, reusing same configuration where sensible
+    srcDB := *db
+    srcDB.DatabaseURL = migURL
 
-		for _, file := range files {
-			if file.IsDir() {
-				continue
-			}
+    srcDrv, err := srcDB.Driver()
+    if err != nil {
+        return nil, err
+    }
 
-			matches := migrationFileRegexp.FindStringSubmatch(file.Name())
-			if len(matches) < 2 {
-				continue
-			}
+    sourceSQL, err := srcDrv.Open()
+    if err != nil {
+        return nil, err
+    }
+    defer dbutil.MustClose(sourceSQL)
 
-			migration := Migration{
-				Applied:  false,
-				FileName: matches[0],
-				FilePath: path.Join(dir, matches[0]),
-				FS:       db.FS,
-				Version:  matches[1],
-			}
-			if ok := appliedMigrations[migration.Version]; ok {
-				// Migration already applied, check if the dump column in db is eventually empty.
-				if dumpMigrations[migration.Version] == "" {
-					fmt.Fprintf(db.Log, "Updating dump column of: %s\n", migration.Version)
+    // Ensure migrations table exists on SOURCE
+    sourceTableExists, err := srcDrv.MigrationsTableExists(sourceSQL)
+    if err != nil {
+        return nil, err
+    }
+    if !sourceTableExists {
+        // no migrations available on source
+        return []Migration{}, nil
+    }
 
-					start := time.Now()
+    // ------------------------------------------------------------
+    // 3) Read (version, dump) from SOURCE migrations table
+    // ------------------------------------------------------------
+    // NOTE: assumes your fork added a "dump" column to the migrations table
+    // and that it contains the FULL text with both -- migrate:up and -- migrate:down blocks.
+    query := fmt.Sprintf(
+        "SELECT version, dump FROM %s ORDER BY version",
+        db.MigrationsTableName,
+    )
 
-					parsed, err := migration.Parse()
-					if err != nil {
-						return err
-					}
+    rows, err := sourceSQL.Query(query)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
 
-					dumpMigrations[migration.Version] = parsed.Down
+    migrations := []Migration{}
+    for rows.Next() {
+        var version string
+        var dump string
+        if err := rows.Scan(&version, &dump); err != nil {
+            return nil, err
+        }
 
-					err = drv.UpdateMigrationDump(sqlDB, migration.Version, parsed.Down)
-					if err != nil {
-						return err
-					}
+        m := Migration{
+            Applied:  false,
+            FileName: fmt.Sprintf("%s.sql", version), // keep sorting consistent with file-based
+            Version:  version,
 
-					elapsed := time.Since(start)
-					fmt.Fprintf(db.Log, "Updated dump column of: %s in %s\n", migration.Version, elapsed)
-				}
-			}
-		}
-	}
+            // DB-based payload
+            Dump: dump,
+        }
 
-	return nil
+        // mark as applied if TARGET already has this version
+        if ok := appliedMigrations[m.Version]; ok {
+            m.Applied = true
+        }
+
+        migrations = append(migrations, m)
+    }
+
+    if err := rows.Err(); err != nil {
+        return nil, err
+    }
+
+    // ------------------------------------------------------------
+    // 4) Sort (same behavior as FindMigrations: by FileName)
+    // ------------------------------------------------------------
+    sort.Slice(migrations, func(i, j int) bool {
+        return migrations[i].FileName < migrations[j].FileName
+    })
+
+    return migrations, nil
+}
+
+// UpdateEmptyDumps updates migrations table "dump" column:
+// - if empty => stores full (up+down)
+// - if only down => upgrades to full (up+down)
+// - if already full => does nothing
+func (db *DB) UpdateEmptyDumps() error {
+    drv, err := db.Driver()
+    if err != nil {
+        return err
+    }
+
+    sqlDB, err := drv.Open()
+    if err != nil {
+        return err
+    }
+    defer dbutil.MustClose(sqlDB)
+
+    migrationsTableExists, err := drv.MigrationsTableExists(sqlDB)
+    if err != nil {
+        return err
+    }
+    if !migrationsTableExists {
+        return nil
+    }
+
+    // Get all migrations dump from database (version -> dump)
+    dumpMigrations, err := drv.SelectMigrationsFromVersion(sqlDB, "")
+    if err != nil {
+        return err
+    }
+
+    // Get applied migrations from database (version -> true)
+    appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
+    if err != nil {
+        return err
+    }
+
+    for _, dir := range db.MigrationsDir {
+        files, err := db.readMigrationsDir(dir)
+        if err != nil {
+            return fmt.Errorf("%w `%s`", ErrMigrationDirNotFound, dir)
+        }
+
+        for _, file := range files {
+            if file.IsDir() {
+                continue
+            }
+
+            matches := migrationFileRegexp.FindStringSubmatch(file.Name())
+            if len(matches) < 2 {
+                continue
+            }
+
+            migration := Migration{
+                Applied:  false,
+                FileName: matches[0],
+                FilePath: path.Join(dir, matches[0]),
+                FS:       db.FS,
+                Version:  matches[1],
+            }
+
+            // only touch migrations that are applied on this DB
+            if !appliedMigrations[migration.Version] {
+                continue
+            }
+
+            currentDump := dumpMigrations[migration.Version]
+
+            // Case 3: already full -> do nothing
+            if dumpHasUpDown(currentDump) {
+                continue
+            }
+
+            // Case 1: empty OR Case 2: only down OR any other "non-full" legacy format -> upgrade to full
+            // (dumpHasOnlyDown(currentDump) is informative, but the action is the same: upgrade)
+            fmt.Fprintf(db.Log, "Updating dump column of: %s\n", migration.Version)
+            start := time.Now()
+
+            parsed, err := migration.Parse()
+            if err != nil {
+                return err
+            }
+
+            // parsed.Full is the whole file (up+down) you added at step 3
+            newDump := parsed.Full
+
+            err = drv.UpdateMigrationDump(sqlDB, migration.Version, newDump)
+            if err != nil {
+                return err
+            }
+
+            // keep local cache coherent
+            dumpMigrations[migration.Version] = newDump
+
+            elapsed := time.Since(start)
+            fmt.Fprintf(db.Log, "Updated dump column of: %s in %s\n", migration.Version, elapsed)
+        }
+    }
+
+    return nil
 }
 
 // Rollback rolls back the most recent migration
@@ -692,15 +847,25 @@ func (db *DB) Synchronize() error {
 	}
 	defer dbutil.MustClose(sqlDB)
 
+	// ensure dump column charset is correct
+	if err := db.EnsureDumpColumnEncoding(sqlDB); err != nil {
+		return err
+	}
+
 	// find last applied migration
-	migrations, err := db.FindMigrations()
+	var migrations []Migration
+	if db.MigrationsUrl != "" {
+		migrations, err = db.FindMigrationsFromDB()   // nuovo
+	} else {
+		migrations, err = db.FindMigrations()         // esistente
+	}
 	if err != nil {
 		return err
 	}
 
-	err = db.UpdateEmptyDumps()
-	if err != nil {
-		return err
+	if db.MigrationsUrl == "" {
+		// file-mode: posso normalizzare dump dal filesystem
+		if err := db.UpdateEmptyDumps(); err != nil { return err }
 	}
 
 	highestAppliedMigrationVersion := ""
@@ -746,7 +911,7 @@ func (db *DB) Synchronize() error {
 				}
 
 				// record migration
-				return drv.InsertMigration(tx, migration.Version, parsed.Down)
+				return drv.InsertMigration(tx, migration.Version, parsed.Full)
 			}
 
 			if parsed.UpOptions.Transaction() {
@@ -771,7 +936,11 @@ func (db *DB) Synchronize() error {
 			return err
 		}
 
-		fmt.Fprintf(db.Log, "Latest available migration file: %s.sql\n", highestAppliedMigrationVersion)
+		if highestAppliedMigrationVersion == "" {
+			fmt.Fprintf(db.Log, "No applied migrations found on target DB\n")
+		} else {
+			fmt.Fprintf(db.Log, "Latest available migration file: %s.sql\n", highestAppliedMigrationVersion)
+		}
 
 		migrationsToBeRolledBack := map[string]string{}
 		if migrationsTableExists {
@@ -780,15 +949,24 @@ func (db *DB) Synchronize() error {
 				return err
 			}
 		}
-		for version, dump := range migrationsToBeRolledBack {
+
+		versions := make([]string, 0, len(migrationsToBeRolledBack))
+		for v := range migrationsToBeRolledBack {
+			versions = append(versions, v)
+		}
+		sort.Sort(sort.Reverse(sort.StringSlice(versions)))
+
+		for _, version := range versions {
+			dump := migrationsToBeRolledBack[version]
 			fmt.Fprintf(db.Log, "Rolling back later db migration: %s\n", version)
 
 			start := time.Now()
 
 			// run actual migration dump rollback
-			result, err := sqlDB.Exec(dump)
+			downSQL := extractDown(dump) // nuova helper (fallback compatibile con down-only)
+			result, err := sqlDB.Exec(downSQL)
 			if err != nil {
-				return drv.QueryError(dump, err)
+				return drv.QueryError(downSQL, err)
 			} else if db.Verbose {
 				db.printVerbose(result)
 			}
