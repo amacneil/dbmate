@@ -74,7 +74,7 @@ var (
 	ErrParseMissingDown    = errors.New("dbmate requires each migration to define a down block with '-- migrate:down'")
 	ErrParseWrongOrder     = errors.New("dbmate requires '-- migrate:up' to appear before '-- migrate:down'")
 	ErrParseUnexpectedStmt = errors.New("dbmate does not support statements preceding the '-- migrate:up' block")
-	ErrParseMultipleDown   = errors.New("dbmate does not support multiple '-- migrate:down' annotations in a single migration section")
+	ErrParseMultipleDown   = errors.New("dbmate requires every '-- migrate:down' to be preceded by a '-- migrate:up'")
 )
 
 func parseMigrationContents(contents string) ([]*ParsedMigration, error) {
