@@ -269,7 +269,7 @@ drop table statuses;
 		require.Error(t, err, "dbmate requires each migration to define a down block with '-- migrate:down'")
 	})
 
-	t.Run("require an up block in each section", func(t *testing.T) {
+	t.Run("reject multiple down annotations in a single section", func(t *testing.T) {
 		migration := `-- migrate:up
 create table users (id serial, name text);
 -- migrate:down
@@ -279,6 +279,6 @@ drop table statuses;
 `
 
 		_, err := parseMigrationContents(migration)
-		require.Error(t, err, "dbmate requires each migration to define an up block with '-- migrate:up'")
+		require.ErrorIs(t, err, ErrParseMultipleDown)
 	})
 }

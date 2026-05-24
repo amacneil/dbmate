@@ -74,6 +74,7 @@ var (
 	ErrParseMissingDown    = errors.New("dbmate requires each migration to define a down block with '-- migrate:down'")
 	ErrParseWrongOrder     = errors.New("dbmate requires '-- migrate:up' to appear before '-- migrate:down'")
 	ErrParseUnexpectedStmt = errors.New("dbmate does not support statements preceding the '-- migrate:up' block")
+	ErrParseMultipleDown   = errors.New("dbmate requires every '-- migrate:down' to be preceded by a '-- migrate:up'")
 )
 
 func parseMigrationContents(contents string) ([]*ParsedMigration, error) {
@@ -244,7 +245,7 @@ func getMigrationSectionSubstrings(contents string) ([]string, error) {
 		begin, end := sectionBeginEnd[0], sectionBeginEnd[1]
 		contentsSubstring := substring(contents, begin, end)
 		if len(downRegExp.FindAllStringIndex(contentsSubstring, -1)) > 1 {
-			return nil, ErrParseMissingUp
+			return nil, ErrParseMultipleDown
 		}
 		sectionSubstrings = append(sectionSubstrings, contentsSubstring)
 	}
