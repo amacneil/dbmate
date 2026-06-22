@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v2"
@@ -210,5 +211,46 @@ func TestConfigureDB_Driver(t *testing.T) {
 		err := app.Run([]string{"dbmate", "--driver", "clickhouse", "test-config"})
 		require.NoError(t, err)
 		require.Equal(t, "clickhouse", configuredDB.DriverName)
+	})
+}
+
+func TestConfigureDB_WaitInterval(t *testing.T) {
+	var configuredDB *dbmate.DB
+
+	app := NewApp()
+	app.Commands = []*cli.Command{
+		{
+			Name: "test-config",
+			Action: func(c *cli.Context) error {
+				var err error
+				configuredDB, err = configureDB(c)
+				return err
+			},
+		},
+	}
+
+	t.Run("default", func(t *testing.T) {
+		configuredDB = nil
+		err := app.Run([]string{"dbmate", "test-config"})
+		require.NoError(t, err)
+		require.Equal(t, time.Second, configuredDB.WaitInterval)
+	})
+
+	t.Run("from env variable", func(t *testing.T) {
+		configuredDB = nil
+		t.Setenv("DBMATE_WAIT_INTERVAL", "2s")
+
+		err := app.Run([]string{"dbmate", "test-config"})
+		require.NoError(t, err)
+		require.Equal(t, 2*time.Second, configuredDB.WaitInterval)
+	})
+
+	t.Run("flag overrides env variable", func(t *testing.T) {
+		configuredDB = nil
+		t.Setenv("DBMATE_WAIT_INTERVAL", "2s")
+
+		err := app.Run([]string{"dbmate", "--wait-interval", "3s", "test-config"})
+		require.NoError(t, err)
+		require.Equal(t, 3*time.Second, configuredDB.WaitInterval)
 	})
 }
