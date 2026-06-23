@@ -2,8 +2,6 @@ module github.com/amacneil/dbmate/v2
 
 go 1.26.4
 
-toolchain go1.26.4
-
 require (
 	cloud.google.com/go/bigquery v1.76.0
 	github.com/ClickHouse/clickhouse-go/v2 v2.45.0
