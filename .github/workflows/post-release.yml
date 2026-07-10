@@ -15,7 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@0e0efbef56eccc14b456017747da3f9d04133dc6
+        uses: Homebrew/actions/setup-homebrew@d74d1431a0ee36e645aa62ebebeec16da878e7e0
+        with:
+          core: true
 
       - name: Bump Homebrew formula
         env:
