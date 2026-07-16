@@ -165,7 +165,7 @@ protocol://username:password@host:port/database_name?options
 ```
 
 - `protocol` must be one of `mysql`, `postgres`, `postgresql`, `sqlite`, `sqlite3`, `clickhouse`
-- `username` and `password` must be URL encoded (you will get an error if you use special charactors)
+- `username` and `password` must be URL encoded (you will get an error if you use special characters)
 - `host` can be either a hostname or IP address
 - `options` are driver-specific (refer to the underlying Go SQL drivers if you wish to use these)
 
@@ -286,7 +286,7 @@ DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name"
 
 ##### HTTP / HTTPS
 
-You can use `clickhouse+http://` (deafult port 8123) or `clickhouse+https://` (default port 8443).
+You can use `clickhouse+http://` (default port 8123) or `clickhouse+https://` (default port 8443).
 
 ```sh
 # HTTP (Defaults to port 8123)
