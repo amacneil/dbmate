@@ -318,7 +318,7 @@ func (drv *Driver) InsertMigration(_ dbutil.Transaction, version string) error {
 
 	queryTemplate := `INSERT INTO %s.%s (version) VALUES ('%s');`
 	queryString := fmt.Sprintf(queryTemplate, config.dataSet, drv.migrationsTableName, version)
-	_, err = db.Exec(queryString, version)
+	_, err = db.Exec(queryString)
 	if err != nil {
 		return err
 	}
