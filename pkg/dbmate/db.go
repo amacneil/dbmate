@@ -52,6 +52,10 @@ type DB struct {
 	MigrationsTableName string
 	// SchemaFile specifies the location for schema.sql file
 	SchemaFile string
+	// TemplatesDir specifies the directory to find migration templates
+	TemplatesDir string
+	// DefaultTemplate specifies the default template to use
+	DefaultTemplate string
 	// Fail if migrations would be applied out of order
 	Strict bool
 	// Verbose prints the result of each statement execution
@@ -286,6 +290,11 @@ const migrationTemplate = "-- migrate:up\n\n\n-- migrate:down\n\n"
 
 // NewMigration creates a new migration file
 func (db *DB) NewMigration(name string) error {
+	return db.NewMigrationTemplate(name, "")
+}
+
+// NewMigrationTemplate creates a new migration file with an optional template
+func (db *DB) NewMigrationTemplate(name, template string) error {
 	// new migration name
 	timestamp := time.Now().UTC().Format("20060102150405")
 	if name == "" {
@@ -306,6 +315,29 @@ func (db *DB) NewMigration(name string) error {
 		return ErrMigrationAlreadyExist
 	}
 
+	// determine template to use
+	if template == "" && db.DefaultTemplate != "" {
+		template = db.DefaultTemplate
+	}
+
+	var content string
+	if template != "" {
+		if db.TemplatesDir == "" {
+			return errors.New("template specified but DBMATE_TEMPLATES_DIR is not set")
+		}
+		templatePath := filepath.Join(db.TemplatesDir, template+".sql")
+		if _, err := os.Stat(templatePath); os.IsNotExist(err) {
+			return fmt.Errorf("template not found: %s", templatePath)
+		}
+		bytes, err := os.ReadFile(templatePath)
+		if err != nil {
+			return fmt.Errorf("reading template %s: %w", templatePath, err)
+		}
+		content = string(bytes)
+	} else {
+		content = migrationTemplate
+	}
+
 	// write new migration
 	file, err := os.Create(path)
 	if err != nil {
@@ -313,7 +345,7 @@ func (db *DB) NewMigration(name string) error {
 	}
 
 	defer dbutil.MustClose(file)
-	_, err = file.WriteString(migrationTemplate)
+	_, err = file.WriteString(content)
 	return err
 }
 

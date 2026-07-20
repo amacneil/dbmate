@@ -79,6 +79,16 @@ func NewApp() *cli.App {
 			Usage:   "specify the database table to record migrations in",
 		},
 		&cli.StringFlag{
+			Name:    "templates-dir",
+			EnvVars: []string{"DBMATE_TEMPLATES_DIR"},
+			Usage:   "specify the directory containing migration templates",
+		},
+		&cli.StringFlag{
+			Name:    "template-default",
+			EnvVars: []string{"DBMATE_TEMPLATE_DEFAULT"},
+			Usage:   "specify the default migration template",
+		},
+		&cli.StringFlag{
 			Name:    "schema-file",
 			Aliases: []string{"s"},
 			EnvVars: []string{"DBMATE_SCHEMA_FILE"},
@@ -108,9 +118,16 @@ func NewApp() *cli.App {
 			Name:    "new",
 			Aliases: []string{"n"},
 			Usage:   "Generate a new migration file",
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:  "template",
+					Usage: "specify the migration template to use",
+				},
+			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
 				name := c.Args().First()
-				return db.NewMigration(name)
+				template := c.String("template")
+				return db.NewMigrationTemplate(name, template)
 			}),
 		},
 		{
@@ -319,6 +336,8 @@ func configureDB(c *cli.Context) (*dbmate.DB, error) {
 	db.MigrationsDir = c.StringSlice("migrations-dir")
 	db.MigrationsTableName = c.String("migrations-table")
 	db.SchemaFile = c.String("schema-file")
+	db.TemplatesDir = c.String("templates-dir")
+	db.DefaultTemplate = c.String("template-default")
 	db.WaitBefore = c.Bool("wait")
 	waitTimeout := c.Duration("wait-timeout")
 	if waitTimeout != 0 {

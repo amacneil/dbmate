@@ -116,6 +116,109 @@ func TestGetDriver(t *testing.T) {
 	})
 }
 
+func TestNewMigration(t *testing.T) {
+	db := newTestDB(t, sqliteTestURL(t))
+
+	// default migrations dir
+	db.MigrationsDir = []string{t.TempDir()}
+
+	err := db.NewMigration("hello_world")
+	require.NoError(t, err)
+
+	// verify file exists
+	files, err := os.ReadDir(db.MigrationsDir[0])
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+	require.Contains(t, files[0].Name(), "_hello_world.sql")
+
+	content, err := os.ReadFile(filepath.Join(db.MigrationsDir[0], files[0].Name()))
+	require.NoError(t, err)
+	require.Contains(t, string(content), "-- migrate:up")
+}
+
+func TestNewMigrationTemplate(t *testing.T) {
+	db := newTestDB(t, sqliteTestURL(t))
+	db.MigrationsDir = []string{t.TempDir()}
+
+	templatesDir := t.TempDir()
+	db.TemplatesDir = templatesDir
+
+	// write a test template
+	templateContent := "-- custom template"
+	err := os.WriteFile(filepath.Join(templatesDir, "custom.sql"), []byte(templateContent), 0o644)
+	require.NoError(t, err)
+
+	t.Run("without template", func(t *testing.T) {
+		err := db.NewMigrationTemplate("test_no_template", "")
+		require.NoError(t, err)
+
+		files, err := os.ReadDir(db.MigrationsDir[0])
+		require.NoError(t, err)
+
+		var found bool
+		for _, f := range files {
+			if strings.Contains(f.Name(), "_test_no_template.sql") {
+				found = true
+				content, err := os.ReadFile(filepath.Join(db.MigrationsDir[0], f.Name()))
+				require.NoError(t, err)
+				require.Contains(t, string(content), "-- migrate:up")
+			}
+		}
+		require.True(t, found)
+	})
+
+	t.Run("with template", func(t *testing.T) {
+		err := db.NewMigrationTemplate("test_with_template", "custom")
+		require.NoError(t, err)
+
+		files, err := os.ReadDir(db.MigrationsDir[0])
+		require.NoError(t, err)
+
+		var found bool
+		for _, f := range files {
+			if strings.Contains(f.Name(), "_test_with_template.sql") {
+				found = true
+				content, err := os.ReadFile(filepath.Join(db.MigrationsDir[0], f.Name()))
+				require.NoError(t, err)
+				require.Equal(t, templateContent, string(content))
+			}
+		}
+		require.True(t, found)
+	})
+
+	t.Run("default template", func(t *testing.T) {
+		db.DefaultTemplate = "custom"
+		err := db.NewMigrationTemplate("test_default_template", "")
+		require.NoError(t, err)
+
+		files, err := os.ReadDir(db.MigrationsDir[0])
+		require.NoError(t, err)
+
+		var found bool
+		for _, f := range files {
+			if strings.Contains(f.Name(), "_test_default_template.sql") {
+				found = true
+				content, err := os.ReadFile(filepath.Join(db.MigrationsDir[0], f.Name()))
+				require.NoError(t, err)
+				require.Equal(t, templateContent, string(content))
+			}
+		}
+		require.True(t, found)
+	})
+
+	t.Run("missing DBMATE_TEMPLATES_DIR", func(t *testing.T) {
+		db.TemplatesDir = ""
+		err := db.NewMigrationTemplate("test_missing_dir", "custom")
+		require.EqualError(t, err, "template specified but DBMATE_TEMPLATES_DIR is not set")
+	})
+
+	t.Run("missing template file", func(t *testing.T) {
+		db.TemplatesDir = templatesDir
+		err := db.NewMigrationTemplate("test_missing_file", "missing")
+		require.ErrorContains(t, err, "template not found")
+	})
+}
+
 func TestWait(t *testing.T) {
 	db := newTestDB(t, sqliteTestURL(t))
 
