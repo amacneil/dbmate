@@ -3,14 +3,40 @@ name: Post Release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to bump (e.g. v2.34.0)"
+        required: true
 
 jobs:
   homebrew:
     name: Bump Homebrew Formula
     runs-on: ubuntu-latest
     steps:
-      - uses: mislav/bump-homebrew-formula-action@v4.1
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@d74d1431a0ee36e645aa62ebebeec16da878e7e0
         with:
-          formula-name: dbmate
+          core: true
+
+      - name: Bump Homebrew formula
         env:
-          COMMITTER_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_GIT_NAME: "Dbmate Release Bot"
+          HOMEBREW_GIT_EMAIL: "55776497+dbmate-releasebot@users.noreply.github.com"
+        run: |
+          tag="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
+          version="${tag#v}"
+          url="https://github.com/amacneil/dbmate/archive/refs/tags/${tag}.tar.gz"
+
+          git config --global user.name "$HOMEBREW_GIT_NAME"
+          git config --global user.email "$HOMEBREW_GIT_EMAIL"
+
+          brew bump-formula-pr dbmate \
+            --url="$url" \
+            --version="$version" \
+            --fork-org=dbmate-releasebot \
+            --no-audit \
+            --no-browse \
+            --message="For additional details see https://github.com/amacneil/dbmate/releases/tag/${tag}"
