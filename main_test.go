@@ -55,6 +55,9 @@ func TestRedactLogString(t *testing.T) {
 		// invalid port, but probably not a password since there is no @
 		{"parse \"mysql://localhost:abc/database\": invalid",
 			"parse \"mysql://localhost:abc/database\": invalid"},
+		// password containing @ sign - should redact entire password
+		{"parse \"postgres://username:oRAND44@W)£+@1.1.1.1:5432/db_name\": invalid",
+			"parse \"postgres://username:********@1.1.1.1:5432/db_name\": invalid"},
 	}
 
 	for _, ex := range examples {
