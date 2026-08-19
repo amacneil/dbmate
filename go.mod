@@ -2,7 +2,7 @@ module github.com/amacneil/dbmate/v2
 
 go 1.25.0
 
-toolchain go1.26.5
+toolchain go1.26.6
 
 require (
 	cloud.google.com/go/bigquery v1.76.0
