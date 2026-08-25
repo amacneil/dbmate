@@ -11,6 +11,7 @@ import (
 	"github.com/amacneil/dbmate/v2/pkg/dbtest"
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
 
+	"github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/require"
 )
 
@@ -115,6 +116,21 @@ func TestConnectionString(t *testing.T) {
 
 		s = connectionString(u)
 		require.Equal(t, "bob:secret@unix(/var/run/mysqld/mysqld.sock)/foo?flag=on&multiStatements=true", s)
+	})
+}
+
+func TestParseConfig(t *testing.T) {
+	t.Run("silences the driver logger", func(t *testing.T) {
+		u := dbtest.MustParseURL(t, "mysql://bob:secret@host:123/foo")
+
+		config, err := parseConfig(connectionString(u))
+		require.NoError(t, err)
+		require.IsType(t, &mysql.NopLogger{}, config.Logger)
+	})
+
+	t.Run("returns an error for an invalid dsn", func(t *testing.T) {
+		_, err := parseConfig("this is not a valid dsn")
+		require.Error(t, err)
 	})
 }
 
