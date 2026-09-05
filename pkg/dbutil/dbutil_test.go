@@ -36,6 +36,18 @@ func TestTrimLeadingSQLComments(t *testing.T) {
 	require.Equal(t, "real stuff\n-- end\n", string(out))
 }
 
+func TestTrimLeadingSQLCommentsSingleCharacterPreambleLine(t *testing.T) {
+	// a one-character line inside the leading-comment block must not panic
+	// or be misread as a comment marker (regression test for out-of-bounds
+	// line[0:2] slice on lines shorter than 2 bytes)
+	in := "-- header\n" +
+		"-\n" +
+		"SELECT 1;\n"
+	out, err := dbutil.TrimLeadingSQLComments([]byte(in))
+	require.NoError(t, err)
+	require.Equal(t, "-\nSELECT 1;\n", string(out))
+}
+
 func TestStripPsqlMetaCommands(t *testing.T) {
 	t.Run("strips restrict and unrestrict", func(t *testing.T) {
 		in := "\\restrict dbmate\n" +
