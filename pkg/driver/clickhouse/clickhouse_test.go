@@ -287,6 +287,22 @@ func TestClickHouseCreateMigrationsTable(t *testing.T) {
 		err = drv.CreateMigrationsTable(db)
 		require.NoError(t, err)
 	})
+
+	t.Run("replicated against Atomic database", func(t *testing.T) {
+		drv := testClickHouseDriver(t)
+		db := prepTestClickHouseDB(t, drv)
+		defer dbutil.MustClose(db)
+
+		u := *drv.databaseURL
+		q := u.Query()
+		q.Set("replicated", "true")
+		u.RawQuery = q.Encode()
+		replicatedDrv := testClickHouseDriverURL(t, &u)
+
+		err := replicatedDrv.CreateMigrationsTable(db)
+		require.ErrorContains(t, err, "clickhouse: replicated requires database engine Replicated or Shared")
+		require.ErrorContains(t, err, "Atomic")
+	})
 }
 
 func TestClickHouseSelectMigrations(t *testing.T) {

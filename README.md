@@ -310,9 +310,9 @@ dbmate --driver clickhouse --url "https://username:password@127.0.0.1:8443/datab
 dbmate --driver clickhouse --url "tcp://username:password@127.0.0.1:9000/database_name" status
 ```
 
-To work with ClickHouse cluster, there are 4 connection query parameters that can be supplied:
+To work with ClickHouse cluster, there are connection query parameters that can be supplied:
 
-- `on_cluster` - Indicataion to use cluster statements and replicated migration table. (default: `false`) If this parameter is not supplied, other cluster related query parameters are ignored.
+- `on_cluster` - Indication to use cluster statements and replicated migration table. (default: `false`) If this parameter is not supplied, other cluster related query parameters are ignored (except `replicated`). Mutually exclusive with `replicated`.
 
 ```sh
 DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_cluster"
@@ -320,22 +320,32 @@ DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_clu
 DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_cluster=true"
 ```
 
-- `cluster_macro` (Optional) - Macro value to be used for ON CLUSTER statements and for the replciated migration table engine zookeeper path. (default: `{cluster}`)
+- `cluster_macro` (Optional) - Macro value to be used for ON CLUSTER statements and for the replicated migration table engine zookeeper path. (default: `{cluster}`)
 
 ```sh
 DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_cluster&cluster_macro={my_cluster}"
 ```
 
-- `replica_macro` (Optional) - Macro value to be used for the replica name in the replciated migration table engine. (default: `{replica}`)
+- `replica_macro` (Optional) - Macro value to be used for the replica name in the replicated migration table engine. (default: `{replica}`)
 
 ```sh
 DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_cluster&replica_macro={my_replica}"
 ```
 
-- `zoo_path` (Optional) - The path to the table migration in ClickHouse/Zoo Keeper. (default: `/clickhouse/tables/<cluster_macro>/{table}`)
+- `zoo_path` (Optional) - The path to the table migration in ClickHouse/ZooKeeper. With `on_cluster`, defaults to `/clickhouse/tables/<cluster_macro>/{table}`. With `replicated`, if omitted the engine uses the server default path (`ReplicatedReplacingMergeTree(ts)`), which follows `default_replica_path` and server macros such as `{shard}` / `{replica}`.
 
 ```sh
 DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_cluster&zoo_path=/zk/path/tables"
+```
+
+- `replicated` - Use `ReplicatedReplacingMergeTree` for the migrations table without `ON CLUSTER`. (default: `false`) Mutually exclusive with `on_cluster`.
+
+  Requires a database that already uses the [Replicated database engine](https://clickhouse.com/docs/reference/engines/database-engines/replicated) (`CREATE DATABASE ... ENGINE = Replicated(...)`) or the Shared database engine on ClickHouse Cloud. `dbmate create` cannot create that database (it issues a bare `CREATE DATABASE`, which yields Atomic by default); create the database yourself first, then point dbmate at it with `replicated`.
+
+```sh
+DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?replicated"
+
+DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?replicated&zoo_path=/clickhouse/tables/{uuid}/{shard}"
 ```
 
 [See other supported connection options](https://github.com/ClickHouse/clickhouse-go#dsn).
