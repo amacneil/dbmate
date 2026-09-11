@@ -16,6 +16,10 @@ For a comparison between dbmate and other popular database schema migration tool
 - [Installation](#installation)
 - [Commands](#commands)
   - [Command Line Options](#command-line-options)
+- [Environment Variables](#environment-variables)
+  - [Loading `.env` files](#loading-env-files)
+  - [Settings and environment variables](#settings-and-environment-variables)
+  - [Precedence](#precedence)
 - [Usage](#usage)
   - [Connecting to the Database](#connecting-to-the-database)
     - [PostgreSQL](#postgresql)
@@ -143,13 +147,69 @@ The following options are available with all commands. You must use command line
 - `--wait` - wait for the db to become available before executing the subsequent command _(env: `DBMATE_WAIT`)_
 - `--wait-timeout 60s` - timeout for --wait flag _(env: `DBMATE_WAIT_TIMEOUT`)_
 
+
+## Environment Variables
+
+Dbmate can be configured with environment variables in addition to command line flags. This section describes how those variables are loaded and which settings they control.
+
+### Loading `.env` files
+
+Before parsing CLI flags, dbmate loads environment variables from dotenv files in the current working directory:
+
+- By default it loads `.env` if that file exists (a missing default `.env` is ignored).
+- Pass one or more `--env-file PATH` options to load alternate files instead of `.env`.
+- When multiple `--env-file` values are given, files are loaded in order. With [`godotenv.Load`](https://github.com/joho/godotenv), a variable already present in the process environment is not overwritten, so earlier files win over later ones for the same key, and variables already exported in your shell win over values from any dotenv file.
+
+Examples:
+
+```sh
+# default: load ./.env when present
+dbmate up
+
+# load a specific file (does not also load .env unless listed)
+dbmate --env-file .env.development up
+
+# load multiple files in order
+dbmate --env-file .env --env-file .env.local up
+```
+
+### Settings and environment variables
+
+| Setting | CLI flag | Environment variable |
+| --- | --- | --- |
+| Database URL | `--url` / `-u` | value of the variable named by `--env` (default name: `DATABASE_URL`) |
+| Name of env var that holds the database URL | `--env` / `-e` | _(CLI only; default `DATABASE_URL`)_ |
+| Dotenv file(s) to load | `--env-file` | _(CLI only; default `.env`)_ |
+| Driver | `--driver` | `DBMATE_DRIVER` |
+| Migrations directory | `--migrations-dir` / `-d` | `DBMATE_MIGRATIONS_DIR` |
+| Migrations table | `--migrations-table` | `DBMATE_MIGRATIONS_TABLE` |
+| Schema file | `--schema-file` / `-s` | `DBMATE_SCHEMA_FILE` |
+| Skip schema dump | `--no-dump-schema` | `DBMATE_NO_DUMP_SCHEMA` |
+| Wait for database | `--wait` | `DBMATE_WAIT` |
+| Wait timeout | `--wait-timeout` | `DBMATE_WAIT_TIMEOUT` |
+| Strict migration order | `--strict` | `DBMATE_STRICT` |
+| Verbose statement output | `--verbose` / `-v` | `DBMATE_VERBOSE` |
+
+`--strict` and `--verbose` are command flags (for example on `up`, `migrate`, and `rollback`), not global flags. Their environment variables still apply when those commands run.
+
+### Precedence
+
+From highest to lowest priority:
+
+1. **Command line flag** — an explicit flag always wins (for example `--url`, `--migrations-dir`, `--strict`).
+2. **Process environment** — variables already set in the shell / container / CI environment.
+3. **Dotenv file(s)** — values loaded from `.env` or `--env-file` paths (see above).
+4. **Built-in defaults** — for example `--env` defaults to `DATABASE_URL`, and `--env-file` defaults to `.env`.
+
+For the database URL specifically: `--url` is used if set; otherwise dbmate reads `os.Getenv` for the variable name given by `--env` (default `DATABASE_URL`), which may have come from the process environment or a dotenv file.
+
 ## Usage
 
 ### Connecting to the Database
 
 Dbmate locates your database using the `DATABASE_URL` environment variable by default. If you are writing a [twelve-factor app](http://12factor.net/), you should be storing all connection strings in environment variables.
 
-To make this easy in development, dbmate looks for a `.env` file in the current directory, and treats any variables listed there as if they were specified in the current environment (existing environment variables take preference, however).
+To make this easy in development, dbmate looks for a `.env` file in the current directory, and treats any variables listed there as if they were specified in the current environment (existing environment variables take preference, however). See [Environment Variables](#environment-variables) for `--env-file`, the full settings table, and precedence details.
 
 If you do not already have a `.env` file, create one and add your database connection URL:
 
