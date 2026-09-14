@@ -17,6 +17,7 @@ For a comparison between dbmate and other popular database schema migration tool
 - [Commands](#commands)
   - [Command Line Options](#command-line-options)
 - [Usage](#usage)
+  - [Environment Variables](#environment-variables)
   - [Connecting to the Database](#connecting-to-the-database)
     - [PostgreSQL](#postgresql)
     - [MySQL](#mysql)
@@ -145,11 +146,56 @@ The following options are available with all commands. You must use command line
 
 ## Usage
 
+### Environment Variables
+
+Most dbmate settings can be configured with environment variables in addition to command line flags. This is useful for twelve-factor style deployments and for sharing local configuration via a `.env` file.
+
+#### Which settings use which environment variables
+
+| Setting | Environment variable | Notes |
+| --- | --- | --- |
+| Database URL | `DATABASE_URL` (default) | Overridden by `--url` / `-u`. Use `--env` / `-e` to read the URL from a different variable (for example `TEST_DATABASE_URL`). |
+| Driver | `DBMATE_DRIVER` | Used when `--driver` is not set. |
+| Migrations directory | `DBMATE_MIGRATIONS_DIR` | Corresponds to `--migrations-dir` / `-d`. |
+| Migrations table | `DBMATE_MIGRATIONS_TABLE` | Corresponds to `--migrations-table`. |
+| Schema file | `DBMATE_SCHEMA_FILE` | Corresponds to `--schema-file` / `-s`. |
+| Disable schema dump | `DBMATE_NO_DUMP_SCHEMA` | Corresponds to `--no-dump-schema`. |
+| Wait for database | `DBMATE_WAIT` | Corresponds to `--wait`. |
+| Wait timeout | `DBMATE_WAIT_TIMEOUT` | Corresponds to `--wait-timeout`. |
+| Strict migrations | `DBMATE_STRICT` | Corresponds to `--strict` on `up` / `migrate`. |
+| Verbose SQL output | `DBMATE_VERBOSE` | Corresponds to `--verbose` / `-v` on `up` / `migrate` / `rollback`. |
+
+`--env` and `--env-file` are CLI-only options (they are not themselves read from environment variables).
+
+#### Loading `.env` files
+
+By default, dbmate loads environment variables from a `.env` file in the current working directory (if present). Missing files are ignored; an invalid dotenv file causes dbmate to exit with an error.
+
+To load one or more alternate dotenv files, pass `--env-file` (repeatable). When any `--env-file` is given, only the listed files are loaded - the default `.env` is not included unless you specify it:
+
+```sh
+dbmate --env-file .env.development up
+dbmate --env-file .env --env-file .env.local up
+```
+
+Files are loaded in the order given.
+
+#### Variable precedence
+
+From highest to lowest priority:
+
+1. **Command line flags** (for example `--url`, `--driver`, `--migrations-dir`)
+2. **Environment variables already set in the calling process**
+3. **Values from dotenv files** (`.env` or files passed with `--env-file`)
+4. **Built-in defaults**
+
+Dotenv files never overwrite variables that are already set in the process environment. For the database URL specifically, `--url` / `-u` takes precedence over the environment variable named by `--env` / `-e` (default `DATABASE_URL`).
+
 ### Connecting to the Database
 
 Dbmate locates your database using the `DATABASE_URL` environment variable by default. If you are writing a [twelve-factor app](http://12factor.net/), you should be storing all connection strings in environment variables.
 
-To make this easy in development, dbmate looks for a `.env` file in the current directory, and treats any variables listed there as if they were specified in the current environment (existing environment variables take preference, however).
+To make this easy in development, dbmate looks for a `.env` file in the current directory, and treats any variables listed there as if they were specified in the current environment (existing environment variables take preference, however). See [Environment Variables](#environment-variables) for details on `--env-file` and precedence.
 
 If you do not already have a `.env` file, create one and add your database connection URL:
 
