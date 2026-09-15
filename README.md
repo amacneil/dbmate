@@ -163,6 +163,7 @@ Most dbmate settings can be configured with environment variables in addition to
 | Disable schema dump | `DBMATE_NO_DUMP_SCHEMA` | Corresponds to `--no-dump-schema`. |
 | Wait for database | `DBMATE_WAIT` | Corresponds to `--wait`. |
 | Wait timeout | `DBMATE_WAIT_TIMEOUT` | Corresponds to `--wait-timeout`. |
+| Wait interval | `DBMATE_WAIT_INTERVAL` | Corresponds to `--wait-interval`. |
 | Strict migrations | `DBMATE_STRICT` | Corresponds to `--strict` on `up` / `migrate`. |
 | Verbose SQL output | `DBMATE_VERBOSE` | Corresponds to `--verbose` / `-v` on `up` / `migrate` / `rollback`. |
 
