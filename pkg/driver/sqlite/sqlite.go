@@ -10,7 +10,7 @@ import (
 	"io"
 	"net/url"
 	"os"
-	"regexp"
+	"path/filepath"
 	"strings"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
@@ -41,33 +41,64 @@ func NewDriver(config dbmate.DriverConfig) dbmate.Driver {
 	}
 }
 
-// ConnectionString converts a URL into a valid connection string
-func ConnectionString(u *url.URL) string {
-	// duplicate URL and remove scheme
-	newURL := *u
-	newURL.Scheme = ""
-
-	if newURL.Opaque == "" && newURL.Path != "" {
-		// When the DSN is in the form "scheme:/absolute/path" or
-		// "scheme://absolute/path" or "scheme:///absolute/path", url.Parse
-		// will consider the file path as :
-		// - "absolute" as the hostname
-		// - "path" (and the rest until "?") as the URL path.
-		// Instead, when the DSN is in the form "scheme:", the (relative) file
-		// path is stored in the "Opaque" field.
-		// See: https://pkg.go.dev/net/url#URL
-		//
-		// While Opaque is not escaped, the URL Path is. So, if .Path contains
-		// the file path, we need to un-escape it, and rebuild the full path.
-
-		newURL.Opaque = "//" + newURL.Host + dbutil.MustUnescapePath(newURL.Path)
-		newURL.Path = ""
+func normalizeSQLiteURL(u *url.URL) *url.URL {
+	out := &url.URL{
+		Scheme:   u.Scheme,
+		RawQuery: u.RawQuery,
+		Fragment: u.Fragment,
 	}
 
-	// trim duplicate leading slashes
-	str := regexp.MustCompile("^//+").ReplaceAllString(newURL.String(), "/")
+	var raw string
+	switch {
+	case u.Opaque != "":
+		raw = u.Opaque
+	case u.Host != "":
+		raw = "/" + u.Host + u.Path
+	default:
+		raw = u.Path
+	}
 
-	return str
+	if p, err := url.PathUnescape(raw); err == nil {
+		raw = p
+	}
+
+	// Collapse runs of leading slashes: ////tmp/foo -> /tmp/foo
+	for len(raw) > 1 && raw[0] == '/' && raw[1] == '/' {
+		raw = raw[1:]
+	}
+
+	if filepath.IsAbs(raw) {
+		// Absolute: use Path so .String() produces sqlite:///abs/path
+		out.Path = filepath.ToSlash(raw)
+	} else {
+		// Relative: use Opaque so .String() produces sqlite:rel/path
+		out.Opaque = raw
+	}
+
+	return out
+}
+
+func filePathFromURL(u *url.URL) string {
+	u = normalizeSQLiteURL(u)
+	if u.Opaque != "" {
+		return u.Opaque
+	}
+	return u.Path
+}
+
+// TODO: Confirm we aren't breaking anyone's expectations and
+// rename this to connectionString, as it's not part of the
+// public Driver interface.
+func ConnectionString(u *url.URL) string {
+	u = normalizeSQLiteURL(u)
+	p := filePathFromURL(u)
+	if u.RawQuery != "" {
+		p += "?" + u.RawQuery
+	}
+	if u.Fragment != "" {
+		p += "#" + u.Fragment
+	}
+	return p
 }
 
 // Open creates a new database connection
@@ -129,8 +160,8 @@ func (drv *Driver) schemaMigrationsDump(db *sql.DB) ([]byte, error) {
 }
 
 // DumpSchema returns the current database schema
-func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
-	path := ConnectionString(drv.databaseURL)
+func (drv *Driver) DumpSchema(db *sql.DB, _ ...string) ([]byte, error) {
+	path := filePathFromURL(drv.databaseURL)
 	schema, err := dbutil.RunCommand("sqlite3", path, ".schema --nosys")
 	if err != nil {
 		return nil, err
@@ -147,7 +178,7 @@ func (drv *Driver) DumpSchema(db *sql.DB) ([]byte, error) {
 
 // DatabaseExists determines whether the database exists
 func (drv *Driver) DatabaseExists() (bool, error) {
-	_, err := os.Stat(ConnectionString(drv.databaseURL))
+	_, err := os.Stat(filePathFromURL(drv.databaseURL))
 	if os.IsNotExist(err) {
 		return false, nil
 	}

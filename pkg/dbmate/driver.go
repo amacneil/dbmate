@@ -15,7 +15,7 @@ type Driver interface {
 	DatabaseExists() (bool, error)
 	CreateDatabase() error
 	DropDatabase() error
-	DumpSchema(*sql.DB) ([]byte, error)
+	DumpSchema(*sql.DB, ...string) ([]byte, error)
 	MigrationsTableExists(*sql.DB) (bool, error)
 	CreateMigrationsTable(*sql.DB) error
 	SelectMigrations(*sql.DB, int) (map[string]bool, error)

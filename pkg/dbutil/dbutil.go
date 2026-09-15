@@ -97,6 +97,48 @@ func TrimLeadingSQLComments(data []byte) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
+// StripPsqlMetaCommands removes psql meta-commands (backslash commands) from SQL.
+// PostgreSQL 15.14+/16.10+/17.6+ pg_dump adds \restrict and \unrestrict commands
+// to schema dumps as a security measure (CVE-2025-8714). These are psql client
+// commands that cannot be executed directly against the PostgreSQL server.
+//
+// Note: This is a naive line-based implementation that does not parse SQL properly.
+// It will incorrectly strip lines inside multi-line string literals if they start
+// with a backslash, e.g.: INSERT INTO t VALUES ('line1\n\line2');
+// In practice this is not an issue because:
+//   - This function is only used to process pg_dump schema output
+//   - pg_dump generates DDL statements which rarely contain multi-line string literals
+//   - pg_dump uses proper escaping (E'...' or $$...$$) for complex strings
+func StripPsqlMetaCommands(data []byte) ([]byte, error) {
+	out := bytes.NewBuffer(make([]byte, 0, len(data)))
+
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	for scanner.Scan() {
+		line := scanner.Bytes()
+
+		// Skip lines that are psql meta-commands (\restrict, \unrestrict, etc.)
+		// This naive approach works for pg_dump output but could theoretically
+		// break on hand-crafted SQL with multi-line strings containing backslashes.
+		trimmed := bytes.TrimLeftFunc(line, unicode.IsSpace)
+		if len(trimmed) > 0 && trimmed[0] == '\\' {
+			continue
+		}
+
+		// copy line to output buffer
+		if _, err := out.Write(line); err != nil {
+			return nil, err
+		}
+		if _, err := out.WriteString("\n"); err != nil {
+			return nil, err
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return out.Bytes(), nil
+}
+
 // QueryColumn runs a SQL statement and returns a slice of strings
 // it is assumed that the statement returns only one column
 // e.g. schema_migrations table

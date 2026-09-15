@@ -17,9 +17,11 @@ For a comparison between dbmate and other popular database schema migration tool
 - [Commands](#commands)
   - [Command Line Options](#command-line-options)
 - [Usage](#usage)
+  - [Environment Variables](#environment-variables)
   - [Connecting to the Database](#connecting-to-the-database)
     - [PostgreSQL](#postgresql)
     - [MySQL](#mysql)
+    - [MariaDB](#mariadb)
     - [SQLite](#sqlite)
     - [ClickHouse](#clickhouse)
     - [BigQuery](#bigquery)
@@ -42,7 +44,7 @@ For a comparison between dbmate and other popular database schema migration tool
 
 ## Features
 
-- Supports MySQL, PostgreSQL, SQLite, and ClickHouse
+- Supports MySQL, MariaDB, PostgreSQL, SQLite, and ClickHouse
 - Uses plain SQL for writing schema migrations
 - Migrations are timestamp-versioned, to avoid version number conflicts with multiple developers
 - Migrations are run atomically inside a transaction
@@ -111,18 +113,19 @@ docker run --rm -it --network=host -v "$(pwd)/db:/db" ghcr.io/amacneil/dbmate ne
 ## Commands
 
 ```sh
-dbmate --help    # print usage help
-dbmate new       # generate a new migration file
-dbmate up        # create the database (if it does not already exist) and run any pending migrations
-dbmate create    # create the database
-dbmate drop      # drop the database
-dbmate migrate   # run any pending migrations
-dbmate rollback  # roll back the most recent migration
-dbmate down      # alias for rollback
-dbmate status    # show the status of all migrations (supports --exit-code and --quiet)
-dbmate dump      # write the database schema.sql file
-dbmate load      # load schema.sql file to the database
-dbmate wait      # wait for the database server to become available
+dbmate --help         # print usage help
+dbmate new            # generate a new migration file
+dbmate up             # create the database (if it does not already exist) and run any pending migrations
+dbmate create         # create the database
+dbmate drop           # drop the database
+dbmate migrate        # run any pending migrations
+dbmate rollback       # roll back the most recent migration
+dbmate down           # alias for rollback
+dbmate status         # show the status of all migrations (supports --exit-code and --quiet)
+dbmate dump           # write the database schema.sql file
+dbmate dump -- [...]  # optionally pass additional arguments directly to mysqldump or pg_dump
+dbmate load           # load schema.sql file to the database
+dbmate wait           # wait for the database server to become available
 ```
 
 ### Command Line Options
@@ -130,6 +133,7 @@ dbmate wait      # wait for the database server to become available
 The following options are available with all commands. You must use command line arguments in the order `dbmate [global options] command [command options]`. Most options can also be configured via environment variables (and loaded from your `.env` file, which is helpful to share configuration between team members).
 
 - `--url, -u "protocol://host:port/dbname"` - specify the database url directly. _(env: `DATABASE_URL`)_
+- `--driver "driver_name"` - specify the driver to use (if empty, the driver is derived from database URL scheme). _(env: `DBMATE_DRIVER`)_
 - `--env, -e "DATABASE_URL"` - specify an environment variable to read the database connection URL from.
 - `--env-file ".env"` - specify an alternate environment variables file(s) to load.
 - `--migrations-dir, -d "./db/migrations"` - where to keep the migration files. _(env: `DBMATE_MIGRATIONS_DIR`)_
@@ -142,11 +146,56 @@ The following options are available with all commands. You must use command line
 
 ## Usage
 
+### Environment Variables
+
+Most dbmate settings can be configured with environment variables in addition to command line flags. This is useful for twelve-factor style deployments and for sharing local configuration via a `.env` file.
+
+#### Which settings use which environment variables
+
+| Setting | Environment variable | Notes |
+| --- | --- | --- |
+| Database URL | `DATABASE_URL` (default) | Overridden by `--url` / `-u`. Use `--env` / `-e` to read the URL from a different variable (for example `TEST_DATABASE_URL`). |
+| Driver | `DBMATE_DRIVER` | Used when `--driver` is not set. |
+| Migrations directory | `DBMATE_MIGRATIONS_DIR` | Corresponds to `--migrations-dir` / `-d`. |
+| Migrations table | `DBMATE_MIGRATIONS_TABLE` | Corresponds to `--migrations-table`. |
+| Schema file | `DBMATE_SCHEMA_FILE` | Corresponds to `--schema-file` / `-s`. |
+| Disable schema dump | `DBMATE_NO_DUMP_SCHEMA` | Corresponds to `--no-dump-schema`. |
+| Wait for database | `DBMATE_WAIT` | Corresponds to `--wait`. |
+| Wait timeout | `DBMATE_WAIT_TIMEOUT` | Corresponds to `--wait-timeout`. |
+| Strict migrations | `DBMATE_STRICT` | Corresponds to `--strict` on `up` / `migrate`. |
+| Verbose SQL output | `DBMATE_VERBOSE` | Corresponds to `--verbose` / `-v` on `up` / `migrate` / `rollback`. |
+
+`--env` and `--env-file` are CLI-only options (they are not themselves read from environment variables).
+
+#### Loading `.env` files
+
+By default, dbmate loads environment variables from a `.env` file in the current working directory (if present). Missing files are ignored; an invalid dotenv file causes dbmate to exit with an error.
+
+To load one or more alternate dotenv files, pass `--env-file` (repeatable). When any `--env-file` is given, only the listed files are loaded - the default `.env` is not included unless you specify it:
+
+```sh
+dbmate --env-file .env.development up
+dbmate --env-file .env --env-file .env.local up
+```
+
+Files are loaded in the order given.
+
+#### Variable precedence
+
+From highest to lowest priority:
+
+1. **Command line flags** (for example `--url`, `--driver`, `--migrations-dir`)
+2. **Environment variables already set in the calling process**
+3. **Values from dotenv files** (`.env` or files passed with `--env-file`)
+4. **Built-in defaults**
+
+Dotenv files never overwrite variables that are already set in the process environment. For the database URL specifically, `--url` / `-u` takes precedence over the environment variable named by `--env` / `-e` (default `DATABASE_URL`).
+
 ### Connecting to the Database
 
 Dbmate locates your database using the `DATABASE_URL` environment variable by default. If you are writing a [twelve-factor app](http://12factor.net/), you should be storing all connection strings in environment variables.
 
-To make this easy in development, dbmate looks for a `.env` file in the current directory, and treats any variables listed there as if they were specified in the current environment (existing environment variables take preference, however).
+To make this easy in development, dbmate looks for a `.env` file in the current directory, and treats any variables listed there as if they were specified in the current environment (existing environment variables take preference, however). See [Environment Variables](#environment-variables) for details on `--env-file` and precedence.
 
 If you do not already have a `.env` file, create one and add your database connection URL:
 
@@ -162,7 +211,7 @@ protocol://username:password@host:port/database_name?options
 ```
 
 - `protocol` must be one of `mysql`, `postgres`, `postgresql`, `sqlite`, `sqlite3`, `clickhouse`
-- `username` and `password` must be URL encoded (you will get an error if you use special charactors)
+- `username` and `password` must be URL encoded (you will get an error if you use special characters)
 - `host` can be either a hostname or IP address
 - `options` are driver-specific (refer to the underlying Go SQL drivers if you wish to use these)
 
@@ -207,6 +256,18 @@ A `socket` or `host` parameter can be specified to connect through a unix socket
 DATABASE_URL="postgres://username:password@/database_name?socket=/var/run/postgresql"
 ```
 
+For passwordless authentication such as PostgreSQL [peer auth](https://www.postgresql.org/docs/current/auth-pg-hba-conf.html), the password can be omitted (note the `@` is still required):
+
+```sh
+DATABASE_URL="postgres://username@/database_name?socket=/var/run/postgresql"
+```
+
+If the username is also omitted, it defaults to the `PGUSER` environment variable if set, otherwise the OS username (via `lib/pq`, matching `libpq` behavior):
+
+```sh
+DATABASE_URL="postgres:///database_name?socket=/var/run/postgresql"
+```
+
 A `search_path` parameter can be used to specify the [current schema](https://www.postgresql.org/docs/13/ddl-schemas.html#DDL-SCHEMAS-PATH) while applying migrations, as well as for dbmate's `schema_migrations` table.
 If the schema does not exist, it will be created automatically. If multiple comma-separated schemas are passed, the first will be used for the `schema_migrations` table.
 
@@ -229,6 +290,10 @@ A `socket` parameter can be specified to connect through a unix socket:
 ```sh
 DATABASE_URL="mysql://username:password@/database_name?socket=/var/run/mysqld/mysqld.sock"
 ```
+
+#### MariaDB
+
+MariaDB is supported using the same `mysql://` connection URLs as MySQL. The Docker image includes `mariadb-client` for schema dumps; `mariadb-dump` is used when available.
 
 #### SQLite
 
@@ -255,8 +320,40 @@ Otherwise the migration will fail with "Error: cannot change into wal mode from 
 
 #### ClickHouse
 
+Dbmate supports connecting to ClickHouse using native TCP (default) or HTTP/HTTPS.
+
+##### Native (TCP)
+
+By default, the `clickhouse://` scheme uses the native protocol on port `9000`.
+
 ```sh
 DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name"
+```
+
+##### HTTP / HTTPS
+
+You can use `clickhouse+http://` (default port 8123) or `clickhouse+https://` (default port 8443).
+
+```sh
+# HTTP (Defaults to port 8123)
+DATABASE_URL="clickhouse+http://username:password@127.0.0.1:8123/database_name"
+
+# HTTPS (Defaults to port 8443)
+DATABASE_URL="clickhouse+https://username:password@127.0.0.1:8443/database_name"
+```
+
+##### Using the --driver flag
+
+You can use the ClickHouse driver with a standard http/https/tcp URL by providing the --driver flag
+
+```sh
+# Connect via HTTP using generic URL syntax
+dbmate --driver clickhouse --url "http://username:password@127.0.0.1:8123/database_name" status
+
+dbmate --driver clickhouse --url "https://username:password@127.0.0.1:8443/database_name" status
+
+# Better to rely on the standard clickhouse:// scheme, but this is supported
+dbmate --driver clickhouse --url "tcp://username:password@127.0.0.1:9000/database_name" status
 ```
 
 To work with ClickHouse cluster, there are 4 connection query parameters that can be supplied:
@@ -482,13 +579,25 @@ When you run the `up`, `migrate`, or `rollback` commands, dbmate will automatica
 It is recommended to check this file into source control, so that you can easily review changes to the schema in commits or pull requests. It's also possible to use this file when you want to quickly load a database schema, without running each migration sequentially (for example in your test harness). However, if you do not wish to save this file, you could add it to your `.gitignore`, or pass the `--no-dump-schema` command line option.
 
 To dump the `schema.sql` file without performing any other actions, run `dbmate dump`. Unlike other dbmate actions, this command relies on the respective `pg_dump`, `mysqldump`, or `sqlite3` commands being available in your PATH. If these tools are not available, dbmate will silently skip the schema dump step during `up`, `migrate`, or `rollback` actions. You can diagnose the issue by running `dbmate dump` and looking at the output:
-
 ```sh
 $ dbmate dump
 exec: "pg_dump": executable file not found in $PATH
 ```
-
 On Ubuntu or Debian systems, you can fix this by installing `postgresql-client`, `mysql-client`, or `sqlite3` respectively. Ensure that the package version you install is greater than or equal to the version running on your database server.
+
+It is possible to pass additional arguments directly to mysqldump or pg_dump:
+```sh
+$ dbmate dump -- --flag1 --flag2
+$ dbmate --url="..." dump -- --restrict-key=restrict_key
+```
+for mysqldump:
+```sh
+mysqldump [default_options] [your_arguments_go_here] dbname
+```
+for pg_dump:
+```sh
+pg_dump [default_options] [your_arguments_go_here] dbname
+``` 
 
 > Note: The `schema.sql` file will contain a complete schema for your database, even if some tables or columns were created outside of dbmate migrations.
 
