@@ -2,17 +2,38 @@ package postgres
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
 	"github.com/amacneil/dbmate/v2/pkg/dbtest"
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
 
+	"github.com/lib/pq"
 	"github.com/stretchr/testify/require"
 )
+
+var errDialStopped = errors.New("dial stopped")
+
+type recordingDialer struct {
+	network string
+	address string
+}
+
+func (d *recordingDialer) Dial(network, address string) (net.Conn, error) {
+	d.network = network
+	d.address = address
+	return nil, errDialStopped
+}
+
+func (d *recordingDialer) DialTimeout(network, address string, _ time.Duration) (net.Conn, error) {
+	return d.Dial(network, address)
+}
 
 func testPostgresDriver(t *testing.T) *Driver {
 	u := dbtest.GetenvURLOrSkip(t, "POSTGRES_TEST_URL")
@@ -160,6 +181,9 @@ func defaultConnString() string {
 }
 
 func TestConnectionString(t *testing.T) {
+	t.Setenv("PGHOST", "")
+	t.Setenv("PGPORT", "")
+
 	cases := []struct {
 		input    string
 		expected string
@@ -191,6 +215,78 @@ func TestConnectionString(t *testing.T) {
 			require.Equal(t, c.expected, actual)
 		})
 	}
+}
+
+func TestConnectionStringPreservesPostgresEnvironment(t *testing.T) {
+	cases := []struct {
+		name     string
+		input    string
+		pgHost   string
+		pgPort   string
+		expected string
+	}{
+		{
+			name:     "host and port from environment",
+			input:    "postgres:///foo",
+			pgHost:   "database.internal",
+			pgPort:   "6543",
+			expected: "postgres:///foo",
+		},
+		{
+			name:     "host from environment and default postgres port",
+			input:    "postgres:///foo",
+			pgHost:   "database.internal",
+			expected: "postgres:///foo",
+		},
+		{
+			name:     "explicit host and port from environment",
+			input:    "postgres://database.internal/foo",
+			pgPort:   "6543",
+			expected: "postgres://database.internal/foo",
+		},
+		{
+			name:     "host from environment and explicit port",
+			input:    "postgres://:6543/foo",
+			pgHost:   "database.internal",
+			expected: "postgres:///foo?port=6543",
+		},
+		{
+			name:     "redshift keeps its default port with host from environment",
+			input:    "redshift:///foo",
+			pgHost:   "database.internal",
+			expected: "postgres:///foo?port=5439",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Setenv("PGHOST", c.pgHost)
+			t.Setenv("PGPORT", c.pgPort)
+
+			u, err := url.Parse(c.input)
+			require.NoError(t, err)
+
+			require.Equal(t, c.expected, connectionString(u))
+		})
+	}
+}
+
+func TestConnectionStringUsesPostgresEnvironment(t *testing.T) {
+	t.Setenv("PGHOST", "database.internal")
+	t.Setenv("PGPORT", "6543")
+
+	u, err := url.Parse("postgres:///foo?sslmode=disable")
+	require.NoError(t, err)
+
+	connector, err := pq.NewConnector(connectionString(u))
+	require.NoError(t, err)
+
+	dialer := &recordingDialer{}
+	connector.Dialer(dialer)
+	_, err = connector.Connect(t.Context())
+	require.ErrorIs(t, err, errDialStopped)
+	require.Equal(t, "tcp", dialer.network)
+	require.Equal(t, "database.internal:6543", dialer.address)
 }
 
 func TestConnectionArgsForDump(t *testing.T) {

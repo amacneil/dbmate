@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"os/exec"
 	"regexp"
 	"runtime"
@@ -99,8 +100,11 @@ func connectionString(u *url.URL) string {
 		query.Del("socket")
 	}
 
+	useEnvHostname := hostname == "" && query.Get("host") == "" && os.Getenv("PGHOST") != ""
+	useEnvPort := port == "" && query.Get("port") == "" && os.Getenv("PGPORT") != ""
+
 	// default hostname
-	if hostname == "" && query.Get("host") == "" {
+	if hostname == "" && query.Get("host") == "" && !useEnvHostname {
 		switch runtime.GOOS {
 		case "linux":
 			query.Set("host", "/var/run/postgresql")
@@ -121,11 +125,17 @@ func connectionString(u *url.URL) string {
 		port = query.Get("port")
 		query.Del("port")
 	}
-	if port == "" {
+	if port == "" && !useEnvPort {
 		switch u.Scheme {
 		case "redshift":
 			port = "5439"
 		default:
+			// lib/pq supplies PostgreSQL's default port when the hostname comes
+			// from PGHOST. Keeping it out of the URL also lets PGPORT take
+			// precedence if both environment variables are configured.
+			if useEnvHostname {
+				break
+			}
 			port = "5432"
 		}
 	}
@@ -134,7 +144,24 @@ func connectionString(u *url.URL) string {
 	out, _ := url.Parse(u.String())
 	// force scheme back to postgres if there was another postgres-compatible scheme
 	out.Scheme = "postgres"
-	out.Host = fmt.Sprintf("%s:%s", hostname, port)
+	switch {
+	case hostname != "" && port != "":
+		out.Host = fmt.Sprintf("%s:%s", hostname, port)
+	case hostname != "":
+		out.Host = hostname
+	case useEnvHostname:
+		out.Host = ""
+		if port != "" {
+			// A URL authority containing only a port would also supply an empty
+			// hostname and overwrite PGHOST, so preserve an explicit or
+			// scheme-specific port as a query parameter instead.
+			query.Set("port", port)
+		}
+	case port != "":
+		out.Host = fmt.Sprintf(":%s", port)
+	default:
+		out.Host = ""
+	}
 	out.RawQuery = query.Encode()
 
 	return out.String()
