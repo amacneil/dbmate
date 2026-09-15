@@ -101,6 +101,12 @@ func NewApp() *cli.App {
 			Usage:   "timeout for --wait flag",
 			Value:   defaultDB.WaitTimeout,
 		},
+		&cli.DurationFlag{
+			Name:    "wait-interval",
+			EnvVars: []string{"DBMATE_WAIT_INTERVAL"},
+			Usage:   "time to wait between connection attempts for --wait flag",
+			Value:   defaultDB.WaitInterval,
+		},
 	}
 
 	app.Commands = []*cli.Command{
@@ -323,6 +329,10 @@ func configureDB(c *cli.Context) (*dbmate.DB, error) {
 	waitTimeout := c.Duration("wait-timeout")
 	if waitTimeout != 0 {
 		db.WaitTimeout = waitTimeout
+	}
+	waitInterval := c.Duration("wait-interval")
+	if waitInterval != 0 {
+		db.WaitInterval = waitInterval
 	}
 
 	return db, nil

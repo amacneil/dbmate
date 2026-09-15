@@ -143,6 +143,7 @@ The following options are available with all commands. You must use command line
 - `--strict` - fail if migrations would be applied out of order _(env: `DBMATE_STRICT`)_
 - `--wait` - wait for the db to become available before executing the subsequent command _(env: `DBMATE_WAIT`)_
 - `--wait-timeout 60s` - timeout for --wait flag _(env: `DBMATE_WAIT_TIMEOUT`)_
+- `--wait-interval 1s` - time to wait between connection attempts for --wait flag _(env: `DBMATE_WAIT_INTERVAL`)_
 
 ## Usage
 
@@ -162,6 +163,7 @@ Most dbmate settings can be configured with environment variables in addition to
 | Disable schema dump | `DBMATE_NO_DUMP_SCHEMA` | Corresponds to `--no-dump-schema`. |
 | Wait for database | `DBMATE_WAIT` | Corresponds to `--wait`. |
 | Wait timeout | `DBMATE_WAIT_TIMEOUT` | Corresponds to `--wait-timeout`. |
+| Wait interval | `DBMATE_WAIT_INTERVAL` | Corresponds to `--wait-interval`. |
 | Strict migrations | `DBMATE_STRICT` | Corresponds to `--strict` on `up` / `migrate`. |
 | Verbose SQL output | `DBMATE_VERBOSE` | Corresponds to `--verbose` / `-v` on `up` / `migrate` / `rollback`. |
 
