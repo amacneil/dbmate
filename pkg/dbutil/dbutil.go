@@ -71,7 +71,7 @@ func TrimLeadingSQLComments(data []byte) ([]byte, error) {
 		// we read bytes directly for premature performance optimization
 		line := scanner.Bytes()
 
-		if preamble && (len(line) == 0 || (len(line) >= 2 && bytes.Equal(line[0:2], []byte("--")))) {
+		if preamble && (len(line) == 0 || bytes.HasPrefix(line, []byte("--"))) {
 			// header section, skip this line in output buffer
 			continue
 		}

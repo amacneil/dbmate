@@ -2,6 +2,7 @@ package dbutil_test
 
 import (
 	"database/sql"
+	"strings"
 	"testing"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbtest"
@@ -36,16 +37,22 @@ func TestTrimLeadingSQLComments(t *testing.T) {
 	require.Equal(t, "real stuff\n-- end\n", string(out))
 }
 
-func TestTrimLeadingSQLCommentsSingleCharacterPreambleLine(t *testing.T) {
-	// a one-character line inside the leading-comment block must not panic
-	// or be misread as a comment marker (regression test for out-of-bounds
-	// line[0:2] slice on lines shorter than 2 bytes)
-	in := "-- header\n" +
-		"-\n" +
-		"SELECT 1;\n"
-	out, err := dbutil.TrimLeadingSQLComments([]byte(in))
+func TestTrimLeadingSQLCommentsShortLineAtEOF(t *testing.T) {
+	// >4KB of leading comments forces bufio.Scanner to slide its buffer,
+	// leaving stale bytes just past the final token; a one-byte last line
+	// must not be misread as a comment marker.
+	var b strings.Builder
+	for b.Len() < 4090 {
+		b.WriteString("--\n")
+	}
+	for b.Len() < 4095 {
+		b.WriteString("-")
+	}
+	b.WriteString("\n-") // final line: one byte, no trailing newline
+
+	out, err := dbutil.TrimLeadingSQLComments([]byte(b.String()))
 	require.NoError(t, err)
-	require.Equal(t, "-\nSELECT 1;\n", string(out))
+	require.Equal(t, "-\n", string(out))
 }
 
 func TestStripPsqlMetaCommands(t *testing.T) {
