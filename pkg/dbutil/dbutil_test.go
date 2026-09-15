@@ -2,6 +2,7 @@ package dbutil_test
 
 import (
 	"database/sql"
+	"strings"
 	"testing"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbtest"
@@ -34,6 +35,24 @@ func TestTrimLeadingSQLComments(t *testing.T) {
 	out, err := dbutil.TrimLeadingSQLComments([]byte(in))
 	require.NoError(t, err)
 	require.Equal(t, "real stuff\n-- end\n", string(out))
+}
+
+func TestTrimLeadingSQLCommentsShortLineAtEOF(t *testing.T) {
+	// >4KB of leading comments forces bufio.Scanner to slide its buffer,
+	// leaving stale bytes just past the final token; a one-byte last line
+	// must not be misread as a comment marker.
+	var b strings.Builder
+	for b.Len() < 4090 {
+		b.WriteString("--\n")
+	}
+	for b.Len() < 4095 {
+		b.WriteString("-")
+	}
+	b.WriteString("\n-") // final line: one byte, no trailing newline
+
+	out, err := dbutil.TrimLeadingSQLComments([]byte(b.String()))
+	require.NoError(t, err)
+	require.Equal(t, "-\n", string(out))
 }
 
 func TestStripPsqlMetaCommands(t *testing.T) {
