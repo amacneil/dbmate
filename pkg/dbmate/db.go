@@ -144,7 +144,7 @@ func (db *DB) wait(drv Driver) error {
 		}
 	}
 
-	// if we find outselves here, we could not connect within the timeout
+	// if we find ourselves here, we could not connect within the timeout
 	fmt.Fprint(db.Log, "\n")
 	return fmt.Errorf("%w: %s", ErrCantConnect, err)
 }

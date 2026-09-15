@@ -283,7 +283,7 @@ func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
 	return exists, nil
 }
 
-func (drv *Driver) DeleteMigration(util dbutil.Transaction, version string) error {
+func (drv *Driver) DeleteMigration(tx dbutil.Transaction, version string) error {
 	db, err := drv.Open()
 	if err != nil {
 		return err
@@ -295,8 +295,8 @@ func (drv *Driver) DeleteMigration(util dbutil.Transaction, version string) erro
 		return err
 	}
 
-	query := fmt.Sprintf("DELETE FROM %s.%s WHERE version = '%s';", config.dataSet, drv.migrationsTableName, version)
-	_, err = util.Exec(query)
+	query := fmt.Sprintf("DELETE FROM %s.%s WHERE version = ?;", config.dataSet, drv.migrationsTableName)
+	_, err = tx.Exec(query, version)
 	if err != nil {
 		return err
 	}
@@ -304,7 +304,7 @@ func (drv *Driver) DeleteMigration(util dbutil.Transaction, version string) erro
 	return nil
 }
 
-func (drv *Driver) InsertMigration(_ dbutil.Transaction, version string) error {
+func (drv *Driver) InsertMigration(tx dbutil.Transaction, version string) error {
 	db, err := drv.Open()
 	if err != nil {
 		return err
@@ -316,9 +316,8 @@ func (drv *Driver) InsertMigration(_ dbutil.Transaction, version string) error {
 		return err
 	}
 
-	queryTemplate := `INSERT INTO %s.%s (version) VALUES ('%s');`
-	queryString := fmt.Sprintf(queryTemplate, config.dataSet, drv.migrationsTableName, version)
-	_, err = db.Exec(queryString, version)
+	query := fmt.Sprintf("INSERT INTO %s.%s (version) VALUES (?);", config.dataSet, drv.migrationsTableName)
+	_, err = tx.Exec(query, version)
 	if err != nil {
 		return err
 	}
