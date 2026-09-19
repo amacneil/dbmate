@@ -484,6 +484,70 @@ func TestUp(t *testing.T) {
 	})
 }
 
+func TestMigrateMultipleSectionsInSingleFile(t *testing.T) {
+	// Regression test for #820: a migration file with more than one
+	// migrate:up section must record its version exactly once. Previously the
+	// version was inserted once per section, so the second section failed with
+	// a duplicate schema_migrations primary key and its changes were lost.
+	mapFS := fstest.MapFS{
+		"db/migrations/001_multi_section.sql": {
+			Data: []byte(`-- migrate:up
+create table users (id integer);
+-- migrate:down
+drop table users;
+-- migrate:up
+create table posts (id integer);
+-- migrate:down
+drop table posts;
+`),
+		},
+	}
+
+	db := newTestDB(t, sqliteTestURL(t))
+	db.FS = mapFS
+
+	drv, err := db.Driver()
+	require.NoError(t, err)
+
+	err = db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
+
+	// migrate must not fail with a duplicate schema_migrations key
+	err = db.Migrate()
+	require.NoError(t, err)
+
+	sqlDB, err := drv.Open()
+	require.NoError(t, err)
+	defer dbutil.MustClose(sqlDB)
+
+	// both sections were applied
+	var count int
+	err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
+	require.NoError(t, err)
+	err = sqlDB.QueryRow("select count(*) from posts").Scan(&count)
+	require.NoError(t, err)
+
+	// the migration version was recorded exactly once
+	err = sqlDB.QueryRow("select count(*) from schema_migrations").Scan(&count)
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+
+	// rollback removes the record exactly once and drops both objects
+	err = db.Rollback()
+	require.NoError(t, err)
+
+	err = sqlDB.QueryRow("select count(*) from schema_migrations").Scan(&count)
+	require.NoError(t, err)
+	require.Equal(t, 0, count)
+
+	err = sqlDB.QueryRow("select count(*) from users").Scan(&count)
+	require.Error(t, err)
+	err = sqlDB.QueryRow("select count(*) from posts").Scan(&count)
+	require.Error(t, err)
+}
+
 func TestRollback(t *testing.T) {
 	testEachURL(t, func(t *testing.T, u *url.URL) {
 		db := newTestDB(t, u)

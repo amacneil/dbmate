@@ -400,7 +400,11 @@ func (db *DB) Migrate() error {
 			return err
 		}
 
-		for _, migrationSection := range parsed {
+		for i, migrationSection := range parsed {
+			// record the migration version only after the final section, so a
+			// file with multiple migrate:up sections inserts its version
+			// exactly once instead of once per section (see #820).
+			isLastSection := i == len(parsed)-1
 			execMigration := func(tx dbutil.Transaction) error {
 				// run actual migration
 				result, err := tx.Exec(migrationSection.Up)
@@ -411,6 +415,9 @@ func (db *DB) Migrate() error {
 				}
 
 				// record migration
+				if !isLastSection {
+					return nil
+				}
 				return drv.InsertMigration(tx, migration.Version)
 			}
 
@@ -571,7 +578,11 @@ func (db *DB) Rollback() error {
 		return err
 	}
 
-	for _, migrationSection := range parsedSections {
+	for i, migrationSection := range parsedSections {
+		// remove the migration record only after the final section, so a file
+		// with multiple migrate:down sections deletes its version exactly once
+		// instead of once per section (see #820).
+		isLastSection := i == len(parsedSections)-1
 		execMigration := func(tx dbutil.Transaction) error {
 			// rollback migration
 			result, err := tx.Exec(migrationSection.Down)
@@ -582,6 +593,9 @@ func (db *DB) Rollback() error {
 			}
 
 			// remove migration record
+			if !isLastSection {
+				return nil
+			}
 			return drv.DeleteMigration(tx, latest.Version)
 		}
 
