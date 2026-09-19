@@ -153,8 +153,35 @@ func (drv *Driver) escapeString(str string) string {
 	return str
 }
 
+func (drv *Driver) checkClusterParameters() error {
+	if drv.clusterParameters.OnCluster && drv.clusterParameters.Replicated {
+		return fmt.Errorf("clickhouse: on_cluster and replicated are mutually exclusive")
+	}
+	if drv.clusterParameters.Replicated {
+		return fmt.Errorf("clickhouse: replicated requires a database already created with ENGINE = Replicated(...) (or Shared on ClickHouse Cloud); dbmate create cannot create that database")
+	}
+	return nil
+}
+
+func (drv *Driver) requireReplicatedDatabase(db *sql.DB) error {
+	var engine string
+	err := db.QueryRow("SELECT engine FROM system.databases WHERE name = ?", drv.databaseName()).
+		Scan(&engine)
+	if err != nil {
+		return err
+	}
+	if engine != "Replicated" && engine != "Shared" {
+		return fmt.Errorf("clickhouse: replicated requires database engine Replicated or Shared, got %s", engine)
+	}
+	return nil
+}
+
 // CreateDatabase creates the specified database
 func (drv *Driver) CreateDatabase() error {
+	if err := drv.checkClusterParameters(); err != nil {
+		return err
+	}
+
 	databaseName := drv.quotedDatabaseName()
 	fmt.Fprintf(drv.log, "Creating: %s\n", databaseName)
 
@@ -292,11 +319,26 @@ func (drv *Driver) MigrationsTableExists(db *sql.DB) (bool, error) {
 
 // CreateMigrationsTable creates the schema migrations table
 func (drv *Driver) CreateMigrationsTable(db *sql.DB) error {
+	if drv.clusterParameters.OnCluster && drv.clusterParameters.Replicated {
+		return fmt.Errorf("clickhouse: on_cluster and replicated are mutually exclusive")
+	}
+
 	engineClause := "ReplacingMergeTree(ts)"
 	if drv.clusterParameters.OnCluster {
 		escapedZooPath := drv.escapeString(drv.clusterParameters.ZooPath)
 		escapedReplicaMacro := drv.escapeString(drv.clusterParameters.ReplicaMacro)
 		engineClause = fmt.Sprintf("ReplicatedReplacingMergeTree('%s', '%s', ts)", escapedZooPath, escapedReplicaMacro)
+	} else if drv.clusterParameters.Replicated {
+		if err := drv.requireReplicatedDatabase(db); err != nil {
+			return err
+		}
+		if drv.clusterParameters.ZooPathSet {
+			escapedZooPath := drv.escapeString(drv.clusterParameters.ZooPath)
+			escapedReplicaMacro := drv.escapeString(drv.clusterParameters.ReplicaMacro)
+			engineClause = fmt.Sprintf("ReplicatedReplacingMergeTree('%s', '%s', ts)", escapedZooPath, escapedReplicaMacro)
+		} else {
+			engineClause = "ReplicatedReplacingMergeTree(ts)"
+		}
 	}
 
 	_, err := db.Exec(fmt.Sprintf(`
