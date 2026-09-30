@@ -69,7 +69,8 @@ func TestNew(t *testing.T) {
 	require.Equal(t, time.Second, db.WaitInterval)
 	require.Equal(t, 60*time.Second, db.WaitTimeout)
 	require.Empty(t, db.DriverName)
-	require.Equal(t, false, db.UseMigrationLock)
+	require.False(t, db.UseMigrationLock)
+	require.Equal(t, 5*time.Minute, db.MigrationLockTimeout)
 }
 
 func TestGetDriver(t *testing.T) {
@@ -733,6 +734,66 @@ func TestFindMigrationsFSMultipleDirs(t *testing.T) {
 	require.Equal(t, "db/migrations_b/004_test_migration_b.sql", actual[3].FilePath)
 	require.Equal(t, "db/migrations_a/005_test_migration_a.sql", actual[4].FilePath)
 	require.Equal(t, "db/migrations_c/006_test_migration_c.sql", actual[5].FilePath)
+}
+
+func TestMigrateWithLock(t *testing.T) {
+	db := newTestDB(t, postgresTestURL(t))
+	db.UseMigrationLock = true
+	drv, err := db.Driver()
+	require.NoError(t, err)
+
+	// drop and recreate database
+	err = db.Drop()
+	require.NoError(t, err)
+	err = db.Create()
+	require.NoError(t, err)
+
+	// migrate
+	err = db.Migrate()
+	require.NoError(t, err)
+
+	// verify results
+	sqlDB, err := drv.Open()
+	require.NoError(t, err)
+	defer dbutil.MustClose(sqlDB)
+
+	// check applied migrations
+	appliedMigrations, err := drv.SelectMigrations(sqlDB, -1)
+	require.NoError(t, err)
+	require.Equal(t, map[string]bool{"20200227231541": true, "20151129054053": true}, appliedMigrations)
+
+	// lock has been released
+	count := 0
+	err = sqlDB.QueryRow("select count(*) from pg_locks where locktype = 'advisory' " +
+		"and database = (select oid from pg_database where datname = current_database())").Scan(&count)
+	require.NoError(t, err)
+	require.Equal(t, 0, count)
+
+	// another instance holding the lock makes migrate wait, then fail once the timeout elapses
+	other, err := drv.Open()
+	require.NoError(t, err)
+	defer dbutil.MustClose(other)
+	other.SetMaxOpenConns(1)
+	_, err = other.Exec("select pg_advisory_lock(48372615)")
+	require.NoError(t, err)
+
+	db.MigrationLockTimeout = 200 * time.Millisecond
+	err = db.Migrate()
+	require.ErrorContains(t, err, "timed out after 200ms waiting for migration lock")
+
+	// released: migrate succeeds with nothing pending
+	_, err = other.Exec("select pg_advisory_unlock_all()")
+	require.NoError(t, err)
+	err = db.Migrate()
+	require.NoError(t, err)
+}
+
+func TestMigrateWithLockUnsupported(t *testing.T) {
+	db := newTestDB(t, sqliteTestURL(t))
+	db.UseMigrationLock = true
+
+	err := db.Migrate()
+	require.ErrorIs(t, err, dbmate.ErrMigrationLockUnsupported)
 }
 
 func TestMigrateUnrestrictedOrder(t *testing.T) {

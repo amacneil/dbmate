@@ -2,8 +2,8 @@ package postgres
 
 import (
 	"bytes"
-	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
@@ -79,8 +80,6 @@ type Driver struct {
 	migrationsTableName string
 	databaseURL         *url.URL
 	log                 io.Writer
-
-	migrationLockTx *sql.Tx
 }
 
 // NewDriver initializes the driver
@@ -547,47 +546,66 @@ func (drv *Driver) quotedMigrationsTableNameParts(db dbutil.Transaction) (string
 	return quotedNameParts[0], strings.Join(quotedNameParts[1:], "."), nil
 }
 
-const lockKey = 48372615
+// migrationLockKey is the advisory lock key used to serialize migration runs.
+// Advisory locks are scoped to the database, so a fixed key is sufficient.
+const migrationLockKey = 48372615
 
-func (drv *Driver) Lock() error {
-	if drv.migrationLockTx != nil {
-		return fmt.Errorf("already locked")
+// Lock acquires a session-level advisory lock on the given connection, waiting up
+// to timeout for another holder to release it. Being session-level, the lock is
+// held across the individual migration transactions and released automatically
+// when the connection closes.
+func (drv *Driver) Lock(db *sql.DB, timeout time.Duration) error {
+	if timeout < 0 {
+		return fmt.Errorf("invalid migration lock timeout: %s", timeout)
 	}
 
-	db, err := drv.Open()
+	// lock_timeout has millisecond resolution, and zero disables it
+	lockTimeout := timeout.Milliseconds()
+	if timeout > 0 && lockTimeout == 0 {
+		lockTimeout = 1
+	}
+
+	tx, err := db.Begin()
 	if err != nil {
 		return err
 	}
 
-	tx, err := db.BeginTx(context.Background(), nil)
+	// the transaction only scopes lock_timeout to the lock acquisition, so that it
+	// does not apply to the migrations themselves; the session-level lock outlives it
+	_, err = tx.Exec(fmt.Sprintf("set local lock_timeout = %d", lockTimeout))
+	if err == nil {
+		_, err = tx.Exec("select pg_advisory_lock($1)", migrationLockKey)
+	}
 	if err != nil {
-		return err
+		if err1 := tx.Rollback(); err1 != nil {
+			return err1
+		}
+
+		// lock_not_available: another session held the lock for longer than the timeout
+		pqErr, ok := err.(*pq.Error)
+		if ok && pqErr.Code == "55P03" {
+			return fmt.Errorf("timed out after %s waiting for migration lock (is another dbmate instance running?)", timeout)
+		}
+
+		return fmt.Errorf("failed to acquire migration lock: %w", err)
 	}
 
-	drv.migrationLockTx = tx
+	return tx.Commit()
+}
 
-	_, err = tx.Exec("SELECT pg_advisory_xact_lock($1)", lockKey)
+// Unlock releases the migration lock held by the given connection
+func (drv *Driver) Unlock(db *sql.DB) error {
+	released := false
+	err := db.QueryRow("select pg_advisory_unlock($1)", migrationLockKey).Scan(&released)
 	if err != nil {
-		return fmt.Errorf("failed to acquire lock: %w", err)
+		return fmt.Errorf("failed to release migration lock: %w", err)
+	}
+
+	if !released {
+		// the lock is not held by this session: the connection must have been dropped
+		// and re-established mid-run, releasing the lock with it
+		return errors.New("migration lock was lost: the database connection was reset during the migration")
 	}
 
 	return nil
-}
-
-func (drv *Driver) Unlock() error {
-	if drv.migrationLockTx == nil {
-		return fmt.Errorf("not locked")
-	}
-
-	if err := drv.migrationLockTx.Rollback(); err != nil {
-		return err
-	}
-
-	drv.migrationLockTx = nil
-
-	return nil
-}
-
-func (drv *Driver) IsLocked() bool {
-	return drv.migrationLockTx != nil
 }

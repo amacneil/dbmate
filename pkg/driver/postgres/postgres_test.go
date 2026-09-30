@@ -925,36 +925,112 @@ func TestPostgresMigrationsTableExists(t *testing.T) {
 }
 
 func TestPostgresMigrationLock(t *testing.T) {
+	drv := testPostgresDriver(t)
+	db := prepTestPostgresDB(t)
+	defer dbutil.MustClose(db)
+	// the lock is session-level, so pin each pool to a single connection
+	db.SetMaxOpenConns(1)
+
+	// a second session on the same database, standing in for another dbmate instance
+	other, err := sql.Open("postgres", connectionString(drv.databaseURL))
+	require.NoError(t, err)
+	defer dbutil.MustClose(other)
+	other.SetMaxOpenConns(1)
+
+	tryLock := func(db *sql.DB) bool {
+		locked := false
+		err := db.QueryRow("select pg_try_advisory_lock($1)", migrationLockKey).Scan(&locked)
+		require.NoError(t, err)
+		return locked
+	}
+	unlock := func(db *sql.DB) {
+		_, err := db.Exec("select pg_advisory_unlock_all()")
+		require.NoError(t, err)
+	}
+
 	t.Run("lock and unlock", func(t *testing.T) {
-		drv := testPostgresDriver(t)
-		err := drv.Lock()
+		err := drv.Lock(db, time.Second)
 		require.NoError(t, err)
 
-		err = drv.Lock()
-		require.Error(t, err, "Should not be able to lock again without unlock")
+		// held: no other session can acquire it
+		require.False(t, tryLock(other))
 
-		err = drv.Unlock()
-		require.NoError(t, err, "Should be able to unlock")
+		err = drv.Unlock(db)
+		require.NoError(t, err)
+
+		// released: another session can acquire it
+		require.True(t, tryLock(other))
+		unlock(other)
 	})
 
-	t.Run("lock on one instance should block lock attempt on another", func(t *testing.T) {
-		drv1 := testPostgresDriver(t)
-		err1 := drv1.Lock()
-		require.NoError(t, err1)
+	t.Run("lock is held across transactions", func(t *testing.T) {
+		err := drv.Lock(db, time.Second)
+		require.NoError(t, err)
 
-		var isUnlocked bool
-		go func() {
-			time.Sleep(10 * time.Millisecond)
-			err := drv1.Unlock()
-			require.NoError(t, err, "Should be able to unlock")
-			isUnlocked = true
-		}()
+		// migrations each run in their own transaction on the locked connection
+		tx, err := db.Begin()
+		require.NoError(t, err)
+		_, err = tx.Exec("select 1")
+		require.NoError(t, err)
+		err = tx.Commit()
+		require.NoError(t, err)
 
-		drv2 := testPostgresDriver(t)
-		err2 := drv2.Lock()
-		require.NoError(t, err2)
-		require.Equal(t, true, isUnlocked)
-		err2 = drv2.Unlock()
-		require.NoError(t, err2, "Should be able to unlock")
+		require.False(t, tryLock(other))
+
+		err = drv.Unlock(db)
+		require.NoError(t, err)
+	})
+
+	t.Run("lock times out when held by another session", func(t *testing.T) {
+		require.True(t, tryLock(other))
+
+		start := time.Now()
+		err := drv.Lock(db, 200*time.Millisecond)
+		require.ErrorContains(t, err, "timed out after 200ms waiting for migration lock")
+		require.GreaterOrEqual(t, time.Since(start), 200*time.Millisecond)
+
+		unlock(other)
+
+		// the timeout must not leak into the session, where it would apply to the migrations
+		lockTimeout := ""
+		err = db.QueryRow("show lock_timeout").Scan(&lockTimeout)
+		require.NoError(t, err)
+		require.Equal(t, "0", lockTimeout)
+	})
+
+	t.Run("sub-millisecond timeout does not wait indefinitely", func(t *testing.T) {
+		require.True(t, tryLock(other))
+
+		err := drv.Lock(db, time.Microsecond)
+		require.ErrorContains(t, err, "timed out after 1µs waiting for migration lock")
+
+		unlock(other)
+	})
+
+	t.Run("negative timeout is rejected", func(t *testing.T) {
+		err := drv.Lock(db, -time.Second)
+		require.ErrorContains(t, err, "invalid migration lock timeout: -1s")
+
+		// nothing was acquired
+		require.True(t, tryLock(other))
+		unlock(other)
+	})
+
+	t.Run("unlock fails when lock is not held", func(t *testing.T) {
+		err := drv.Unlock(db)
+		require.ErrorContains(t, err, "migration lock was lost")
+	})
+
+	t.Run("lock is released when holding session disconnects", func(t *testing.T) {
+		require.True(t, tryLock(other))
+
+		// simulate a crash: drop the holding connection without unlocking
+		err := other.Close()
+		require.NoError(t, err)
+
+		err = drv.Lock(db, time.Second)
+		require.NoError(t, err)
+		err = drv.Unlock(db)
+		require.NoError(t, err)
 	})
 }
