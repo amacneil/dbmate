@@ -509,7 +509,14 @@ Writing: ./db/schema.sql
 
 Pending migrations are always applied in numerical order. However, dbmate does not prevent migrations from being applied out of order if they are committed independently (for example: if a developer has been working on a branch for a long time, and commits a migration which has a lower version number than other already-applied migrations, dbmate will simply apply the pending migration). See [#159](https://github.com/amacneil/dbmate/issues/159) for a more detailed explanation.
 
-If several instances of your application may run `dbmate up` at the same time (for example, replicas starting simultaneously), pass `--migration-lock` to hold an exclusive lock for the duration of the run. Concurrent instances then wait for the lock, and find nothing left to apply once they acquire it, instead of racing to apply the same migrations. The wait is bounded by `--migration-lock-timeout` (default 5 minutes). The lock is released automatically when the holding connection closes, so a crashed or killed instance never leaves a stale lock behind. The migration lock is currently supported for PostgreSQL only.
+If several instances of your application may run `dbmate up` at the same time (for example, replicas starting simultaneously), pass `--migration-lock` to hold an exclusive lock for the duration of the run. Concurrent instances then wait for the lock, and find nothing left to apply once they acquire it, instead of racing to apply the same migrations. The wait is bounded by `--migration-lock-timeout` (default 5 minutes). The lock is released automatically when the holding connection closes, so a crashed or killed instance never leaves a stale lock behind. If that connection is lost mid-run, the run fails rather than carrying on without the lock.
+
+A few limitations are worth knowing about:
+
+- The migration lock is currently supported for PostgreSQL only. Redshift and `spanner-postgres` use the same driver, but are not supported.
+- The lock is held for the duration of a session, so it needs a direct connection or a session-pooling proxy. A transaction-pooling proxy such as PgBouncer in transaction mode will not hold it.
+- The lock covers migrations only. Concurrent instances creating the database itself (`dbmate up` where the database does not exist yet) can still race, with or without this flag.
+- The lock is released when the server sees the connection close. A host failure or a network partition can leave it held until the server detects the dead connection, so other instances keep waiting, and may reach `--migration-lock-timeout` before it is released.
 
 ### Rolling Back Migrations
 

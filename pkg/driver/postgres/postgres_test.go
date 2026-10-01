@@ -928,13 +928,12 @@ func TestPostgresMigrationLock(t *testing.T) {
 	drv := testPostgresDriver(t)
 	db := prepTestPostgresDB(t)
 	defer dbutil.MustClose(db)
-	// the lock is session-level, so pin each pool to a single connection
-	db.SetMaxOpenConns(1)
 
 	// a second session on the same database, standing in for another dbmate instance
 	other, err := sql.Open("postgres", connectionString(drv.databaseURL))
 	require.NoError(t, err)
 	defer dbutil.MustClose(other)
+	// the lock is session-level, so pin this pool to a single connection
 	other.SetMaxOpenConns(1)
 
 	tryLock := func(db *sql.DB) bool {
@@ -948,14 +947,14 @@ func TestPostgresMigrationLock(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	t.Run("lock and unlock", func(t *testing.T) {
-		err := drv.Lock(db, time.Second)
+	t.Run("lock is held until the handle is closed", func(t *testing.T) {
+		locked, err := drv.OpenWithMigrationLock(time.Second)
 		require.NoError(t, err)
 
 		// held: no other session can acquire it
 		require.False(t, tryLock(other))
 
-		err = drv.Unlock(db)
+		err = locked.Close()
 		require.NoError(t, err)
 
 		// released: another session can acquire it
@@ -964,11 +963,12 @@ func TestPostgresMigrationLock(t *testing.T) {
 	})
 
 	t.Run("lock is held across transactions", func(t *testing.T) {
-		err := drv.Lock(db, time.Second)
+		locked, err := drv.OpenWithMigrationLock(time.Second)
 		require.NoError(t, err)
+		defer dbutil.MustClose(locked)
 
 		// migrations each run in their own transaction on the locked connection
-		tx, err := db.Begin()
+		tx, err := locked.Begin()
 		require.NoError(t, err)
 		_, err = tx.Exec("select 1")
 		require.NoError(t, err)
@@ -976,61 +976,110 @@ func TestPostgresMigrationLock(t *testing.T) {
 		require.NoError(t, err)
 
 		require.False(t, tryLock(other))
-
-		err = drv.Unlock(db)
-		require.NoError(t, err)
 	})
 
-	t.Run("lock times out when held by another session", func(t *testing.T) {
-		require.True(t, tryLock(other))
+	t.Run("lock_timeout does not apply to the migrations", func(t *testing.T) {
+		locked, err := drv.OpenWithMigrationLock(time.Second)
+		require.NoError(t, err)
+		defer dbutil.MustClose(locked)
 
-		start := time.Now()
-		err := drv.Lock(db, 200*time.Millisecond)
-		require.ErrorContains(t, err, "timed out after 200ms waiting for migration lock")
-		require.GreaterOrEqual(t, time.Since(start), 200*time.Millisecond)
-
-		unlock(other)
-
-		// the timeout must not leak into the session, where it would apply to the migrations
+		// the timeout bounds the wait for the lock only: leaving it set would make
+		// the migrations themselves fail while waiting for an ordinary table lock
 		lockTimeout := ""
-		err = db.QueryRow("show lock_timeout").Scan(&lockTimeout)
+		err = locked.QueryRow("show lock_timeout").Scan(&lockTimeout)
 		require.NoError(t, err)
 		require.Equal(t, "0", lockTimeout)
 	})
 
+	t.Run("lock times out when held by another session", func(t *testing.T) {
+		require.True(t, tryLock(other))
+		defer unlock(other)
+
+		start := time.Now()
+		locked, err := drv.OpenWithMigrationLock(200 * time.Millisecond)
+		require.ErrorContains(t, err, "timed out after 200ms waiting for migration lock")
+		require.Nil(t, locked)
+		require.GreaterOrEqual(t, time.Since(start), 200*time.Millisecond)
+	})
+
 	t.Run("sub-millisecond timeout does not wait indefinitely", func(t *testing.T) {
 		require.True(t, tryLock(other))
+		defer unlock(other)
 
-		err := drv.Lock(db, time.Microsecond)
+		locked, err := drv.OpenWithMigrationLock(time.Microsecond)
 		require.ErrorContains(t, err, "timed out after 1µs waiting for migration lock")
-
-		unlock(other)
+		require.Nil(t, locked)
 	})
 
 	t.Run("negative timeout is rejected", func(t *testing.T) {
-		err := drv.Lock(db, -time.Second)
+		locked, err := drv.OpenWithMigrationLock(-time.Second)
 		require.ErrorContains(t, err, "invalid migration lock timeout: -1s")
+		require.Nil(t, locked)
 
 		// nothing was acquired
 		require.True(t, tryLock(other))
 		unlock(other)
 	})
 
-	t.Run("unlock fails when lock is not held", func(t *testing.T) {
-		err := drv.Unlock(db)
-		require.ErrorContains(t, err, "migration lock was lost")
+	t.Run("handle fails instead of reconnecting without the lock", func(t *testing.T) {
+		locked, err := drv.OpenWithMigrationLock(time.Second)
+		require.NoError(t, err)
+		defer func() {
+			// the handle holds a terminated connection, so ignore any close error
+			_ = locked.Close()
+		}()
+
+		pid := 0
+		err = locked.QueryRow("select pg_backend_pid()").Scan(&pid)
+		require.NoError(t, err)
+
+		// simulate a lost connection: terminate the session holding the lock
+		terminated := false
+		err = other.QueryRow("select pg_terminate_backend($1)", pid).Scan(&terminated)
+		require.NoError(t, err)
+		require.True(t, terminated)
+
+		// the termination may first surface as a connection error on the statement
+		// in flight, but the handle must never connect again without the lock
+		for i := 0; i < 3; i++ {
+			_, err = locked.Exec("select 1")
+			require.Error(t, err)
+			if errors.Is(err, errMigrationLockLost) {
+				break
+			}
+		}
+		require.ErrorIs(t, err, errMigrationLockLost)
+
+		// the lock went with the connection, so another instance can take over
+		// once the server has finished cleaning up the terminated session
+		require.Eventually(t, func() bool {
+			return tryLock(other)
+		}, 5*time.Second, 10*time.Millisecond)
+		unlock(other)
 	})
 
-	t.Run("lock is released when holding session disconnects", func(t *testing.T) {
-		require.True(t, tryLock(other))
+	t.Run("connection errors are not blamed on the lock", func(t *testing.T) {
+		u := *drv.databaseURL
+		u.Host = "localhost:1"
+		unreachable := NewDriver(dbmate.DriverConfig{DatabaseURL: &u}).(*Driver)
 
-		// simulate a crash: drop the holding connection without unlocking
-		err := other.Close()
-		require.NoError(t, err)
+		locked, err := unreachable.OpenWithMigrationLock(time.Second)
+		require.Error(t, err)
+		require.Nil(t, locked)
+		require.NotContains(t, err.Error(), "migration lock")
+	})
 
-		err = drv.Lock(db, time.Second)
-		require.NoError(t, err)
-		err = drv.Unlock(db)
-		require.NoError(t, err)
+	t.Run("unsupported for drivers sharing the postgres implementation", func(t *testing.T) {
+		for _, scheme := range []string{"redshift", "spanner-postgres"} {
+			t.Run(scheme, func(t *testing.T) {
+				u := *drv.databaseURL
+				u.Scheme = scheme
+				other := NewDriver(dbmate.DriverConfig{DatabaseURL: &u}).(*Driver)
+
+				locked, err := other.OpenWithMigrationLock(time.Second)
+				require.ErrorIs(t, err, dbmate.ErrMigrationLockUnsupported)
+				require.Nil(t, locked)
+			})
+		}
 	})
 }

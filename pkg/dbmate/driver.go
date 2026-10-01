@@ -29,17 +29,16 @@ type Driver interface {
 // DriverMigrationLock is implemented by drivers that can hold an exclusive lock
 // for the duration of a migration run, so that concurrent dbmate instances wait
 // for each other instead of racing to apply the same migrations.
-//
-// The lock is session-level and belongs to the connection it is acquired on: it
-// is held across the individual migration transactions, and released by the
-// database when that connection closes, so a crashed dbmate never leaves a stale
-// lock behind.
 type DriverMigrationLock interface {
-	// Lock acquires the migration lock on the given connection, waiting up to
-	// timeout for another holder to release it (zero waits indefinitely)
-	Lock(*sql.DB, time.Duration) error
-	// Unlock releases the migration lock held by the given connection
-	Unlock(*sql.DB) error
+	// OpenWithMigrationLock opens a database handle backed by a single connection
+	// that holds the migration lock, waiting up to timeout for another holder to
+	// release it (zero waits indefinitely).
+	//
+	// Closing the handle releases the lock, so a crashed dbmate never leaves a
+	// stale lock behind. If the connection is lost the handle returns an error
+	// from the next statement rather than silently reconnecting without the lock,
+	// so that the lock and the migrations share a fate.
+	OpenWithMigrationLock(timeout time.Duration) (*sql.DB, error)
 }
 
 // DriverConfig holds configuration passed to driver constructors

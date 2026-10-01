@@ -357,42 +357,29 @@ func (db *DB) openDatabaseForMigration(drv Driver) (*sql.DB, error) {
 }
 
 // Migrate migrates database to the latest version
-func (db *DB) Migrate() (returnErr error) {
+func (db *DB) Migrate() error {
 	drv, err := db.Driver()
 	if err != nil {
 		return err
 	}
 
-	var drvLock DriverMigrationLock
+	var sqlDB *sql.DB
 	if db.UseMigrationLock {
-		var ok bool
-		drvLock, ok = drv.(DriverMigrationLock)
+		drvLock, ok := drv.(DriverMigrationLock)
 		if !ok {
 			return ErrMigrationLockUnsupported
 		}
-	}
 
-	sqlDB, err := drv.Open()
+		// every statement below runs on the connection holding the lock, and the
+		// deferred close is what releases it (see DriverMigrationLock)
+		sqlDB, err = drvLock.OpenWithMigrationLock(db.MigrationLockTimeout)
+	} else {
+		sqlDB, err = drv.Open()
+	}
 	if err != nil {
 		return err
 	}
 	defer dbutil.MustClose(sqlDB)
-
-	if drvLock != nil {
-		// the lock is session-level, so pin the pool to a single connection: every
-		// statement below then runs in the session holding the lock, and the lock
-		// and the migrations share a fate (see DriverMigrationLock)
-		sqlDB.SetMaxOpenConns(1)
-
-		if err := drvLock.Lock(sqlDB, db.MigrationLockTimeout); err != nil {
-			return err
-		}
-		defer func() {
-			if err := drvLock.Unlock(sqlDB); err != nil {
-				returnErr = errors.Join(returnErr, err)
-			}
-		}()
-	}
 
 	// applied migrations must be read after the lock is acquired, otherwise an
 	// instance that waited for the lock would re-apply what the holder just did
