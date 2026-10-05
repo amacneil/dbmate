@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"testing"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
@@ -139,6 +140,58 @@ func TestSQLiteCreateDropDatabase(t *testing.T) {
 	require.NoError(t, err)
 
 	// check that database no longer exists
+	require.NoFileExists(t, path)
+}
+
+func TestSQLiteDropDatabaseWithConnectionOptions(t *testing.T) {
+	cases := []struct {
+		name     string
+		query    string
+		relative bool
+	}{
+		{"no options", "", false},
+		{"shared cache", "cache=shared", false},
+		{"foreign keys", "_foreign_keys=on", false},
+		{"relative path", "cache=shared&_busy_timeout=1000", true},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			drv := testSQLiteDriver(t)
+			path := filePathFromURL(drv.databaseURL)
+			if c.relative {
+				t.Chdir(filepath.Dir(path))
+				drv.databaseURL = dbtest.MustParseURL(t, "sqlite:"+filepath.Base(path))
+			}
+			drv.databaseURL.RawQuery = c.query
+
+			require.NoError(t, drv.CreateDatabase())
+			require.FileExists(t, path)
+			require.NoError(t, drv.DropDatabase())
+			require.NoFileExists(t, path)
+			require.NoError(t, drv.DropDatabase())
+		})
+	}
+}
+
+func TestSQLiteDropDatabasePreservesConnectionStringNamedFile(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows file names cannot contain question marks")
+	}
+
+	drv := testSQLiteDriver(t)
+	drv.databaseURL.RawQuery = "cache=shared"
+	path := filePathFromURL(drv.databaseURL)
+	require.NoError(t, drv.CreateDatabase())
+
+	otherPath := path + "?cache=shared"
+	contents := []byte("unrelated file")
+	require.NoError(t, os.WriteFile(otherPath, contents, 0o600))
+
+	require.NoError(t, drv.DropDatabase())
+	actual, err := os.ReadFile(otherPath)
+	require.NoError(t, err)
+	require.Equal(t, contents, actual)
 	require.NoFileExists(t, path)
 }
 
