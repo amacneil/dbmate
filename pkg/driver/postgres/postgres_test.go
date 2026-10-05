@@ -946,6 +946,21 @@ func TestPostgresMigrationLock(t *testing.T) {
 		_, err := db.Exec("select pg_advisory_unlock_all()")
 		require.NoError(t, err)
 	}
+	// Close returns once the client has closed the connection, and the server
+	// releases the lock as the session ends a moment later, so wait for that
+	// before the next check relies on it
+	closeAndWait := func(t *testing.T, locked *sql.DB) {
+		err := locked.Close()
+		require.NoError(t, err)
+
+		require.Eventually(t, func() bool {
+			held := 0
+			err := other.QueryRow("select count(*) from pg_locks where locktype = 'advisory' and objid = $1 "+
+				"and database = (select oid from pg_database where datname = current_database())",
+				migrationLockKey).Scan(&held)
+			return err == nil && held == 0
+		}, 5*time.Second, 10*time.Millisecond)
+	}
 
 	t.Run("lock is held until the handle is closed", func(t *testing.T) {
 		locked, err := drv.OpenWithMigrationLock(time.Second)
@@ -954,8 +969,7 @@ func TestPostgresMigrationLock(t *testing.T) {
 		// held: no other session can acquire it
 		require.False(t, tryLock(other))
 
-		err = locked.Close()
-		require.NoError(t, err)
+		closeAndWait(t, locked)
 
 		// released: another session can acquire it
 		require.True(t, tryLock(other))
@@ -965,7 +979,7 @@ func TestPostgresMigrationLock(t *testing.T) {
 	t.Run("lock is held across transactions", func(t *testing.T) {
 		locked, err := drv.OpenWithMigrationLock(time.Second)
 		require.NoError(t, err)
-		defer dbutil.MustClose(locked)
+		defer closeAndWait(t, locked)
 
 		// migrations each run in their own transaction on the locked connection
 		tx, err := locked.Begin()
@@ -981,7 +995,7 @@ func TestPostgresMigrationLock(t *testing.T) {
 	t.Run("lock_timeout does not apply to the migrations", func(t *testing.T) {
 		locked, err := drv.OpenWithMigrationLock(time.Second)
 		require.NoError(t, err)
-		defer dbutil.MustClose(locked)
+		defer closeAndWait(t, locked)
 
 		// the timeout bounds the wait for the lock only: leaving it set would make
 		// the migrations themselves fail while waiting for an ordinary table lock

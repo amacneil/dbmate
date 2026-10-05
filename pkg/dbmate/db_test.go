@@ -762,12 +762,14 @@ func TestMigrateWithLock(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, map[string]bool{"20200227231541": true, "20151129054053": true}, appliedMigrations)
 
-	// lock has been released
-	count := 0
-	err = sqlDB.QueryRow("select count(*) from pg_locks where locktype = 'advisory' " +
-		"and database = (select oid from pg_database where datname = current_database())").Scan(&count)
-	require.NoError(t, err)
-	require.Equal(t, 0, count)
+	// lock has been released: the server does so as the session ends, which can be
+	// a moment after Migrate has closed its connection
+	require.Eventually(t, func() bool {
+		count := 0
+		err := sqlDB.QueryRow("select count(*) from pg_locks where locktype = 'advisory' " +
+			"and database = (select oid from pg_database where datname = current_database())").Scan(&count)
+		return err == nil && count == 0
+	}, 5*time.Second, 10*time.Millisecond)
 
 	// another instance holding the lock makes migrate wait, then fail once the timeout elapses
 	other, err := drv.Open()
