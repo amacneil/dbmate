@@ -422,12 +422,12 @@ func (db *DB) Migrate() error {
 				err = execMigration(sqlDB)
 			}
 
-			elapsed := time.Since(start)
-			fmt.Fprintf(db.Log, "Applied: %s in %s\n", migration.FileName, elapsed)
-
 			if err != nil {
 				return err
 			}
+
+			elapsed := time.Since(start)
+			fmt.Fprintf(db.Log, "Applied: %s in %s\n", migration.FileName, elapsed)
 		}
 	}
 
