@@ -144,6 +144,8 @@ The following options are available with all commands. You must use command line
 - `--wait` - wait for the db to become available before executing the subsequent command _(env: `DBMATE_WAIT`)_
 - `--wait-timeout 60s` - timeout for --wait flag _(env: `DBMATE_WAIT_TIMEOUT`)_
 - `--wait-interval 1s` - time to wait between connection attempts for --wait flag _(env: `DBMATE_WAIT_INTERVAL`)_
+- `--migration-lock` - hold a database lock while migrating so that concurrent dbmate instances wait for each other (PostgreSQL only) _(env: `DBMATE_MIGRATION_LOCK`)_
+- `--migration-lock-timeout 5m` - maximum time to wait for the migration lock, 0 to wait indefinitely _(env: `DBMATE_MIGRATION_LOCK_TIMEOUT`)_
 
 ## Usage
 
@@ -164,6 +166,8 @@ Most dbmate settings can be configured with environment variables in addition to
 | Wait for database | `DBMATE_WAIT` | Corresponds to `--wait`. |
 | Wait timeout | `DBMATE_WAIT_TIMEOUT` | Corresponds to `--wait-timeout`. |
 | Wait interval | `DBMATE_WAIT_INTERVAL` | Corresponds to `--wait-interval`. |
+| Migration lock | `DBMATE_MIGRATION_LOCK` | Corresponds to `--migration-lock`. |
+| Migration lock timeout | `DBMATE_MIGRATION_LOCK_TIMEOUT` | Corresponds to `--migration-lock-timeout`. |
 | Strict migrations | `DBMATE_STRICT` | Corresponds to `--strict` on `up` / `migrate`. |
 | Verbose SQL output | `DBMATE_VERBOSE` | Corresponds to `--verbose` / `-v` on `up` / `migrate` / `rollback`. |
 
@@ -504,6 +508,15 @@ Writing: ./db/schema.sql
 > Note: `dbmate up` will create the database if it does not already exist (assuming the current user has permission to create databases). If you want to run migrations without creating the database, run `dbmate migrate`.
 
 Pending migrations are always applied in numerical order. However, dbmate does not prevent migrations from being applied out of order if they are committed independently (for example: if a developer has been working on a branch for a long time, and commits a migration which has a lower version number than other already-applied migrations, dbmate will simply apply the pending migration). See [#159](https://github.com/amacneil/dbmate/issues/159) for a more detailed explanation.
+
+If several instances of your application may run `dbmate up` at the same time (for example, replicas starting simultaneously), pass `--migration-lock` to hold an exclusive lock for the duration of the run. Concurrent instances then wait for the lock, and find nothing left to apply once they acquire it, instead of racing to apply the same migrations. The wait is bounded by `--migration-lock-timeout` (default 5 minutes). The lock is released automatically when the holding connection closes, so a crashed or killed instance never leaves a stale lock behind. If that connection is lost mid-run, the run fails rather than carrying on without the lock.
+
+A few limitations are worth knowing about:
+
+- The migration lock is currently supported for PostgreSQL only. Redshift and `spanner-postgres` use the same driver, but are not supported.
+- The lock is held for the duration of a session, so it needs a direct connection or a session-pooling proxy. A transaction-pooling proxy such as PgBouncer in transaction mode will not hold it.
+- The lock covers migrations only. Concurrent instances creating the database itself (`dbmate up` where the database does not exist yet) can still race, with or without this flag.
+- The lock is released when the server sees the connection close. A host failure or a network partition can leave it held until the server detects the dead connection, so other instances keep waiting, and may reach `--migration-lock-timeout` before it is released.
 
 ### Rolling Back Migrations
 

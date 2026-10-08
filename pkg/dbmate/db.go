@@ -19,16 +19,17 @@ import (
 
 // Error codes
 var (
-	ErrNoMigrationFiles      = errors.New("no migration files found")
-	ErrInvalidURL            = errors.New("invalid url, have you set your --url flag or DATABASE_URL environment variable?")
-	ErrNoRollback            = errors.New("can't rollback: no migrations have been applied")
-	ErrCantConnect           = errors.New("unable to connect to database")
-	ErrUnsupportedDriver     = errors.New("unsupported driver")
-	ErrNoMigrationName       = errors.New("please specify a name for the new migration")
-	ErrMigrationAlreadyExist = errors.New("file already exists")
-	ErrMigrationDirNotFound  = errors.New("could not find migrations directory")
-	ErrMigrationNotFound     = errors.New("can't find migration file")
-	ErrCreateDirectory       = errors.New("unable to create directory")
+	ErrNoMigrationFiles         = errors.New("no migration files found")
+	ErrInvalidURL               = errors.New("invalid url, have you set your --url flag or DATABASE_URL environment variable?")
+	ErrNoRollback               = errors.New("can't rollback: no migrations have been applied")
+	ErrCantConnect              = errors.New("unable to connect to database")
+	ErrUnsupportedDriver        = errors.New("unsupported driver")
+	ErrNoMigrationName          = errors.New("please specify a name for the new migration")
+	ErrMigrationAlreadyExist    = errors.New("file already exists")
+	ErrMigrationDirNotFound     = errors.New("could not find migrations directory")
+	ErrMigrationNotFound        = errors.New("can't find migration file")
+	ErrCreateDirectory          = errors.New("unable to create directory")
+	ErrMigrationLockUnsupported = errors.New("driver does not support the migration lock")
 )
 
 // migrationFileRegexp pattern for valid migration files
@@ -64,6 +65,11 @@ type DB struct {
 	WaitTimeout time.Duration
 	// Additional arguments for the subcommand being invoked e.g. pg_dump/mysqldump
 	Args []string
+	// UseMigrationLock holds an exclusive lock for the duration of the migration run,
+	// so that concurrent dbmate instances wait for each other (see DriverMigrationLock)
+	UseMigrationLock bool
+	// MigrationLockTimeout specifies maximum time to wait for the migration lock
+	MigrationLockTimeout time.Duration
 }
 
 // StatusResult represents an available migration status
@@ -75,19 +81,21 @@ type StatusResult struct {
 // New initializes a new dbmate database
 func New(databaseURL *url.URL) *DB {
 	return &DB{
-		AutoDumpSchema:      true,
-		DatabaseURL:         databaseURL,
-		FS:                  nil,
-		Log:                 os.Stdout,
-		MigrationsDir:       []string{"./db/migrations"},
-		MigrationsTableName: "schema_migrations",
-		SchemaFile:          "./db/schema.sql",
-		Strict:              false,
-		Verbose:             false,
-		WaitBefore:          false,
-		WaitInterval:        time.Second,
-		WaitTimeout:         60 * time.Second,
-		Args:                []string{},
+		AutoDumpSchema:       true,
+		DatabaseURL:          databaseURL,
+		FS:                   nil,
+		Log:                  os.Stdout,
+		MigrationsDir:        []string{"./db/migrations"},
+		MigrationsTableName:  "schema_migrations",
+		SchemaFile:           "./db/schema.sql",
+		Strict:               false,
+		Verbose:              false,
+		WaitBefore:           false,
+		WaitInterval:         time.Second,
+		WaitTimeout:          60 * time.Second,
+		Args:                 []string{},
+		UseMigrationLock:     false,
+		MigrationLockTimeout: 5 * time.Minute,
 	}
 }
 
@@ -355,7 +363,27 @@ func (db *DB) Migrate() error {
 		return err
 	}
 
-	migrations, err := db.FindMigrations()
+	var sqlDB *sql.DB
+	if db.UseMigrationLock {
+		drvLock, ok := drv.(DriverMigrationLock)
+		if !ok {
+			return ErrMigrationLockUnsupported
+		}
+
+		// every statement below runs on the connection holding the lock, and the
+		// deferred close is what releases it (see DriverMigrationLock)
+		sqlDB, err = drvLock.OpenWithMigrationLock(db.MigrationLockTimeout)
+	} else {
+		sqlDB, err = drv.Open()
+	}
+	if err != nil {
+		return err
+	}
+	defer dbutil.MustClose(sqlDB)
+
+	// applied migrations must be read after the lock is acquired, otherwise an
+	// instance that waited for the lock would re-apply what the holder just did
+	migrations, err := db.findMigrations(drv, sqlDB)
 	if err != nil {
 		return err
 	}
@@ -384,11 +412,9 @@ func (db *DB) Migrate() error {
 		)
 	}
 
-	sqlDB, err := db.openDatabaseForMigration(drv)
-	if err != nil {
+	if err := drv.CreateMigrationsTable(sqlDB); err != nil {
 		return err
 	}
-	defer dbutil.MustClose(sqlDB)
 
 	for _, migration := range pendingMigrations {
 		fmt.Fprintf(db.Log, "Applying: %s\n", migration.FileName)
@@ -476,6 +502,11 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 	}
 	defer dbutil.MustClose(sqlDB)
 
+	return db.findMigrations(drv, sqlDB)
+}
+
+// findMigrations lists all available migrations using an existing connection
+func (db *DB) findMigrations(drv Driver, sqlDB *sql.DB) ([]Migration, error) {
 	// find applied migrations
 	appliedMigrations := map[string]bool{}
 	migrationsTableExists, err := drv.MigrationsTableExists(sqlDB)

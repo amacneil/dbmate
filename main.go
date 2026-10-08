@@ -107,6 +107,17 @@ func NewApp() *cli.App {
 			Usage:   "time to wait between connection attempts for --wait flag",
 			Value:   defaultDB.WaitInterval,
 		},
+		&cli.BoolFlag{
+			Name:    "migration-lock",
+			EnvVars: []string{"DBMATE_MIGRATION_LOCK"},
+			Usage:   "hold a database lock while migrating so that concurrent dbmate instances wait for each other (postgres only)",
+		},
+		&cli.DurationFlag{
+			Name:    "migration-lock-timeout",
+			EnvVars: []string{"DBMATE_MIGRATION_LOCK_TIMEOUT"},
+			Usage:   "maximum time to wait for the migration lock, 0 to wait indefinitely",
+			Value:   defaultDB.MigrationLockTimeout,
+		},
 	}
 
 	app.Commands = []*cli.Command{
@@ -334,6 +345,8 @@ func configureDB(c *cli.Context) (*dbmate.DB, error) {
 	if waitInterval != 0 {
 		db.WaitInterval = waitInterval
 	}
+	db.UseMigrationLock = c.Bool("migration-lock")
+	db.MigrationLockTimeout = c.Duration("migration-lock-timeout")
 
 	return db, nil
 }

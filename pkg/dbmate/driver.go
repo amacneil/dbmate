@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"time"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
 )
@@ -23,6 +24,21 @@ type Driver interface {
 	DeleteMigration(dbutil.Transaction, string) error
 	Ping() error
 	QueryError(string, error) error
+}
+
+// DriverMigrationLock is implemented by drivers that can hold an exclusive lock
+// for the duration of a migration run, so that concurrent dbmate instances wait
+// for each other instead of racing to apply the same migrations.
+type DriverMigrationLock interface {
+	// OpenWithMigrationLock opens a database handle backed by a single connection
+	// that holds the migration lock, waiting up to timeout for another holder to
+	// release it (zero waits indefinitely).
+	//
+	// Closing the handle releases the lock, so a crashed dbmate never leaves a
+	// stale lock behind. If the connection is lost the handle returns an error
+	// from the next statement rather than silently reconnecting without the lock,
+	// so that the lock and the migrations share a fate.
+	OpenWithMigrationLock(timeout time.Duration) (*sql.DB, error)
 }
 
 // DriverConfig holds configuration passed to driver constructors
