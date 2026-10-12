@@ -428,6 +428,12 @@ func (db *DB) Migrate() error {
 
 		for _, migrationSection := range parsed {
 			execMigration := func(tx dbutil.Transaction) error {
+				if ctxDrv, ok := drv.(DriverMigrationContext); ok {
+					if err := ctxDrv.SetMigrationContext(tx, migration.Version); err != nil {
+						return err
+					}
+				}
+
 				// run actual migration
 				result, err := tx.Exec(migrationSection.Up)
 				if err != nil {
@@ -604,6 +610,12 @@ func (db *DB) Rollback() error {
 
 	for _, migrationSection := range parsedSections {
 		execMigration := func(tx dbutil.Transaction) error {
+			if ctxDrv, ok := drv.(DriverMigrationContext); ok {
+				if err := ctxDrv.SetMigrationContext(tx, latest.Version); err != nil {
+					return err
+				}
+			}
+
 			// rollback migration
 			result, err := tx.Exec(migrationSection.Down)
 			if err != nil {

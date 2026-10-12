@@ -650,3 +650,46 @@ func (drv *Driver) OpenWithMigrationLock(timeout time.Duration) (*sql.DB, error)
 
 	return db, nil
 }
+
+// FormatApplicationName formats an application_name with a migration version.
+// If base is empty, it defaults to "dbmate". If version is non-empty,
+// the version is appended in brackets, e.g. "dbmate[20251111103123]".
+func FormatApplicationName(base, version string) string {
+	if base == "" {
+		base = "dbmate"
+	}
+	if version == "" {
+		return base
+	}
+	return fmt.Sprintf("%s[%s]", base, version)
+}
+
+// ApplicationName returns the formatted application_name for a migration version
+// based on the database URL's application_name query parameter.
+func (drv *Driver) ApplicationName(version string) string {
+	base := drv.databaseURL.Query().Get("application_name")
+	return FormatApplicationName(base, version)
+}
+
+// ConnectionURLWithApplicationName returns a copy of u with the application_name
+// query parameter set according to the migration version.
+func ConnectionURLWithApplicationName(u *url.URL, version string) *url.URL {
+	out, _ := url.Parse(u.String())
+	query := out.Query()
+	base := query.Get("application_name")
+	query.Set("application_name", FormatApplicationName(base, version))
+	out.RawQuery = query.Encode()
+	return out
+}
+
+// SetMigrationContext sets application_name on the connection or transaction
+// to reflect the running migration version.
+func (drv *Driver) SetMigrationContext(tx dbutil.Transaction, version string) error {
+	if drv.databaseURL.Scheme == "spanner-postgres" {
+		return nil
+	}
+
+	appName := drv.ApplicationName(version)
+	_, err := tx.Exec(fmt.Sprintf("set application_name = %s", pq.QuoteLiteral(appName)))
+	return err
+}
