@@ -426,7 +426,9 @@ func (db *DB) Migrate() error {
 			return err
 		}
 
-		for _, migrationSection := range parsed {
+		for i, migrationSection := range parsed {
+			isLast := i == len(parsed)-1
+
 			execMigration := func(tx dbutil.Transaction) error {
 				// run actual migration
 				result, err := tx.Exec(migrationSection.Up)
@@ -436,8 +438,12 @@ func (db *DB) Migrate() error {
 					db.printVerbose(result)
 				}
 
-				// record migration
-				return drv.InsertMigration(tx, migration.Version)
+				if isLast {
+					// record migration
+					return drv.InsertMigration(tx, migration.Version)
+				}
+
+				return nil
 			}
 
 			if migrationSection.UpOptions.Transaction() {
@@ -448,13 +454,13 @@ func (db *DB) Migrate() error {
 				err = execMigration(sqlDB)
 			}
 
-			elapsed := time.Since(start)
-			fmt.Fprintf(db.Log, "Applied: %s in %s\n", migration.FileName, elapsed)
-
 			if err != nil {
 				return err
 			}
 		}
+
+		elapsed := time.Since(start)
+		fmt.Fprintf(db.Log, "Applied: %s in %s\n", migration.FileName, elapsed)
 	}
 
 	// automatically update schema file, silence errors
@@ -602,7 +608,10 @@ func (db *DB) Rollback() error {
 		return err
 	}
 
-	for _, migrationSection := range parsedSections {
+	for i := len(parsedSections) - 1; i >= 0; i-- {
+		migrationSection := parsedSections[i]
+		isLast := i == 0
+
 		execMigration := func(tx dbutil.Transaction) error {
 			// rollback migration
 			result, err := tx.Exec(migrationSection.Down)
@@ -612,8 +621,12 @@ func (db *DB) Rollback() error {
 				db.printVerbose(result)
 			}
 
-			// remove migration record
-			return drv.DeleteMigration(tx, latest.Version)
+			if isLast {
+				// remove migration record
+				return drv.DeleteMigration(tx, latest.Version)
+			}
+
+			return nil
 		}
 
 		if migrationSection.DownOptions.Transaction() {
@@ -624,17 +637,17 @@ func (db *DB) Rollback() error {
 			err = execMigration(sqlDB)
 		}
 
-		elapsed := time.Since(start)
-		fmt.Fprintf(db.Log, "Rolled back: %s in %s\n", latest.FileName, elapsed)
-
 		if err != nil {
 			return err
 		}
+	}
 
-		// automatically update schema file, silence errors
-		if db.AutoDumpSchema {
-			_ = db.DumpSchema()
-		}
+	elapsed := time.Since(start)
+	fmt.Fprintf(db.Log, "Rolled back: %s in %s\n", latest.FileName, elapsed)
+
+	// automatically update schema file, silence errors
+	if db.AutoDumpSchema {
+		_ = db.DumpSchema()
 	}
 
 	return nil
