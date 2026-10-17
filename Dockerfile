@@ -36,3 +36,4 @@ RUN apk add --no-cache \
   tzdata
 COPY --from=dev /src/dist/dbmate /usr/local/bin/dbmate
 ENTRYPOINT ["/usr/local/bin/dbmate"]
+# test-858: trigger sync-go-toolchain workflow
