@@ -427,8 +427,10 @@ func (db *DB) Migrate() error {
 		}
 
 		for i, migrationSection := range parsed {
-			isLast := i == len(parsed)-1
-
+			// record the migration version only after the final section, so a
+			// file with multiple migrate:up sections inserts its version
+			// exactly once instead of once per section (see #820).
+			isLastSection := i == len(parsed)-1
 			execMigration := func(tx dbutil.Transaction) error {
 				// run actual migration
 				result, err := tx.Exec(migrationSection.Up)
@@ -438,12 +440,11 @@ func (db *DB) Migrate() error {
 					db.printVerbose(result)
 				}
 
-				if isLast {
-					// record migration
-					return drv.InsertMigration(tx, migration.Version)
+				// record migration
+				if !isLastSection {
+					return nil
 				}
-
-				return nil
+				return drv.InsertMigration(tx, migration.Version)
 			}
 
 			if migrationSection.UpOptions.Transaction() {
@@ -608,10 +609,15 @@ func (db *DB) Rollback() error {
 		return err
 	}
 
+	// roll back sections in reverse order, so a later section is undone
+	// before an earlier one it may depend on
 	for i := len(parsedSections) - 1; i >= 0; i-- {
 		migrationSection := parsedSections[i]
-		isLast := i == 0
-
+		// remove the migration record only after the final section to run
+		// (the first in the file), so a file with multiple migrate:down
+		// sections deletes its version exactly once instead of once per
+		// section (see #820).
+		isLastSection := i == 0
 		execMigration := func(tx dbutil.Transaction) error {
 			// rollback migration
 			result, err := tx.Exec(migrationSection.Down)
@@ -621,12 +627,11 @@ func (db *DB) Rollback() error {
 				db.printVerbose(result)
 			}
 
-			if isLast {
-				// remove migration record
-				return drv.DeleteMigration(tx, latest.Version)
+			// remove migration record
+			if !isLastSection {
+				return nil
 			}
-
-			return nil
+			return drv.DeleteMigration(tx, latest.Version)
 		}
 
 		if migrationSection.DownOptions.Transaction() {
