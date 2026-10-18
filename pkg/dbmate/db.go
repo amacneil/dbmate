@@ -458,10 +458,10 @@ func (db *DB) Migrate() error {
 			if err != nil {
 				return err
 			}
-
-			elapsed := time.Since(start)
-			fmt.Fprintf(db.Log, "Applied: %s in %s\n", migration.FileName, elapsed)
 		}
+
+		elapsed := time.Since(start)
+		fmt.Fprintf(db.Log, "Applied: %s in %s\n", migration.FileName, elapsed)
 	}
 
 	// automatically update schema file, silence errors
@@ -609,11 +609,15 @@ func (db *DB) Rollback() error {
 		return err
 	}
 
-	for i, migrationSection := range parsedSections {
-		// remove the migration record only after the final section, so a file
-		// with multiple migrate:down sections deletes its version exactly once
-		// instead of once per section (see #820).
-		isLastSection := i == len(parsedSections)-1
+	// roll back sections in reverse order, so a later section is undone
+	// before an earlier one it may depend on
+	for i := len(parsedSections) - 1; i >= 0; i-- {
+		migrationSection := parsedSections[i]
+		// remove the migration record only after the final section to run
+		// (the first in the file), so a file with multiple migrate:down
+		// sections deletes its version exactly once instead of once per
+		// section (see #820).
+		isLastSection := i == 0
 		execMigration := func(tx dbutil.Transaction) error {
 			// rollback migration
 			result, err := tx.Exec(migrationSection.Down)
@@ -638,17 +642,17 @@ func (db *DB) Rollback() error {
 			err = execMigration(sqlDB)
 		}
 
-		elapsed := time.Since(start)
-		fmt.Fprintf(db.Log, "Rolled back: %s in %s\n", latest.FileName, elapsed)
-
 		if err != nil {
 			return err
 		}
+	}
 
-		// automatically update schema file, silence errors
-		if db.AutoDumpSchema {
-			_ = db.DumpSchema()
-		}
+	elapsed := time.Since(start)
+	fmt.Fprintf(db.Log, "Rolled back: %s in %s\n", latest.FileName, elapsed)
+
+	// automatically update schema file, silence errors
+	if db.AutoDumpSchema {
+		_ = db.DumpSchema()
 	}
 
 	return nil

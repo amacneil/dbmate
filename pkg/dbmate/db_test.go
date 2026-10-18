@@ -1,6 +1,7 @@
 package dbmate_test
 
 import (
+	"bytes"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -1046,5 +1047,199 @@ func TestMigrationContents(t *testing.T) {
 		// rollback last migration
 		err = db.Rollback()
 		require.NoError(t, err)
+	})
+}
+
+func TestMultipleMigrationSections(t *testing.T) {
+	testEachURL(t, func(t *testing.T, u *url.URL) {
+		db := newTestDB(t, u)
+		drv, err := db.Driver()
+		require.NoError(t, err)
+
+		err = db.Drop()
+		require.NoError(t, err)
+		err = db.Create()
+		require.NoError(t, err)
+
+		sqlDB, err := drv.Open()
+		require.NoError(t, err)
+		defer dbutil.MustClose(sqlDB)
+
+		var logBuf bytes.Buffer
+		db.Log = &logBuf
+
+		db.FS = fstest.MapFS{
+			"db/migrations/20261014120000_multi_section.sql": {
+				Data: []byte(`-- migrate:up
+create table t1 (
+  id integer primary key,
+  col_a text
+);
+
+-- migrate:down
+drop table t1;
+
+-- migrate:up
+create table t2 (
+  id integer primary key,
+  t1_id integer references t1(id),
+  col_b text
+);
+
+-- migrate:down
+drop table t2;
+`),
+			},
+		}
+
+		// 1. Run migration
+		err = db.Migrate()
+		require.NoError(t, err)
+
+		// Verify both tables were created
+		_, err = sqlDB.Exec("insert into t1 (id, col_a) values (1, 'hello')")
+		require.NoError(t, err)
+		_, err = sqlDB.Exec("insert into t2 (id, t1_id, col_b) values (10, 1, 'world')")
+		require.NoError(t, err)
+
+		// Verify schema_migrations has exactly one record
+		migrations, err := drv.SelectMigrations(sqlDB, -1)
+		require.NoError(t, err)
+		require.Equal(t, map[string]bool{"20261014120000": true}, migrations)
+
+		// Verify status
+		pending, err := db.Status(true)
+		require.NoError(t, err)
+		require.Equal(t, 0, pending)
+
+		// Verify log output only prints "Applied:" once
+		appliedCount := strings.Count(logBuf.String(), "Applied: 20261014120000_multi_section.sql")
+		require.Equal(t, 1, appliedCount)
+
+		// 2. Rollback migration
+		logBuf.Reset()
+		err = db.Rollback()
+		require.NoError(t, err)
+
+		// Verify reverse rollback succeeded (t2 dropped before t1)
+		_, err = sqlDB.Exec("select * from t2")
+		require.Error(t, err)
+		_, err = sqlDB.Exec("select * from t1")
+		require.Error(t, err)
+
+		// Verify schema_migrations has 0 records
+		migrations, err = drv.SelectMigrations(sqlDB, -1)
+		require.NoError(t, err)
+		require.Empty(t, migrations)
+
+		// Verify status
+		pending, err = db.Status(true)
+		require.NoError(t, err)
+		require.Equal(t, 1, pending)
+
+		// Verify log output only prints "Rolled back:" once
+		rolledBackCount := strings.Count(logBuf.String(), "Rolled back: 20261014120000_multi_section.sql")
+		require.Equal(t, 1, rolledBackCount)
+	})
+}
+
+func TestMultipleMigrationSectionsFailure(t *testing.T) {
+	testEachURL(t, func(t *testing.T, u *url.URL) {
+		db := newTestDB(t, u)
+		drv, err := db.Driver()
+		require.NoError(t, err)
+
+		err = db.Drop()
+		require.NoError(t, err)
+		err = db.Create()
+		require.NoError(t, err)
+
+		sqlDB, err := drv.Open()
+		require.NoError(t, err)
+		defer dbutil.MustClose(sqlDB)
+
+		db.FS = fstest.MapFS{
+			"db/migrations/20261014120001_fail_section.sql": {
+				Data: []byte(`-- migrate:up
+create table t_ok (
+  id integer
+);
+
+-- migrate:down
+drop table t_ok;
+
+-- migrate:up
+this is invalid sql that will cause a syntax error;
+
+-- migrate:down
+drop table t_never_created;
+`),
+			},
+		}
+
+		// Migration should fail on second section
+		err = db.Migrate()
+		require.Error(t, err)
+
+		// schema_migrations should NOT record the migration as applied
+		migrations, err := drv.SelectMigrations(sqlDB, -1)
+		require.NoError(t, err)
+		require.False(t, migrations["20261014120001"])
+
+		pending, err := db.Status(true)
+		require.NoError(t, err)
+		require.Equal(t, 1, pending)
+	})
+}
+
+func TestMultipleMigrationSectionsOptions(t *testing.T) {
+	testEachURL(t, func(t *testing.T, u *url.URL) {
+		db := newTestDB(t, u)
+		drv, err := db.Driver()
+		require.NoError(t, err)
+
+		err = db.Drop()
+		require.NoError(t, err)
+		err = db.Create()
+		require.NoError(t, err)
+
+		sqlDB, err := drv.Open()
+		require.NoError(t, err)
+		defer dbutil.MustClose(sqlDB)
+
+		db.FS = fstest.MapFS{
+			"db/migrations/20261014120002_options.sql": {
+				Data: []byte(`-- migrate:up transaction:false
+create table t_opts1 (
+  id integer
+);
+
+-- migrate:down transaction:false
+drop table t_opts1;
+
+-- migrate:up transaction:true
+create table t_opts2 (
+  id integer
+);
+
+-- migrate:down transaction:true
+drop table t_opts2;
+`),
+			},
+		}
+
+		err = db.Migrate()
+		require.NoError(t, err)
+
+		migrations, err := drv.SelectMigrations(sqlDB, -1)
+		require.NoError(t, err)
+		require.True(t, migrations["20261014120002"])
+
+		err = db.Rollback()
+		require.NoError(t, err)
+
+		migrations, err = drv.SelectMigrations(sqlDB, -1)
+		require.NoError(t, err)
+		require.False(t, migrations["20261014120002"])
 	})
 }
