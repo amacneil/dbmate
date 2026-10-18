@@ -14,4 +14,4 @@ Create a PR titled `vX.Y.Z` ([example](https://github.com/amacneil/dbmate/pull/6
 
 After the PR is merged, create a new release titled `vX.Y.Z` on the [releases page](https://github.com/amacneil/dbmate/releases) and write release notes.
 
-GitHub Actions will automatically build and publish binaries, publish the NPM package, and open a Homebrew PR.
+GitHub Actions will automatically build and publish binaries and publish the NPM package. Homebrew's BrewTestBot opens the formula bump PR on its own, usually within a few hours.
