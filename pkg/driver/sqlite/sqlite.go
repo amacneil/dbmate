@@ -121,7 +121,7 @@ func (drv *Driver) CreateDatabase() error {
 
 // DropDatabase drops the specified database (if it exists)
 func (drv *Driver) DropDatabase() error {
-	path := ConnectionString(drv.databaseURL)
+	path := filePathFromURL(drv.databaseURL)
 	fmt.Fprintf(drv.log, "Dropping: %s\n", path)
 
 	exists, err := drv.DatabaseExists()

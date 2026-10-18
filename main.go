@@ -101,6 +101,23 @@ func NewApp() *cli.App {
 			Usage:   "timeout for --wait flag",
 			Value:   defaultDB.WaitTimeout,
 		},
+		&cli.DurationFlag{
+			Name:    "wait-interval",
+			EnvVars: []string{"DBMATE_WAIT_INTERVAL"},
+			Usage:   "time to wait between connection attempts for --wait flag",
+			Value:   defaultDB.WaitInterval,
+		},
+		&cli.BoolFlag{
+			Name:    "migration-lock",
+			EnvVars: []string{"DBMATE_MIGRATION_LOCK"},
+			Usage:   "hold a database lock while migrating so that concurrent dbmate instances wait for each other (postgres only)",
+		},
+		&cli.DurationFlag{
+			Name:    "migration-lock-timeout",
+			EnvVars: []string{"DBMATE_MIGRATION_LOCK_TIMEOUT"},
+			Usage:   "maximum time to wait for the migration lock, 0 to wait indefinitely",
+			Value:   defaultDB.MigrationLockTimeout,
+		},
 	}
 
 	app.Commands = []*cli.Command{
@@ -324,6 +341,12 @@ func configureDB(c *cli.Context) (*dbmate.DB, error) {
 	if waitTimeout != 0 {
 		db.WaitTimeout = waitTimeout
 	}
+	waitInterval := c.Duration("wait-interval")
+	if waitInterval != 0 {
+		db.WaitInterval = waitInterval
+	}
+	db.UseMigrationLock = c.Bool("migration-lock")
+	db.MigrationLockTimeout = c.Duration("migration-lock-timeout")
 
 	return db, nil
 }
@@ -343,7 +366,7 @@ func getDatabaseURL(c *cli.Context) (u *url.URL, err error) {
 
 // redactLogString attempts to redact passwords from errors
 func redactLogString(in string) string {
-	re := regexp.MustCompile("([a-zA-Z]+://[^:]+:)[^@]+@")
+	re := regexp.MustCompile(`([a-zA-Z]+://[^:]+:)[^\s?#]+@`)
 
 	return re.ReplaceAllString(in, "${1}********@")
 }

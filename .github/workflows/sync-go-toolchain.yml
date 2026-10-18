@@ -10,11 +10,15 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      # Fork PR branches don't exist in this repository, and the token can't
+      # push to them, so fork PRs are checked instead of synced.
+      SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
 
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.head_ref }}
+          ref: ${{ env.SAME_REPO == 'true' && github.head_ref || '' }}
 
       - uses: actions/setup-go@v7
         with:
@@ -34,8 +38,17 @@ jobs:
           echo "toolchain=$TOOLCHAIN" >> $GITHUB_OUTPUT
           echo "Current go.mod toolchain: $TOOLCHAIN"
 
+      - name: Check go.mod toolchain matches Dockerfile
+        if: env.SAME_REPO != 'true' && steps.gomod.outputs.toolchain != format('go{0}', steps.dockerfile.outputs.version)
+        env:
+          NEW_VERSION: ${{ steps.dockerfile.outputs.version }}
+          TOOLCHAIN: ${{ steps.gomod.outputs.toolchain }}
+        run: |
+          echo "::error file=go.mod::go.mod toolchain (${TOOLCHAIN:-none}) does not match Dockerfile (go${NEW_VERSION}). Run: go mod edit -toolchain=go${NEW_VERSION}"
+          exit 1
+
       - name: Update go.mod toolchain if needed
-        if: steps.gomod.outputs.toolchain != format('go{0}', steps.dockerfile.outputs.version)
+        if: env.SAME_REPO == 'true' && steps.gomod.outputs.toolchain != format('go{0}', steps.dockerfile.outputs.version)
         env:
           NEW_VERSION: ${{ steps.dockerfile.outputs.version }}
         run: |
@@ -43,7 +56,7 @@ jobs:
           go mod edit -toolchain="go${NEW_VERSION}"
 
       - name: Commit and push changes
-        if: steps.gomod.outputs.toolchain != format('go{0}', steps.dockerfile.outputs.version)
+        if: env.SAME_REPO == 'true' && steps.gomod.outputs.toolchain != format('go{0}', steps.dockerfile.outputs.version)
         env:
           NEW_VERSION: ${{ steps.dockerfile.outputs.version }}
         run: |
