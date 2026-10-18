@@ -105,9 +105,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Configure QEMU
-        uses: docker/setup-qemu-action@v4
-
       - name: Configure Buildx
         uses: docker/setup-buildx-action@v4
 
@@ -150,7 +147,7 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
-          pattern: dbmate-linux-*
+          pattern: dbmate-linux-{amd64,arm64}
           path: dist
           merge-multiple: true
 
