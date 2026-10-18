@@ -10,13 +10,16 @@ const (
 	ZooPathQueryParam      = "zoo_path"
 	ClusterMacroQueryParam = "cluster_macro"
 	ReplicaMacroQueryParam = "replica_macro"
+	ReplicatedQueryParam   = "replicated"
 )
 
 type ClusterParameters struct {
 	OnCluster    bool
 	ZooPath      string
+	ZooPathSet   bool
 	ClusterMacro string
 	ReplicaMacro string
+	Replicated   bool
 }
 
 func ClearClusterParametersFromURL(u *url.URL) *url.URL {
@@ -25,6 +28,7 @@ func ClearClusterParametersFromURL(u *url.URL) *url.URL {
 	q.Del(ClusterMacroQueryParam)
 	q.Del(ReplicaMacroQueryParam)
 	q.Del(ZooPathQueryParam)
+	q.Del(ReplicatedQueryParam)
 	u.RawQuery = q.Encode()
 
 	return u
@@ -34,24 +38,34 @@ func ExtractClusterParametersFromURL(u *url.URL) *ClusterParameters {
 	onCluster := extractOnCluster(u)
 	clusterMacro := extractClusterMacro(u)
 	replicaMacro := extractReplicaMacro(u)
-	zookeeperPath := extractZookeeperPath(u)
+	zookeeperPath, zooPathSet := extractZookeeperPath(u)
+	replicated := extractReplicated(u)
 
 	r := &ClusterParameters{
 		OnCluster:    onCluster,
 		ZooPath:      zookeeperPath,
+		ZooPathSet:   zooPathSet,
 		ClusterMacro: clusterMacro,
 		ReplicaMacro: replicaMacro,
+		Replicated:   replicated,
 	}
 
 	return r
 }
 
-func extractOnCluster(u *url.URL) bool {
+func extractBoolQueryParam(u *url.URL, name string) bool {
 	v := u.Query()
-	hasOnCluster := v.Has(OnClusterQueryParam)
-	onClusterValue := v.Get(OnClusterQueryParam)
-	onCluster := hasOnCluster && (onClusterValue == "" || onClusterValue == "true")
-	return onCluster
+	has := v.Has(name)
+	value := v.Get(name)
+	return has && (value == "" || value == "true")
+}
+
+func extractOnCluster(u *url.URL) bool {
+	return extractBoolQueryParam(u, OnClusterQueryParam)
+}
+
+func extractReplicated(u *url.URL) bool {
+	return extractBoolQueryParam(u, ReplicatedQueryParam)
 }
 
 func extractClusterMacro(u *url.URL) string {
@@ -72,12 +86,12 @@ func extractReplicaMacro(u *url.URL) string {
 	return replicaMacro
 }
 
-func extractZookeeperPath(u *url.URL) string {
+func extractZookeeperPath(u *url.URL) (string, bool) {
 	v := u.Query()
-	clusterMacro := extractClusterMacro(u)
 	zookeeperPath := v.Get(ZooPathQueryParam)
 	if zookeeperPath == "" {
-		zookeeperPath = fmt.Sprintf("/clickhouse/tables/%s/{table}", clusterMacro)
+		clusterMacro := extractClusterMacro(u)
+		return fmt.Sprintf("/clickhouse/tables/%s/{table}", clusterMacro), false
 	}
-	return zookeeperPath
+	return zookeeperPath, true
 }

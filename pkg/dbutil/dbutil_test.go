@@ -1,7 +1,10 @@
 package dbutil_test
 
 import (
+	"bufio"
 	"database/sql"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbtest"
@@ -34,6 +37,24 @@ func TestTrimLeadingSQLComments(t *testing.T) {
 	out, err := dbutil.TrimLeadingSQLComments([]byte(in))
 	require.NoError(t, err)
 	require.Equal(t, "real stuff\n-- end\n", string(out))
+}
+
+func TestTrimLeadingSQLCommentsShortLineAtEOF(t *testing.T) {
+	// >4KB of leading comments forces bufio.Scanner to slide its buffer,
+	// leaving stale bytes just past the final token; a one-byte last line
+	// must not be misread as a comment marker.
+	var b strings.Builder
+	for b.Len() < 4090 {
+		b.WriteString("--\n")
+	}
+	for b.Len() < 4095 {
+		b.WriteString("-")
+	}
+	b.WriteString("\n-") // final line: one byte, no trailing newline
+
+	out, err := dbutil.TrimLeadingSQLComments([]byte(b.String()))
+	require.NoError(t, err)
+	require.Equal(t, "-\n", string(out))
 }
 
 func TestStripPsqlMetaCommands(t *testing.T) {
@@ -84,6 +105,50 @@ func TestStripPsqlMetaCommands(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "SELECT 1;\n", string(out))
 	})
+}
+
+func TestSQLFiltersLongLines(t *testing.T) {
+	filters := []struct {
+		name          string
+		filter        func([]byte) ([]byte, error)
+		skippedPrefix string
+	}{
+		{"TrimLeadingSQLComments", dbutil.TrimLeadingSQLComments, "-- "},
+		{"StripPsqlMetaCommands", dbutil.StripPsqlMetaCommands, "\\restrict "},
+	}
+	for _, filter := range filters {
+		t.Run(filter.name, func(t *testing.T) {
+			for _, size := range []int{bufio.MaxScanTokenSize - 1, bufio.MaxScanTokenSize, bufio.MaxScanTokenSize + 1, 1024 * 1024} {
+				for _, ending := range []struct {
+					name  string
+					value string
+				}{
+					{"LF", "\n"},
+					{"CRLF", "\r\n"},
+					{"EOF", ""},
+				} {
+					t.Run(fmt.Sprintf("SQL/%d/%s", size, ending.name), func(t *testing.T) {
+						prefix, suffix := "CREATE TABLE test (value TEXT CHECK (value <> '", "'));"
+						line := prefix + strings.Repeat("x", size-len(prefix)-len(suffix)) + suffix
+						out, err := filter.filter([]byte(line + ending.value))
+						require.NoError(t, err)
+						require.Equal(t, line+"\n", string(out))
+					})
+				}
+			}
+
+			t.Run("skipped long line", func(t *testing.T) {
+				line := filter.skippedPrefix + strings.Repeat("x", 2*bufio.MaxScanTokenSize)
+				out, err := filter.filter([]byte(line + "\nSELECT 1;\n"))
+				require.NoError(t, err)
+				require.Equal(t, "SELECT 1;\n", string(out))
+
+				out, err = filter.filter([]byte(line))
+				require.NoError(t, err)
+				require.Empty(t, out)
+			})
+		})
+	}
 }
 
 // connect to in-memory sqlite database for testing

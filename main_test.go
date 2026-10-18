@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v2"
@@ -55,6 +56,12 @@ func TestRedactLogString(t *testing.T) {
 		// invalid port, but probably not a password since there is no @
 		{"parse \"mysql://localhost:abc/database\": invalid",
 			"parse \"mysql://localhost:abc/database\": invalid"},
+		// password containing @ sign - should redact entire password
+		{"parse \"postgres://username:oRAND44@W)£+@1.1.1.1:5432/db_name\": invalid",
+			"parse \"postgres://username:********@1.1.1.1:5432/db_name\": invalid"},
+		// @ signs in query values are not part of the password
+		{"parse \"postgresql://user:password@host:5432/mydb?foo=b@r\": invalid",
+			"parse \"postgresql://user:********@host:5432/mydb?foo=b@r\": invalid"},
 	}
 
 	for _, ex := range examples {
@@ -210,5 +217,46 @@ func TestConfigureDB_Driver(t *testing.T) {
 		err := app.Run([]string{"dbmate", "--driver", "clickhouse", "test-config"})
 		require.NoError(t, err)
 		require.Equal(t, "clickhouse", configuredDB.DriverName)
+	})
+}
+
+func TestConfigureDB_WaitInterval(t *testing.T) {
+	var configuredDB *dbmate.DB
+
+	app := NewApp()
+	app.Commands = []*cli.Command{
+		{
+			Name: "test-config",
+			Action: func(c *cli.Context) error {
+				var err error
+				configuredDB, err = configureDB(c)
+				return err
+			},
+		},
+	}
+
+	t.Run("default", func(t *testing.T) {
+		configuredDB = nil
+		err := app.Run([]string{"dbmate", "test-config"})
+		require.NoError(t, err)
+		require.Equal(t, time.Second, configuredDB.WaitInterval)
+	})
+
+	t.Run("from env variable", func(t *testing.T) {
+		configuredDB = nil
+		t.Setenv("DBMATE_WAIT_INTERVAL", "2s")
+
+		err := app.Run([]string{"dbmate", "test-config"})
+		require.NoError(t, err)
+		require.Equal(t, 2*time.Second, configuredDB.WaitInterval)
+	})
+
+	t.Run("flag overrides env variable", func(t *testing.T) {
+		configuredDB = nil
+		t.Setenv("DBMATE_WAIT_INTERVAL", "2s")
+
+		err := app.Run([]string{"dbmate", "--wait-interval", "3s", "test-config"})
+		require.NoError(t, err)
+		require.Equal(t, 3*time.Second, configuredDB.WaitInterval)
 	})
 }

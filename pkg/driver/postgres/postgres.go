@@ -2,15 +2,21 @@ package postgres
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
+	"database/sql/driver"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"os/exec"
 	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
@@ -99,8 +105,11 @@ func connectionString(u *url.URL) string {
 		query.Del("socket")
 	}
 
+	useEnvHostname := hostname == "" && query.Get("host") == "" && os.Getenv("PGHOST") != ""
+	useEnvPort := port == "" && query.Get("port") == "" && os.Getenv("PGPORT") != ""
+
 	// default hostname
-	if hostname == "" && query.Get("host") == "" {
+	if hostname == "" && query.Get("host") == "" && !useEnvHostname {
 		switch runtime.GOOS {
 		case "linux":
 			query.Set("host", "/var/run/postgresql")
@@ -121,11 +130,17 @@ func connectionString(u *url.URL) string {
 		port = query.Get("port")
 		query.Del("port")
 	}
-	if port == "" {
+	if port == "" && !useEnvPort {
 		switch u.Scheme {
 		case "redshift":
 			port = "5439"
 		default:
+			// lib/pq supplies PostgreSQL's default port when the hostname comes
+			// from PGHOST. Keeping it out of the URL also lets PGPORT take
+			// precedence if both environment variables are configured.
+			if useEnvHostname {
+				break
+			}
 			port = "5432"
 		}
 	}
@@ -134,7 +149,24 @@ func connectionString(u *url.URL) string {
 	out, _ := url.Parse(u.String())
 	// force scheme back to postgres if there was another postgres-compatible scheme
 	out.Scheme = "postgres"
-	out.Host = fmt.Sprintf("%s:%s", hostname, port)
+	switch {
+	case hostname != "" && port != "":
+		out.Host = fmt.Sprintf("%s:%s", hostname, port)
+	case hostname != "":
+		out.Host = hostname
+	case useEnvHostname:
+		out.Host = ""
+		if port != "" {
+			// A URL authority containing only a port would also supply an empty
+			// hostname and overwrite PGHOST, so preserve an explicit or
+			// scheme-specific port as a query parameter instead.
+			query.Set("port", port)
+		}
+	case port != "":
+		out.Host = fmt.Sprintf(":%s", port)
+	default:
+		out.Host = ""
+	}
 	out.RawQuery = query.Encode()
 
 	return out.String()
@@ -515,4 +547,106 @@ func (drv *Driver) quotedMigrationsTableNameParts(db dbutil.Transaction) (string
 
 	// if more than one part, we already have a schema
 	return quotedNameParts[0], strings.Join(quotedNameParts[1:], "."), nil
+}
+
+// migrationLockKey is the advisory lock key used to serialize migration runs.
+// Advisory locks are scoped to the database, so a fixed key is sufficient.
+const migrationLockKey = 48372615
+
+// errMigrationLockLost is returned when the connection holding the migration
+// lock is gone, in place of connecting again without the lock
+var errMigrationLockLost = errors.New("migration lock was lost: the database connection was reset during the migration")
+
+// lockedConnector hands out a single connection, which acquires a session-level
+// advisory lock as it connects.
+//
+// database/sql asks its connector for a replacement whenever a connection dies,
+// so refusing to connect a second time turns a lost lock into an error on the
+// next statement, instead of the rest of the migration run silently continuing
+// on a session that holds no lock.
+type lockedConnector struct {
+	driver.Connector
+	lockTimeout int64
+	locked      atomic.Bool
+}
+
+func (c *lockedConnector) Connect(ctx context.Context) (driver.Conn, error) {
+	if c.locked.Load() {
+		return nil, errMigrationLockLost
+	}
+
+	conn, err := c.Connector.Connect(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	execer, ok := conn.(driver.ExecerContext)
+	if !ok {
+		// closing a connection that is already being discarded, so the error that
+		// is on its way to the caller is the more useful one
+		_ = conn.Close()
+		return nil, fmt.Errorf("failed to acquire migration lock: %T cannot execute statements", conn)
+	}
+
+	// lock_timeout bounds the wait for the lock, and resetting it afterwards puts
+	// back the session default so that it does not apply to the migrations
+	// themselves; these run as a single simple query, outside any transaction, so
+	// that the lock survives the migration transactions that follow
+	query := fmt.Sprintf("set lock_timeout = %d; select pg_advisory_lock(%d); reset lock_timeout",
+		c.lockTimeout, migrationLockKey)
+	if _, err := execer.ExecContext(ctx, query, nil); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("failed to acquire migration lock: %w", err)
+	}
+
+	c.locked.Store(true)
+
+	return conn, nil
+}
+
+// OpenWithMigrationLock creates a new database connection holding the migration
+// lock, waiting up to timeout for another holder to release it
+func (drv *Driver) OpenWithMigrationLock(timeout time.Duration) (*sql.DB, error) {
+	// the same driver serves Redshift and Spanner, neither of which is known to
+	// support advisory locks
+	if drv.databaseURL.Scheme == "redshift" || drv.databaseURL.Scheme == "spanner-postgres" {
+		return nil, dbmate.ErrMigrationLockUnsupported
+	}
+
+	if timeout < 0 {
+		return nil, fmt.Errorf("invalid migration lock timeout: %s", timeout)
+	}
+
+	// lock_timeout has millisecond resolution, and zero disables it
+	lockTimeout := timeout.Milliseconds()
+	if timeout > 0 && lockTimeout == 0 {
+		lockTimeout = 1
+	}
+
+	connector, err := pq.NewConnector(connectionString(drv.databaseURL))
+	if err != nil {
+		return nil, err
+	}
+
+	db := sql.OpenDB(&lockedConnector{Connector: connector, lockTimeout: lockTimeout})
+	// only the locked connection may be used, so never open a second one
+	db.SetMaxOpenConns(1)
+
+	// connect eagerly, so that acquiring the lock fails here rather than part way
+	// through the migration run
+	if err := db.Ping(); err != nil {
+		dbutil.MustClose(db)
+
+		// lock_not_available: another session held the lock for longer than the timeout
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) && pqErr.Code == "55P03" {
+			return nil, fmt.Errorf("timed out after %s waiting for migration lock (is another dbmate instance running?)", timeout)
+		}
+
+		// otherwise a plain connection error, reported as it would be without the
+		// lock, or a lock error already described as such by the connector
+		return nil, err
+	}
+
+	return db, nil
 }

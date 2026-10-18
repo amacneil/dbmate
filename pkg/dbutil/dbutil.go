@@ -67,11 +67,13 @@ func TrimLeadingSQLComments(data []byte) ([]byte, error) {
 	// iterate over sql lines
 	preamble := true
 	scanner := bufio.NewScanner(bytes.NewReader(data))
+	// Allow any line in the input, including a final line without a newline.
+	scanner.Buffer(nil, max(bufio.MaxScanTokenSize, len(data)+1))
 	for scanner.Scan() {
 		// we read bytes directly for premature performance optimization
 		line := scanner.Bytes()
 
-		if preamble && (len(line) == 0 || bytes.Equal(line[0:2], []byte("--"))) {
+		if preamble && (len(line) == 0 || bytes.HasPrefix(line, []byte("--"))) {
 			// header section, skip this line in output buffer
 			continue
 		}
@@ -113,6 +115,8 @@ func StripPsqlMetaCommands(data []byte) ([]byte, error) {
 	out := bytes.NewBuffer(make([]byte, 0, len(data)))
 
 	scanner := bufio.NewScanner(bytes.NewReader(data))
+	// Allow any line in the input, including a final line without a newline.
+	scanner.Buffer(nil, max(bufio.MaxScanTokenSize, len(data)+1))
 	for scanner.Scan() {
 		line := scanner.Bytes()
 

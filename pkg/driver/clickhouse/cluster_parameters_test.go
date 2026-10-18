@@ -79,19 +79,64 @@ func TestZookeeperPath(t *testing.T) {
 	cases := []struct {
 		input    string
 		expected string
+		set      bool
 	}{
 		// zoo_path not supplied
-		{"clickhouse://myhost:9000", "/clickhouse/tables/{cluster}/{table}"},
+		{"clickhouse://myhost:9000", "/clickhouse/tables/{cluster}/{table}", false},
+		// zoo_path present but empty is treated as unset
+		{"clickhouse://myhost:9000?zoo_path=", "/clickhouse/tables/{cluster}/{table}", false},
 		// zoo_path supplied
-		{"clickhouse://myhost:9000?zoo_path=/zk/path/tables", "/zk/path/tables"},
+		{"clickhouse://myhost:9000?zoo_path=/zk/path/tables", "/zk/path/tables", true},
 	}
 
 	for _, c := range cases {
 		t.Run(c.input, func(t *testing.T) {
 			u := dbtest.MustParseURL(t, c.input)
 
-			actual := extractZookeeperPath(u)
+			actual, set := extractZookeeperPath(u)
+			require.Equal(t, c.expected, actual)
+			require.Equal(t, c.set, set)
+		})
+	}
+}
+
+func TestReplicated(t *testing.T) {
+	cases := []struct {
+		input    string
+		expected bool
+	}{
+		{"clickhouse://myhost:9000", false},
+		{"clickhouse://myhost:9000?replicated", true},
+		{"clickhouse://myhost:9000?replicated=true", true},
+		{"clickhouse://myhost:9000?replicated=falsy", false},
+	}
+
+	for _, c := range cases {
+		t.Run(c.input, func(t *testing.T) {
+			u := dbtest.MustParseURL(t, c.input)
+
+			actual := extractReplicated(u)
 			require.Equal(t, c.expected, actual)
 		})
 	}
+}
+
+func TestOnClusterAndReplicatedMutuallyExclusive(t *testing.T) {
+	drv := testClickHouseDriverURL(t, dbtest.MustParseURL(t,
+		"clickhouse://myhost:9000/dbmate_test?on_cluster&replicated"))
+
+	err := drv.CreateDatabase()
+	require.EqualError(t, err, "clickhouse: on_cluster and replicated are mutually exclusive")
+
+	err = drv.CreateMigrationsTable(nil)
+	require.EqualError(t, err, "clickhouse: on_cluster and replicated are mutually exclusive")
+}
+
+func TestCreateDatabaseRefusesReplicated(t *testing.T) {
+	drv := testClickHouseDriverURL(t, dbtest.MustParseURL(t,
+		"clickhouse://myhost:9000/dbmate_test?replicated"))
+
+	err := drv.CreateDatabase()
+	require.EqualError(t, err,
+		"clickhouse: replicated requires a database already created with ENGINE = Replicated(...) (or Shared on ClickHouse Cloud); dbmate create cannot create that database")
 }

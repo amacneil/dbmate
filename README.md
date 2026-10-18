@@ -17,6 +17,7 @@ For a comparison between dbmate and other popular database schema migration tool
 - [Commands](#commands)
   - [Command Line Options](#command-line-options)
 - [Usage](#usage)
+  - [Environment Variables](#environment-variables)
   - [Connecting to the Database](#connecting-to-the-database)
     - [PostgreSQL](#postgresql)
     - [MySQL](#mysql)
@@ -142,14 +143,65 @@ The following options are available with all commands. You must use command line
 - `--strict` - fail if migrations would be applied out of order _(env: `DBMATE_STRICT`)_
 - `--wait` - wait for the db to become available before executing the subsequent command _(env: `DBMATE_WAIT`)_
 - `--wait-timeout 60s` - timeout for --wait flag _(env: `DBMATE_WAIT_TIMEOUT`)_
+- `--wait-interval 1s` - time to wait between connection attempts for --wait flag _(env: `DBMATE_WAIT_INTERVAL`)_
+- `--migration-lock` - hold a database lock while migrating so that concurrent dbmate instances wait for each other (PostgreSQL only) _(env: `DBMATE_MIGRATION_LOCK`)_
+- `--migration-lock-timeout 5m` - maximum time to wait for the migration lock, 0 to wait indefinitely _(env: `DBMATE_MIGRATION_LOCK_TIMEOUT`)_
 
 ## Usage
+
+### Environment Variables
+
+Most dbmate settings can be configured with environment variables in addition to command line flags. This is useful for twelve-factor style deployments and for sharing local configuration via a `.env` file.
+
+#### Which settings use which environment variables
+
+| Setting | Environment variable | Notes |
+| --- | --- | --- |
+| Database URL | `DATABASE_URL` (default) | Overridden by `--url` / `-u`. Use `--env` / `-e` to read the URL from a different variable (for example `TEST_DATABASE_URL`). |
+| Driver | `DBMATE_DRIVER` | Used when `--driver` is not set. |
+| Migrations directory | `DBMATE_MIGRATIONS_DIR` | Corresponds to `--migrations-dir` / `-d`. |
+| Migrations table | `DBMATE_MIGRATIONS_TABLE` | Corresponds to `--migrations-table`. |
+| Schema file | `DBMATE_SCHEMA_FILE` | Corresponds to `--schema-file` / `-s`. |
+| Disable schema dump | `DBMATE_NO_DUMP_SCHEMA` | Corresponds to `--no-dump-schema`. |
+| Wait for database | `DBMATE_WAIT` | Corresponds to `--wait`. |
+| Wait timeout | `DBMATE_WAIT_TIMEOUT` | Corresponds to `--wait-timeout`. |
+| Wait interval | `DBMATE_WAIT_INTERVAL` | Corresponds to `--wait-interval`. |
+| Migration lock | `DBMATE_MIGRATION_LOCK` | Corresponds to `--migration-lock`. |
+| Migration lock timeout | `DBMATE_MIGRATION_LOCK_TIMEOUT` | Corresponds to `--migration-lock-timeout`. |
+| Strict migrations | `DBMATE_STRICT` | Corresponds to `--strict` on `up` / `migrate`. |
+| Verbose SQL output | `DBMATE_VERBOSE` | Corresponds to `--verbose` / `-v` on `up` / `migrate` / `rollback`. |
+
+`--env` and `--env-file` are CLI-only options (they are not themselves read from environment variables).
+
+#### Loading `.env` files
+
+By default, dbmate loads environment variables from a `.env` file in the current working directory (if present). Missing files are ignored; an invalid dotenv file causes dbmate to exit with an error.
+
+To load one or more alternate dotenv files, pass `--env-file` (repeatable). When any `--env-file` is given, only the listed files are loaded - the default `.env` is not included unless you specify it:
+
+```sh
+dbmate --env-file .env.development up
+dbmate --env-file .env --env-file .env.local up
+```
+
+Files are loaded in the order given.
+
+#### Variable precedence
+
+From highest to lowest priority:
+
+1. **Command line flags** (for example `--url`, `--driver`, `--migrations-dir`)
+2. **Environment variables already set in the calling process**
+3. **Values from dotenv files** (`.env` or files passed with `--env-file`)
+4. **Built-in defaults**
+
+Dotenv files never overwrite variables that are already set in the process environment. For the database URL specifically, `--url` / `-u` takes precedence over the environment variable named by `--env` / `-e` (default `DATABASE_URL`).
 
 ### Connecting to the Database
 
 Dbmate locates your database using the `DATABASE_URL` environment variable by default. If you are writing a [twelve-factor app](http://12factor.net/), you should be storing all connection strings in environment variables.
 
-To make this easy in development, dbmate looks for a `.env` file in the current directory, and treats any variables listed there as if they were specified in the current environment (existing environment variables take preference, however).
+To make this easy in development, dbmate looks for a `.env` file in the current directory, and treats any variables listed there as if they were specified in the current environment (existing environment variables take preference, however). See [Environment Variables](#environment-variables) for details on `--env-file` and precedence.
 
 If you do not already have a `.env` file, create one and add your database connection URL:
 
@@ -310,9 +362,9 @@ dbmate --driver clickhouse --url "https://username:password@127.0.0.1:8443/datab
 dbmate --driver clickhouse --url "tcp://username:password@127.0.0.1:9000/database_name" status
 ```
 
-To work with ClickHouse cluster, there are 4 connection query parameters that can be supplied:
+To work with ClickHouse cluster, there are connection query parameters that can be supplied:
 
-- `on_cluster` - Indicataion to use cluster statements and replicated migration table. (default: `false`) If this parameter is not supplied, other cluster related query parameters are ignored.
+- `on_cluster` - Indication to use cluster statements and replicated migration table. (default: `false`) If this parameter is not supplied, other cluster related query parameters are ignored (except `replicated`). Mutually exclusive with `replicated`.
 
 ```sh
 DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_cluster"
@@ -320,22 +372,32 @@ DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_clu
 DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_cluster=true"
 ```
 
-- `cluster_macro` (Optional) - Macro value to be used for ON CLUSTER statements and for the replciated migration table engine zookeeper path. (default: `{cluster}`)
+- `cluster_macro` (Optional) - Macro value to be used for ON CLUSTER statements and for the replicated migration table engine zookeeper path. (default: `{cluster}`)
 
 ```sh
 DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_cluster&cluster_macro={my_cluster}"
 ```
 
-- `replica_macro` (Optional) - Macro value to be used for the replica name in the replciated migration table engine. (default: `{replica}`)
+- `replica_macro` (Optional) - Macro value to be used for the replica name in the replicated migration table engine. (default: `{replica}`)
 
 ```sh
 DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_cluster&replica_macro={my_replica}"
 ```
 
-- `zoo_path` (Optional) - The path to the table migration in ClickHouse/Zoo Keeper. (default: `/clickhouse/tables/<cluster_macro>/{table}`)
+- `zoo_path` (Optional) - The path to the table migration in ClickHouse/ZooKeeper. With `on_cluster`, defaults to `/clickhouse/tables/<cluster_macro>/{table}`. With `replicated`, if omitted the engine uses the server default path (`ReplicatedReplacingMergeTree(ts)`), which follows `default_replica_path` and server macros such as `{shard}` / `{replica}`.
 
 ```sh
 DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?on_cluster&zoo_path=/zk/path/tables"
+```
+
+- `replicated` - Use `ReplicatedReplacingMergeTree` for the migrations table without `ON CLUSTER`. (default: `false`) Mutually exclusive with `on_cluster`.
+
+  Requires a database that already uses the [Replicated database engine](https://clickhouse.com/docs/reference/engines/database-engines/replicated) (`CREATE DATABASE ... ENGINE = Replicated(...)`) or the Shared database engine on ClickHouse Cloud. `dbmate create` cannot create that database (it issues a bare `CREATE DATABASE`, which yields Atomic by default); create the database yourself first, then point dbmate at it with `replicated`.
+
+```sh
+DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?replicated"
+
+DATABASE_URL="clickhouse://username:password@127.0.0.1:9000/database_name?replicated&zoo_path=/clickhouse/tables/{uuid}/{shard}"
 ```
 
 [See other supported connection options](https://github.com/ClickHouse/clickhouse-go#dsn).
@@ -446,6 +508,15 @@ Writing: ./db/schema.sql
 > Note: `dbmate up` will create the database if it does not already exist (assuming the current user has permission to create databases). If you want to run migrations without creating the database, run `dbmate migrate`.
 
 Pending migrations are always applied in numerical order. However, dbmate does not prevent migrations from being applied out of order if they are committed independently (for example: if a developer has been working on a branch for a long time, and commits a migration which has a lower version number than other already-applied migrations, dbmate will simply apply the pending migration). See [#159](https://github.com/amacneil/dbmate/issues/159) for a more detailed explanation.
+
+If several instances of your application may run `dbmate up` at the same time (for example, replicas starting simultaneously), pass `--migration-lock` to hold an exclusive lock for the duration of the run. Concurrent instances then wait for the lock, and find nothing left to apply once they acquire it, instead of racing to apply the same migrations. The wait is bounded by `--migration-lock-timeout` (default 5 minutes). The lock is released automatically when the holding connection closes, so a crashed or killed instance never leaves a stale lock behind. If that connection is lost mid-run, the run fails rather than carrying on without the lock.
+
+A few limitations are worth knowing about:
+
+- The migration lock is currently supported for PostgreSQL only. Redshift and `spanner-postgres` use the same driver, but are not supported.
+- The lock is held for the duration of a session, so it needs a direct connection or a session-pooling proxy. A transaction-pooling proxy such as PgBouncer in transaction mode will not hold it.
+- The lock covers migrations only. Concurrent instances creating the database itself (`dbmate up` where the database does not exist yet) can still race, with or without this flag.
+- The lock is released when the server sees the connection close. A host failure or a network partition can leave it held until the server detects the dead connection, so other instances keep waiting, and may reach `--migration-lock-timeout` before it is released.
 
 ### Rolling Back Migrations
 

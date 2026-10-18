@@ -14,7 +14,7 @@ import (
 	"github.com/amacneil/dbmate/v2/pkg/dbmate"
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
 
-	_ "github.com/go-sql-driver/mysql" // database/sql driver
+	"github.com/go-sql-driver/mysql"
 )
 
 // for mocking out during tests
@@ -81,9 +81,38 @@ func connectionString(u *url.URL) string {
 	return normalizedString
 }
 
+// parseConfig parses a DSN and silences the driver's own logger. Otherwise
+// go-sql-driver prints lines like "packets.go:37: unexpected EOF" straight to
+// stderr, which is noise during --wait where a failed connection is expected
+// and dbmate already reports the real error itself.
+func parseConfig(dsn string) (*mysql.Config, error) {
+	config, err := mysql.ParseDSN(dsn)
+	if err != nil {
+		return nil, err
+	}
+	config.Logger = &mysql.NopLogger{}
+
+	return config, nil
+}
+
+// openConnection opens a connection using the given DSN.
+func openConnection(dsn string) (*sql.DB, error) {
+	config, err := parseConfig(dsn)
+	if err != nil {
+		return nil, err
+	}
+
+	connector, err := mysql.NewConnector(config)
+	if err != nil {
+		return nil, err
+	}
+
+	return sql.OpenDB(connector), nil
+}
+
 // Open creates a new database connection
 func (drv *Driver) Open() (*sql.DB, error) {
-	return sql.Open("mysql", connectionString(drv.databaseURL))
+	return openConnection(connectionString(drv.databaseURL))
 }
 
 func (drv *Driver) openRootDB() (*sql.DB, error) {
@@ -96,7 +125,7 @@ func (drv *Driver) openRootDB() (*sql.DB, error) {
 	// connect to no particular database
 	rootURL.Path = "/"
 
-	return sql.Open("mysql", connectionString(rootURL))
+	return openConnection(connectionString(rootURL))
 }
 
 func (drv *Driver) quoteIdentifier(str string) string {
