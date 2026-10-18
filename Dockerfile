@@ -26,13 +26,21 @@ RUN go mod download
 COPY . /src/
 RUN make build
 
-# release stage
-FROM alpine:3.24.2 as release
+# runtime stage
+FROM alpine:3.24.2 as runtime
 RUN apk add --no-cache \
   mariadb-client \
   mariadb-connector-c \
   postgresql-client \
   sqlite \
   tzdata
-COPY --from=dev /src/dist/dbmate /usr/local/bin/dbmate
 ENTRYPOINT ["/usr/local/bin/dbmate"]
+
+# release stage
+FROM runtime as release
+COPY --from=dev /src/dist/dbmate /usr/local/bin/dbmate
+
+# release stage using binaries from the CI build matrix
+FROM runtime as release-prebuilt
+ARG TARGETARCH
+COPY --chmod=0755 dist/dbmate-linux-${TARGETARCH} /usr/local/bin/dbmate
