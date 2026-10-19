@@ -27,6 +27,7 @@ For a comparison between dbmate and other popular database schema migration tool
     - [BigQuery](#bigquery)
     - [Spanner](#spanner)
   - [Creating Migrations](#creating-migrations)
+    - [Multiple Migrations in a Single File (Not Recommended)](#multiple-migrations-in-a-single-file-not-recommended)
   - [Running Migrations](#running-migrations)
   - [Rolling Back Migrations](#rolling-back-migrations)
   - [Migration Options](#migration-options)
@@ -47,7 +48,7 @@ For a comparison between dbmate and other popular database schema migration tool
 - Supports MySQL, MariaDB, PostgreSQL, SQLite, and ClickHouse
 - Uses plain SQL for writing schema migrations
 - Migrations are timestamp-versioned, to avoid version number conflicts with multiple developers
-- Migrations are run atomically inside a transaction
+- Migrations are run atomically inside a transaction, except for migrations with `transaction:false`, databases without transactions (such as ClickHouse), statements the database commits implicitly (such as DDL on MySQL), and files with [multiple migrations](#multiple-migrations-in-a-single-file-not-recommended)
 - Supports creating and dropping databases (handy in development/test)
 - Supports saving a `schema.sql` file to easily diff schema changes in git
 - Database connection URL is defined using an environment variable (`DATABASE_URL` by default), or specified on the command line
@@ -475,7 +476,9 @@ create table users (
 -- migrate:down
 ```
 
-For related changes, it is possible to include multiple migrations in a single file using additional `migrate:up` and `migrate:down` sections. Migration file either succeeds or fails as a whole.
+#### Multiple Migrations in a Single File (Not Recommended)
+
+It is possible to include multiple migrations in a single file using additional `migrate:up` and `migrate:down` sections, but this is **not recommended**, and support for it may be removed in dbmate v3. Put each migration in its own file instead.
 
 ```sql
 -- migrate:up
@@ -490,6 +493,16 @@ ALTER TABLE users ADD COLUMN email VARCHAR;
 -- migrate:down
 ALTER TABLE users DROP COLUMN email;
 ```
+
+A migration file with multiple sections does **not** succeed or fail as a whole. Each section runs in its own transaction (or without one, when it uses `transaction:false` or the database does not support transactions, such as ClickHouse), and dbmate records the migration as applied only after the last section succeeds. That leads to these pitfalls:
+
+- If a `migrate:up` section fails, the sections before it stay applied, but the migration is not recorded as applied, so `dbmate status` still shows it as pending.
+- Running `dbmate up` again runs those earlier sections a second time. Depending on the SQL, that fails (for example, a `CREATE TABLE` without `IF NOT EXISTS`) or silently applies the change twice (for example, an `INSERT` adds a duplicate row).
+- `dbmate rollback` cannot undo the sections that were applied. It rolls back the most recent migration that _is_ recorded as applied, such as an earlier migration file, or fails with "no migrations have been applied" if there is none.
+- If a `migrate:down` section fails, the sections after it in the file have already been rolled back, but the migration is still recorded as applied. Running `dbmate rollback` again runs those `migrate:down` sections a second time.
+- dbmate does not record which sections of a file have been applied, so it cannot tell you how far a failed migration got. You have to inspect the database and repair it by hand before retrying.
+
+With one migration per file, dbmate records each migration as part of applying it (in the same transaction, where the database supports it), so a failure never leaves an earlier, successful migration unrecorded.
 
 > Note: Migration files are named in the format `[version]_[description].sql`. Only the version (defined as all leading numeric characters in the file name) is recorded in the database, so you can safely rename a migration file without having any effect on its current application state.
 
