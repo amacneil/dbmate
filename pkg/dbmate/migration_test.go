@@ -53,6 +53,17 @@ drop table users;`
 		require.Equal(t, true, parsed.DownOptions.Transaction())
 	})
 
+	t.Run("ignore a byte order mark at the start of the file", func(t *testing.T) {
+		migration := "\ufeff-- migrate:up\ncreate table users (id serial, name text);\n-- migrate:down\ndrop table users;"
+
+		parsedSections, err := parseMigrationContents(migration)
+		require.Nil(t, err)
+		parsed := parsedSections[0]
+
+		require.Equal(t, "-- migrate:up\ncreate table users (id serial, name text);\n", parsed.Up)
+		require.Equal(t, "-- migrate:down\ndrop table users;", parsed.Down)
+	})
+
 	t.Run("do not require space between '--' and 'migrate'", func(t *testing.T) {
 		migration := `
 --migrate:up
