@@ -78,6 +78,10 @@ var (
 )
 
 func parseMigrationContents(contents string) ([]*ParsedMigration, error) {
+	// some editors start UTF-8 files with a byte order mark, which would hide
+	// the first "-- migrate:up" from the regular expressions
+	contents = strings.TrimPrefix(contents, "\ufeff")
+
 	sectionSubstrings, err := getMigrationSectionSubstrings(contents)
 	if err != nil {
 		return nil, err
