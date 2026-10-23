@@ -55,17 +55,17 @@ type migrationOptions map[string]string
 // Transaction returns whether or not this migration should run in a transaction
 // Defaults to true.
 func (m migrationOptions) Transaction() bool {
-	return m["transaction"] != "false"
+	return !strings.EqualFold(strings.TrimSpace(m["transaction"]), "false")
 }
 
 var (
-	upRegExp              = regexp.MustCompile(`(?m)^--\s*migrate:up(\s*$|\s+\S+)`)
-	downRegExp            = regexp.MustCompile(`(?m)^--\s*migrate:down(\s*$|\s+\S+)`)
+	upRegExp              = regexp.MustCompile(`(?m)^--\s*(?:migrate|dbmate):up(\s*$|\s+\S+)`)
+	downRegExp            = regexp.MustCompile(`(?m)^--\s*(?:migrate|dbmate):down(\s*$|\s+\S+)`)
 	emptyLineRegExp       = regexp.MustCompile(`^\s*$`)
 	commentLineRegExp     = regexp.MustCompile(`^\s*--`)
-	whitespaceRegExp      = regexp.MustCompile(`\s+`)
-	optionSeparatorRegExp = regexp.MustCompile(`:`)
-	blockDirectiveRegExp  = regexp.MustCompile(`^--\s*migrate:(up|down)`)
+	directivePrefixRegExp = regexp.MustCompile(`^\s*--\s*(?:(?:migrate|dbmate):(up|down)|dbmate)(?::\s*|\s+|$)`)
+	dbmateDirectiveRegExp = regexp.MustCompile(`^\s*--\s*dbmate(?::\s*|\s+|$)`)
+	optionPairRegExp      = regexp.MustCompile(`([a-zA-Z0-9_-]+)\s*[:=]\s*([^\s:=]+)`)
 )
 
 // Error codes
@@ -78,6 +78,20 @@ var (
 )
 
 func parseMigrationContents(contents string) ([]*ParsedMigration, error) {
+	contents = strings.TrimPrefix(contents, "\ufeff")
+
+	allUpDirectives := upRegExp.FindAllStringIndex(contents, -1)
+	if allUpDirectives == nil {
+		return nil, ErrParseMissingUp
+	}
+
+	header := contents[0:allUpDirectives[0][0]]
+	if statementsPrecedeMigrateBlocks(contents, allUpDirectives[0][0]) {
+		return nil, ErrParseUnexpectedStmt
+	}
+
+	headerOptions := parseHeaderOptions(header)
+
 	sectionSubstrings, err := getMigrationSectionSubstrings(contents)
 	if err != nil {
 		return nil, err
@@ -85,7 +99,7 @@ func parseMigrationContents(contents string) ([]*ParsedMigration, error) {
 
 	var migrationSections []*ParsedMigration
 	for _, sectionSubstring := range sectionSubstrings {
-		migrationSection, err := parseMigrationSection(sectionSubstring)
+		migrationSection, err := parseMigrationSection(sectionSubstring, headerOptions)
 		if err != nil {
 			return nil, err
 		}
@@ -100,7 +114,7 @@ func parseMigrationContents(contents string) ([]*ParsedMigration, error) {
 // block and the second representing the "down" block. This function
 // requires that up and down blocks were defined and will otherwise
 // return an error.
-func parseMigrationSection(section string) (*ParsedMigration, error) {
+func parseMigrationSection(section string, defaultOptions migrationOptions) (*ParsedMigration, error) {
 	upDirectiveStart, hasDefinedUpBlock := getMatchPosition(section, upRegExp)
 	downDirectiveStart, hasDefinedDownBlock := getMatchPosition(section, downRegExp)
 
@@ -119,48 +133,86 @@ func parseMigrationSection(section string) (*ParsedMigration, error) {
 
 	parsed := ParsedMigration{
 		Up:          upBlock,
-		UpOptions:   parseMigrationOptions(upBlock),
+		UpOptions:   parseMigrationOptions(upBlock, defaultOptions),
 		Down:        downBlock,
-		DownOptions: parseMigrationOptions(downBlock),
+		DownOptions: parseMigrationOptions(downBlock, defaultOptions),
 	}
 	return &parsed, nil
 }
 
+func stripTrailingComment(s string) string {
+	if idx := strings.Index(s, "--"); idx != -1 {
+		s = s[:idx]
+	}
+	if idx := strings.Index(s, "//"); idx != -1 {
+		s = s[:idx]
+	}
+	if idx := strings.Index(s, "/*"); idx != -1 {
+		s = s[:idx]
+	}
+	return strings.TrimSpace(s)
+}
+
+func isDbmateDirective(line string) bool {
+	return dbmateDirectiveRegExp.MatchString(line)
+}
+
+func parseDirectiveLineOptions(line string, options migrationOptions) {
+	if !directivePrefixRegExp.MatchString(line) {
+		return
+	}
+	remainder := directivePrefixRegExp.ReplaceAllString(line, "")
+	remainder = stripTrailingComment(remainder)
+
+	matches := optionPairRegExp.FindAllStringSubmatch(remainder, -1)
+	for _, match := range matches {
+		if len(match) == 3 {
+			options[match[1]] = match[2]
+		}
+	}
+}
+
+func parseHeaderOptions(header string) migrationOptions {
+	options := make(migrationOptions)
+	for _, line := range strings.Split(header, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		if isCommentLine(trimmed) && isDbmateDirective(trimmed) {
+			parseDirectiveLineOptions(trimmed, options)
+		}
+	}
+	return options
+}
+
 // parseMigrationOptions parses the migration options out of a block
 // directive into an object that implements the MigrationOptions interface.
-//
-// For example:
-//
-//	fmt.Printf("%#v", parseMigrationOptions("-- migrate:up transaction:false"))
-//	// migrationOptions{"transaction": "false"}
-func parseMigrationOptions(section string) ParsedMigrationOptions {
+func parseMigrationOptions(block string, defaultOptions migrationOptions) ParsedMigrationOptions {
 	options := make(migrationOptions)
+	for k, v := range defaultOptions {
+		options[k] = v
+	}
 
-	// remove everything after first newline
-	section = strings.SplitN(section, "\n", 2)[0]
-
-	// strip away the -- migrate:[up|down] part
-	section = blockDirectiveRegExp.ReplaceAllString(section, "")
-
-	// remove leading and trailing whitespace
-	section = strings.TrimSpace(section)
-
-	// return empty options if nothing is left to parse
-	if section == "" {
+	lines := strings.Split(block, "\n")
+	if len(lines) == 0 {
 		return options
 	}
 
-	// split the options string into pairs, e.g. "transaction:false foo:bar" -> []string{"transaction:false", "foo:bar"}
-	stringPairs := whitespaceRegExp.Split(section, -1)
+	parseDirectiveLineOptions(lines[0], options)
 
-	for _, stringPair := range stringPairs {
-		// split stringified pair into key and value pairs, e.g. "transaction:false" -> []string{"transaction", "false"}
-		pair := optionSeparatorRegExp.Split(stringPair, -1)
-
-		// if the syntax is well-formed, then store the key and value pair in options
-		if len(pair) == 2 {
-			options[pair[0]] = pair[1]
+	for _, line := range lines[1:] {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
 		}
+		if isCommentLine(trimmed) {
+			if isDbmateDirective(trimmed) {
+				parseDirectiveLineOptions(trimmed, options)
+			}
+			continue
+		}
+		break
 	}
 
 	return options
