@@ -153,6 +153,117 @@ ALTER TYPE colors ADD VALUE 'purple' AFTER 'red';
 		require.Equal(t, false, parsedFifthSection.DownOptions.Transaction())
 	})
 
+	t.Run("support dbmate directives in header before migrate:up", func(t *testing.T) {
+		migration := `-- dbmate transaction:false
+-- migrate:up
+CREATE INDEX CONCURRENTLY idx_users_email ON users (email);
+-- migrate:down
+DROP INDEX CONCURRENTLY idx_users_email;
+`
+
+		parsedSections, err := parseMigrationContents(migration)
+		require.Nil(t, err)
+		require.Len(t, parsedSections, 1)
+
+		parsed := parsedSections[0]
+		require.Equal(t, migrationOptions{"transaction": "false"}, parsed.UpOptions)
+		require.Equal(t, false, parsed.UpOptions.Transaction())
+		require.Equal(t, migrationOptions{"transaction": "false"}, parsed.DownOptions)
+		require.Equal(t, false, parsed.DownOptions.Transaction())
+	})
+
+	t.Run("support dbmate directive in header with section override", func(t *testing.T) {
+		migration := `-- dbmate transaction:false
+-- migrate:up
+CREATE INDEX CONCURRENTLY idx_users_email ON users (email);
+-- migrate:down transaction:true
+DROP INDEX CONCURRENTLY idx_users_email;
+`
+
+		parsedSections, err := parseMigrationContents(migration)
+		require.Nil(t, err)
+		require.Len(t, parsedSections, 1)
+
+		parsed := parsedSections[0]
+		require.Equal(t, false, parsed.UpOptions.Transaction())
+		require.Equal(t, true, parsed.DownOptions.Transaction())
+	})
+
+	t.Run("support dbmate directive inside block comments", func(t *testing.T) {
+		migration := `-- migrate:up
+-- dbmate transaction:false
+CREATE INDEX CONCURRENTLY idx_users_email ON users (email);
+-- migrate:down
+DROP INDEX CONCURRENTLY idx_users_email;
+`
+
+		parsedSections, err := parseMigrationContents(migration)
+		require.Nil(t, err)
+		require.Len(t, parsedSections, 1)
+
+		parsed := parsedSections[0]
+		require.Equal(t, migrationOptions{"transaction": "false"}, parsed.UpOptions)
+		require.Equal(t, false, parsed.UpOptions.Transaction())
+		require.Equal(t, migrationOptions{}, parsed.DownOptions)
+		require.Equal(t, true, parsed.DownOptions.Transaction())
+	})
+
+	t.Run("support trailing comments on directive lines", func(t *testing.T) {
+		migration := `-- dbmate transaction:false -- preamble comment with: colons
+-- migrate:up transaction:false -- reason: index creation
+CREATE INDEX CONCURRENTLY idx_users_email ON users (email);
+-- migrate:down transaction:false // inline comment
+DROP INDEX CONCURRENTLY idx_users_email;
+`
+
+		parsedSections, err := parseMigrationContents(migration)
+		require.Nil(t, err)
+		require.Len(t, parsedSections, 1)
+
+		parsed := parsedSections[0]
+		require.Equal(t, migrationOptions{"transaction": "false"}, parsed.UpOptions)
+		require.Equal(t, false, parsed.UpOptions.Transaction())
+		require.Equal(t, migrationOptions{"transaction": "false"}, parsed.DownOptions)
+		require.Equal(t, false, parsed.DownOptions.Transaction())
+	})
+
+	t.Run("support whitespace and case variations in directive options", func(t *testing.T) {
+		migration := `-- migrate:up transaction: false
+CREATE INDEX CONCURRENTLY idx_1 ON users (col1);
+-- migrate:down transaction : false
+DROP INDEX CONCURRENTLY idx_1;
+-- migrate:up transaction:False
+CREATE INDEX CONCURRENTLY idx_2 ON users (col2);
+-- migrate:down transaction:FALSE
+DROP INDEX CONCURRENTLY idx_2;
+`
+
+		parsedSections, err := parseMigrationContents(migration)
+		require.Nil(t, err)
+		require.Len(t, parsedSections, 2)
+
+		require.Equal(t, false, parsedSections[0].UpOptions.Transaction())
+		require.Equal(t, false, parsedSections[0].DownOptions.Transaction())
+		require.Equal(t, false, parsedSections[1].UpOptions.Transaction())
+		require.Equal(t, false, parsedSections[1].DownOptions.Transaction())
+	})
+
+	t.Run("support dbmate:up and dbmate:down directives", func(t *testing.T) {
+		migration := `-- dbmate:up transaction:false
+CREATE INDEX CONCURRENTLY idx_users_email ON users (email);
+-- dbmate:down transaction:false
+DROP INDEX CONCURRENTLY idx_users_email;
+`
+
+		parsedSections, err := parseMigrationContents(migration)
+		require.Nil(t, err)
+		require.Len(t, parsedSections, 1)
+
+		parsed := parsedSections[0]
+		require.Equal(t, false, parsed.UpOptions.Transaction())
+		require.Equal(t, false, parsed.DownOptions.Transaction())
+	})
+
 	t.Run("require migrate blocks", func(t *testing.T) {
 		migration := `
 ALTER TABLE users
