@@ -1471,3 +1471,48 @@ func TestDriverMigrationContextLifecycle(t *testing.T) {
 	err = db.Rollback()
 	require.EqualError(t, err, "simulated rollback context failure")
 }
+
+func TestHeaderDirectiveMigrationOptions(t *testing.T) {
+	testEachURL(t, func(t *testing.T, u *url.URL) {
+		db := newTestDB(t, u)
+		drv, err := db.Driver()
+		require.NoError(t, err)
+
+		err = db.Drop()
+		require.NoError(t, err)
+		err = db.Create()
+		require.NoError(t, err)
+
+		sqlDB, err := drv.Open()
+		require.NoError(t, err)
+		defer dbutil.MustClose(sqlDB)
+
+		db.FS = fstest.MapFS{
+			"db/migrations/20261022120001_header_directive.sql": {
+				Data: []byte(`-- dbmate transaction:false -- run outside transaction
+-- migrate:up
+create table t_header_opts1 (
+  id integer
+);
+
+-- migrate:down
+drop table t_header_opts1;
+`),
+			},
+		}
+
+		err = db.Migrate()
+		require.NoError(t, err)
+
+		migrations, err := drv.SelectMigrations(sqlDB, -1)
+		require.NoError(t, err)
+		require.True(t, migrations["20261022120001"])
+
+		err = db.Rollback()
+		require.NoError(t, err)
+
+		migrations, err = drv.SelectMigrations(sqlDB, -1)
+		require.NoError(t, err)
+		require.False(t, migrations["20261022120001"])
+	})
+}
