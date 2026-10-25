@@ -98,7 +98,7 @@ dbmate --help
 
 Docker images are published to GitHub Container Registry ([`ghcr.io/amacneil/dbmate`](https://ghcr.io/amacneil/dbmate)).
 
-Remember to set `--network=host` or see [this comment](https://github.com/amacneil/dbmate/issues/128#issuecomment-615924611) for more tips on using dbmate with docker networking):
+Remember to set `--network=host` or see [this comment](https://github.com/amacneil/dbmate/issues/128#issuecomment-615924611) for more tips on using dbmate with docker networking:
 
 ```sh
 docker run --rm -it --network=host ghcr.io/amacneil/dbmate --help
@@ -711,7 +711,7 @@ Here is an example:
 -- migrate:up
 create table users (
   id integer,
-  name varchar(255),
+  name varchar(255)
 );
 
 -- migrate:down
@@ -730,7 +730,7 @@ This file should be checked in to source control, so that you can easily compare
 
 ### Schema migrations table
 
-Dbmate stores a record of each applied migration in table named `schema_migrations`. This table will be created for you automatically if it does not already exist.
+Dbmate stores a record of each applied migration in a table named `schema_migrations`. This table will be created for you automatically if it does not already exist.
 
 The table is very simple:
 
@@ -763,7 +763,7 @@ Why another database schema migration tool? Dbmate was inspired by many other to
 | PostgreSQL                                                   |              :white_check_mark:              |            :white_check_mark:             |                  :white_check_mark:                  |                     :white_check_mark:                      |                             :white_check_mark:                              |                            :white_check_mark:                            |       :white_check_mark:        |      :white_check_mark:       |
 | MySQL                                                        |              :white_check_mark:              |            :white_check_mark:             |                  :white_check_mark:                  |                     :white_check_mark:                      |                             :white_check_mark:                              |                            :white_check_mark:                            |       :white_check_mark:        |      :white_check_mark:       |
 | SQLite                                                       |              :white_check_mark:              |            :white_check_mark:             |                  :white_check_mark:                  |                     :white_check_mark:                      |                             :white_check_mark:                              |                            :white_check_mark:                            |       :white_check_mark:        |      :white_check_mark:       |
-| CliсkHouse                                                   |              :white_check_mark:              |                                           |                                                      |                     :white_check_mark:                      |                             :white_check_mark:                              |                            :white_check_mark:                            |                                 |
+| ClickHouse                                                   |              :white_check_mark:              |                                           |                                                      |                     :white_check_mark:                      |                             :white_check_mark:                              |                            :white_check_mark:                            |                                 |
 
 _If you notice any inaccuracies in this table, please [propose a change](https://github.com/amacneil/dbmate/edit/main/README.md)._
 
