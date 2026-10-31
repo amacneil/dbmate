@@ -1243,3 +1243,67 @@ drop table t_opts2;
 		require.False(t, migrations["20261014120002"])
 	})
 }
+
+type contextTrackingDriver struct {
+	dbmate.Driver
+	migrationContexts []string
+}
+
+func (d *contextTrackingDriver) SetMigrationContext(_ dbutil.Transaction, version string) error {
+	d.migrationContexts = append(d.migrationContexts, version)
+	return nil
+}
+
+func TestDriverMigrationContextLifecycle(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "test_context.sqlite3")
+	testURL := dbtest.MustParseURL(t, "sqlite:"+dbPath)
+	db := newTestDB(t, testURL)
+
+	baseDrv, err := db.Driver()
+	require.NoError(t, err)
+
+	trackingDrv := &contextTrackingDriver{Driver: baseDrv}
+
+	customScheme := "test-context-driver"
+	dbmate.RegisterDriver(func(_ dbmate.DriverConfig) dbmate.Driver {
+		return trackingDrv
+	}, customScheme)
+
+	db.DatabaseURL = dbtest.MustParseURL(t, customScheme+"://test")
+	db.DriverName = customScheme
+
+	sqlDB, err := baseDrv.Open()
+	require.NoError(t, err)
+	defer dbutil.MustClose(sqlDB)
+
+	err = baseDrv.CreateMigrationsTable(sqlDB)
+	require.NoError(t, err)
+
+	db.FS = fstest.MapFS{
+		"db/migrations/20251111103123_first.sql": {
+			Data: []byte("-- migrate:up\ncreate table t1 (id int);\n-- migrate:down\ndrop table t1;\n"),
+		},
+		"db/migrations/20251111103124_notx.sql": {
+			Data: []byte("-- migrate:up transaction:false\ncreate table t2 (id int);\n-- migrate:down transaction:false\ndrop table t2;\n"),
+		},
+		"db/migrations/20251111103125_second.sql": {
+			Data: []byte("-- migrate:up\ncreate table t3 (id int);\n-- migrate:down\ndrop table t3;\n"),
+		},
+	}
+
+	err = db.Migrate()
+	require.NoError(t, err)
+	// Only transactional migrations receive migration context (notx is skipped)
+	require.Equal(t, []string{"20251111103123", "20251111103125"}, trackingDrv.migrationContexts)
+
+	trackingDrv.migrationContexts = nil
+	err = db.Rollback()
+	require.NoError(t, err)
+	require.Equal(t, []string{"20251111103125"}, trackingDrv.migrationContexts)
+
+	// Rolling back the transaction:false migration does not invoke SetMigrationContext
+	trackingDrv.migrationContexts = nil
+	err = db.Rollback()
+	require.NoError(t, err)
+	require.Empty(t, trackingDrv.migrationContexts)
+}
