@@ -650,3 +650,76 @@ func (drv *Driver) OpenWithMigrationLock(timeout time.Duration) (*sql.DB, error)
 
 	return db, nil
 }
+
+// baseApplicationName resolves the base application_name from:
+// 1. URL parameter "application_name"
+// 2. Environment variable "PGAPPNAME"
+// 3. URL parameter "fallback_application_name"
+// 4. Default "dbmate"
+func baseApplicationName(u *url.URL) string {
+	if u != nil {
+		query := u.Query()
+		if val := query.Get("application_name"); val != "" {
+			return val
+		}
+	}
+	if env := os.Getenv("PGAPPNAME"); env != "" {
+		return env
+	}
+	if u != nil {
+		query := u.Query()
+		if val := query.Get("fallback_application_name"); val != "" {
+			return val
+		}
+	}
+	return "dbmate"
+}
+
+// FormatApplicationName formats an application_name with a migration version.
+// If base is empty, it defaults to "dbmate". If version is non-empty,
+// the version is appended in brackets, e.g. "dbmate[20251111103123]".
+func FormatApplicationName(base, version string) string {
+	if base == "" {
+		base = "dbmate"
+	}
+	if version == "" {
+		return base
+	}
+	return fmt.Sprintf("%s[%s]", base, version)
+}
+
+// ApplicationName returns the formatted application_name for a migration version
+// following the resolution order: URL application_name, PGAPPNAME env var,
+// URL fallback_application_name, and finally defaulting to "dbmate".
+func (drv *Driver) ApplicationName(version string) string {
+	base := baseApplicationName(drv.databaseURL)
+	return FormatApplicationName(base, version)
+}
+
+// ConnectionURLWithApplicationName returns a copy of u with the application_name
+// query parameter set according to the migration version.
+func ConnectionURLWithApplicationName(u *url.URL, version string) *url.URL {
+	out, _ := url.Parse(u.String())
+	query := out.Query()
+	base := baseApplicationName(u)
+	query.Set("application_name", FormatApplicationName(base, version))
+	out.RawQuery = query.Encode()
+	return out
+}
+
+// SetMigrationContext sets application_name on the transaction
+// to reflect the running migration version.
+func (drv *Driver) SetMigrationContext(tx dbutil.Transaction, version string) error {
+	switch drv.databaseURL.Scheme {
+	case "spanner-postgres", "redshift":
+		return nil
+	}
+
+	if _, isDB := tx.(*sql.DB); isDB {
+		return nil
+	}
+
+	appName := drv.ApplicationName(version)
+	_, _ = tx.Exec(fmt.Sprintf("set local application_name = %s", pq.QuoteLiteral(appName)))
+	return nil
+}
