@@ -512,6 +512,28 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 	return db.findMigrations(drv, sqlDB)
 }
 
+// checkLatestAppliedMigrationFile returns an error if the most recently applied
+// migration has no file, so rollback does not silently undo an older one instead
+func checkLatestAppliedMigrationFile(drv Driver, sqlDB *sql.DB, latest *Migration) error {
+	applied, err := drv.SelectMigrations(sqlDB, -1)
+	if err != nil {
+		return err
+	}
+
+	missing := ""
+	for version := range applied {
+		if (latest == nil || version > latest.Version) && version > missing {
+			missing = version
+		}
+	}
+
+	if missing != "" {
+		return fmt.Errorf("%w for applied migration `%s`, can't rollback in --strict mode", ErrMigrationNotFound, missing)
+	}
+
+	return nil
+}
+
 // findMigrations lists all available migrations using an existing connection
 func (db *DB) findMigrations(drv Driver, sqlDB *sql.DB) ([]Migration, error) {
 	// find applied migrations
@@ -593,6 +615,12 @@ func (db *DB) Rollback() error {
 	for i, migration := range migrations {
 		if migration.Applied {
 			latest = &migrations[i]
+		}
+	}
+
+	if db.Strict {
+		if err := checkLatestAppliedMigrationFile(drv, sqlDB, latest); err != nil {
+			return err
 		}
 	}
 

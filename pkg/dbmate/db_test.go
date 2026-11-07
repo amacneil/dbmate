@@ -937,6 +937,58 @@ func TestMigrateStrictOrder(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestRollbackMissingLatestMigrationFile(t *testing.T) {
+	emptyMigration := []byte("-- migrate:up\n-- migrate:down")
+	bothFiles := fstest.MapFS{
+		"db/migrations/001_test_migration_a.sql": {Data: emptyMigration},
+		"db/migrations/010_test_migration_b.sql": {Data: emptyMigration},
+	}
+	onlyFirstFile := fstest.MapFS{
+		"db/migrations/001_test_migration_a.sql": {Data: emptyMigration},
+	}
+
+	setup := func(t *testing.T) *dbmate.DB {
+		t.Helper()
+		db := newTestDB(t, sqliteTestURL(t))
+		require.NoError(t, db.Drop())
+		require.NoError(t, db.Create())
+		db.FS = bothFiles
+		require.NoError(t, db.Migrate())
+		db.FS = onlyFirstFile
+		return db
+	}
+
+	appliedVersions := func(t *testing.T, db *dbmate.DB) map[string]bool {
+		t.Helper()
+		drv, err := db.Driver()
+		require.NoError(t, err)
+		sqlDB, err := drv.Open()
+		require.NoError(t, err)
+		defer dbutil.MustClose(sqlDB)
+		applied, err := drv.SelectMigrations(sqlDB, -1)
+		require.NoError(t, err)
+		return applied
+	}
+
+	t.Run("strict", func(t *testing.T) {
+		db := setup(t)
+		db.Strict = true
+
+		err := db.Rollback()
+		require.ErrorIs(t, err, dbmate.ErrMigrationNotFound)
+		require.ErrorContains(t, err, "010")
+		require.Equal(t, map[string]bool{"001": true, "010": true}, appliedVersions(t, db))
+	})
+
+	t.Run("without strict keeps the current behavior", func(t *testing.T) {
+		db := setup(t)
+
+		err := db.Rollback()
+		require.NoError(t, err)
+		require.Equal(t, map[string]bool{"010": true}, appliedVersions(t, db))
+	})
+}
+
 func TestMigrateQueryErrorMessage(t *testing.T) {
 	db := newTestDB(t, sqliteTestURL(t))
 
