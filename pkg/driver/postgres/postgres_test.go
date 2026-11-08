@@ -1100,11 +1100,13 @@ func TestPostgresMigrationLock(t *testing.T) {
 
 type mockTx struct {
 	executedQueries []string
+	executedArgs    [][]interface{}
 	execErr         error
 }
 
-func (m *mockTx) Exec(query string, _ ...interface{}) (sql.Result, error) {
+func (m *mockTx) Exec(query string, args ...interface{}) (sql.Result, error) {
 	m.executedQueries = append(m.executedQueries, query)
+	m.executedArgs = append(m.executedArgs, args)
 	return nil, m.execErr
 }
 
@@ -1116,156 +1118,17 @@ func (m *mockTx) QueryRow(_ string, _ ...interface{}) *sql.Row {
 	return nil
 }
 
-func TestPostgresFormatApplicationName(t *testing.T) {
-	cases := []struct {
-		name     string
-		base     string
-		version  string
-		expected string
-	}{
-		{
-			name:     "empty base with version",
-			base:     "",
-			version:  "20251111103123",
-			expected: "dbmate[20251111103123]",
-		},
-		{
-			name:     "dbmate base with version",
-			base:     "dbmate",
-			version:  "20251111103123",
-			expected: "dbmate[20251111103123]",
-		},
-		{
-			name:     "custom base with version",
-			base:     "my-service",
-			version:  "20251111103123",
-			expected: "my-service[20251111103123]",
-		},
-		{
-			name:     "empty base and empty version",
-			base:     "",
-			version:  "",
-			expected: "dbmate",
-		},
-		{
-			name:     "custom base and empty version",
-			base:     "my-service",
-			version:  "",
-			expected: "my-service",
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			actual := FormatApplicationName(c.base, c.version)
-			require.Equal(t, c.expected, actual)
-		})
-	}
-}
-
-func TestPostgresApplicationNameResolution(t *testing.T) {
-	t.Run("default URL without configuration", func(t *testing.T) {
-		t.Setenv("PGAPPNAME", "")
-		u := dbtest.MustParseURL(t, "postgres://localhost/db")
-		drv := NewDriver(dbmate.DriverConfig{DatabaseURL: u}).(*Driver)
-		require.Equal(t, "dbmate[20251111103123]", drv.ApplicationName("20251111103123"))
-		require.Equal(t, "dbmate", drv.ApplicationName(""))
-	})
-
-	t.Run("URL with application_name query parameter", func(t *testing.T) {
-		t.Setenv("PGAPPNAME", "")
-		u := dbtest.MustParseURL(t, "postgres://localhost/db?application_name=custom_app")
-		drv := NewDriver(dbmate.DriverConfig{DatabaseURL: u}).(*Driver)
-		require.Equal(t, "custom_app[20251111103123]", drv.ApplicationName("20251111103123"))
-		require.Equal(t, "custom_app", drv.ApplicationName(""))
-	})
-
-	t.Run("PGAPPNAME environment variable", func(t *testing.T) {
-		t.Setenv("PGAPPNAME", "env_worker")
-		u := dbtest.MustParseURL(t, "postgres://localhost/db")
-		drv := NewDriver(dbmate.DriverConfig{DatabaseURL: u}).(*Driver)
-		require.Equal(t, "env_worker[20251111103123]", drv.ApplicationName("20251111103123"))
-		require.Equal(t, "env_worker", drv.ApplicationName(""))
-	})
-
-	t.Run("URL fallback_application_name parameter", func(t *testing.T) {
-		t.Setenv("PGAPPNAME", "")
-		u := dbtest.MustParseURL(t, "postgres://localhost/db?fallback_application_name=fallback_worker")
-		drv := NewDriver(dbmate.DriverConfig{DatabaseURL: u}).(*Driver)
-		require.Equal(t, "fallback_worker[20251111103123]", drv.ApplicationName("20251111103123"))
-		require.Equal(t, "fallback_worker", drv.ApplicationName(""))
-	})
-
-	t.Run("application_name parameter takes precedence over PGAPPNAME", func(t *testing.T) {
-		t.Setenv("PGAPPNAME", "env_worker")
-		u := dbtest.MustParseURL(t, "postgres://localhost/db?application_name=param_worker")
-		drv := NewDriver(dbmate.DriverConfig{DatabaseURL: u}).(*Driver)
-		require.Equal(t, "param_worker[20251111103123]", drv.ApplicationName("20251111103123"))
-	})
-
-	t.Run("PGAPPNAME takes precedence over fallback_application_name", func(t *testing.T) {
-		t.Setenv("PGAPPNAME", "env_worker")
-		u := dbtest.MustParseURL(t, "postgres://localhost/db?fallback_application_name=fallback_worker")
-		drv := NewDriver(dbmate.DriverConfig{DatabaseURL: u}).(*Driver)
-		require.Equal(t, "env_worker[20251111103123]", drv.ApplicationName("20251111103123"))
-	})
-}
-
-func TestPostgresConnectionURLWithApplicationName(t *testing.T) {
-	t.Run("default URL", func(t *testing.T) {
-		t.Setenv("PGAPPNAME", "")
-		u := dbtest.MustParseURL(t, "postgres://localhost/db")
-		out := ConnectionURLWithApplicationName(u, "20251111103123")
-		require.Equal(t, "dbmate[20251111103123]", out.Query().Get("application_name"))
-	})
-
-	t.Run("URL with custom application_name", func(t *testing.T) {
-		t.Setenv("PGAPPNAME", "")
-		u := dbtest.MustParseURL(t, "postgres://localhost/db?application_name=custom_app")
-		out := ConnectionURLWithApplicationName(u, "20251111103123")
-		require.Equal(t, "custom_app[20251111103123]", out.Query().Get("application_name"))
-	})
-
-	t.Run("URL with PGAPPNAME set", func(t *testing.T) {
-		t.Setenv("PGAPPNAME", "env_app")
-		u := dbtest.MustParseURL(t, "postgres://localhost/db")
-		out := ConnectionURLWithApplicationName(u, "20251111103123")
-		require.Equal(t, "env_app[20251111103123]", out.Query().Get("application_name"))
-	})
-}
-
 func TestPostgresSetMigrationContext(t *testing.T) {
-	t.Run("sets default application_name on transaction", func(t *testing.T) {
-		t.Setenv("PGAPPNAME", "")
+	t.Run("sets application_name on transaction", func(t *testing.T) {
 		u := dbtest.MustParseURL(t, "postgres://localhost/db")
 		drv := NewDriver(dbmate.DriverConfig{DatabaseURL: u}).(*Driver)
 
 		tx := &mockTx{}
 		err := drv.SetMigrationContext(tx, "20251111103123")
 		require.NoError(t, err)
-		require.Equal(t, []string{"set local application_name = 'dbmate[20251111103123]'"}, tx.executedQueries)
-	})
-
-	t.Run("sets custom application_name on transaction", func(t *testing.T) {
-		t.Setenv("PGAPPNAME", "")
-		u := dbtest.MustParseURL(t, "postgres://localhost/db?application_name=analytics_svc")
-		drv := NewDriver(dbmate.DriverConfig{DatabaseURL: u}).(*Driver)
-
-		tx := &mockTx{}
-		err := drv.SetMigrationContext(tx, "20251111103123")
-		require.NoError(t, err)
-		require.Equal(t, []string{"set local application_name = 'analytics_svc[20251111103123]'"}, tx.executedQueries)
-	})
-
-	t.Run("escapes quotes in application_name", func(t *testing.T) {
-		t.Setenv("PGAPPNAME", "")
-		u := dbtest.MustParseURL(t, "postgres://localhost/db?application_name=app'name")
-		drv := NewDriver(dbmate.DriverConfig{DatabaseURL: u}).(*Driver)
-
-		tx := &mockTx{}
-		err := drv.SetMigrationContext(tx, "20251111103123")
-		require.NoError(t, err)
-		require.Equal(t, []string{"set local application_name = 'app''name[20251111103123]'"}, tx.executedQueries)
+		require.Len(t, tx.executedQueries, 1)
+		require.Contains(t, tx.executedQueries[0], "set_config('application_name'")
+		require.Equal(t, [][]interface{}{{"20251111103123"}}, tx.executedArgs)
 	})
 
 	t.Run("spanner-postgres skips setting application_name", func(t *testing.T) {
@@ -1296,15 +1159,14 @@ func TestPostgresSetMigrationContext(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("suppresses errors from SET LOCAL if unsupported", func(t *testing.T) {
-		t.Setenv("PGAPPNAME", "")
+	t.Run("returns error from set_config", func(t *testing.T) {
 		u := dbtest.MustParseURL(t, "postgres://localhost/db")
 		drv := NewDriver(dbmate.DriverConfig{DatabaseURL: u}).(*Driver)
 
 		tx := &mockTx{execErr: errors.New("unrecognized configuration parameter")}
 		err := drv.SetMigrationContext(tx, "20251111103123")
-		require.NoError(t, err)
-		require.Equal(t, []string{"set local application_name = 'dbmate[20251111103123]'"}, tx.executedQueries)
+		require.EqualError(t, err, "unrecognized configuration parameter")
+		require.Len(t, tx.executedQueries, 1)
 	})
 }
 
@@ -1328,7 +1190,13 @@ func TestPostgresSetMigrationContext_Integration(t *testing.T) {
 	var appName string
 	err = tx.QueryRow("show application_name").Scan(&appName)
 	require.NoError(t, err)
-	require.Equal(t, "dbmate[20251111103123]", appName)
+
+	expectedAppName := initialAppName
+	if expectedAppName == "" {
+		expectedAppName = "dbmate"
+	}
+	expectedAppName = expectedAppName + "[20251111103123]"
+	require.Equal(t, expectedAppName, appName)
 
 	err = tx.Commit()
 	require.NoError(t, err)

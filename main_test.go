@@ -260,3 +260,44 @@ func TestConfigureDB_WaitInterval(t *testing.T) {
 		require.Equal(t, 3*time.Second, configuredDB.WaitInterval)
 	})
 }
+
+func TestConfigureDB_MigrationApplicationName(t *testing.T) {
+	var configuredDB *dbmate.DB
+
+	app := NewApp()
+	app.Commands = []*cli.Command{
+		{
+			Name: "test-config",
+			Action: func(c *cli.Context) error {
+				var err error
+				configuredDB, err = configureDB(c)
+				return err
+			},
+		},
+	}
+
+	t.Run("default", func(t *testing.T) {
+		configuredDB = nil
+		err := app.Run([]string{"dbmate", "test-config"})
+		require.NoError(t, err)
+		require.False(t, configuredDB.MigrationApplicationName)
+	})
+
+	t.Run("from env variable", func(t *testing.T) {
+		configuredDB = nil
+		t.Setenv("DBMATE_MIGRATION_APPLICATION_NAME", "true")
+
+		err := app.Run([]string{"dbmate", "test-config"})
+		require.NoError(t, err)
+		require.True(t, configuredDB.MigrationApplicationName)
+	})
+
+	t.Run("flag overrides env variable", func(t *testing.T) {
+		configuredDB = nil
+		t.Setenv("DBMATE_MIGRATION_APPLICATION_NAME", "false")
+
+		err := app.Run([]string{"dbmate", "--migration-application-name", "test-config"})
+		require.NoError(t, err)
+		require.True(t, configuredDB.MigrationApplicationName)
+	})
+}

@@ -2,6 +2,7 @@ package dbmate_test
 
 import (
 	"bytes"
+	"errors"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -72,6 +73,7 @@ func TestNew(t *testing.T) {
 	require.Empty(t, db.DriverName)
 	require.False(t, db.UseMigrationLock)
 	require.Equal(t, 5*time.Minute, db.MigrationLockTimeout)
+	require.False(t, db.MigrationApplicationName)
 }
 
 func TestGetDriver(t *testing.T) {
@@ -863,6 +865,17 @@ func TestMigrateWithLockUnsupported(t *testing.T) {
 	require.ErrorIs(t, err, dbmate.ErrMigrationLockUnsupported)
 }
 
+func TestMigrateWithApplicationNameUnsupported(t *testing.T) {
+	db := newTestDB(t, sqliteTestURL(t))
+	db.MigrationApplicationName = true
+
+	err := db.Migrate()
+	require.ErrorIs(t, err, dbmate.ErrMigrationApplicationNameUnsupported)
+
+	err = db.Rollback()
+	require.ErrorIs(t, err, dbmate.ErrMigrationApplicationNameUnsupported)
+}
+
 func TestMigrateUnrestrictedOrder(t *testing.T) {
 	emptyMigration := []byte("-- migrate:up\n-- migrate:down")
 
@@ -1247,9 +1260,13 @@ drop table t_opts2;
 type contextTrackingDriver struct {
 	dbmate.Driver
 	migrationContexts []string
+	contextErr        error
 }
 
 func (d *contextTrackingDriver) SetMigrationContext(_ dbutil.Transaction, version string) error {
+	if d.contextErr != nil {
+		return d.contextErr
+	}
 	d.migrationContexts = append(d.migrationContexts, version)
 	return nil
 }
@@ -1291,10 +1308,20 @@ func TestDriverMigrationContextLifecycle(t *testing.T) {
 		},
 	}
 
+	// When opt-in flag is disabled (default), SetMigrationContext is not called
 	err = db.Migrate()
 	require.NoError(t, err)
-	// Only transactional migrations receive migration context (notx is skipped)
-	require.Equal(t, []string{"20251111103123", "20251111103125"}, trackingDrv.migrationContexts)
+	require.Empty(t, trackingDrv.migrationContexts)
+
+	err = db.Rollback()
+	require.NoError(t, err)
+	require.Empty(t, trackingDrv.migrationContexts)
+
+	// When opt-in flag is enabled, only transactional migrations receive migration context (notx is skipped)
+	db.MigrationApplicationName = true
+	err = db.Migrate()
+	require.NoError(t, err)
+	require.Equal(t, []string{"20251111103125"}, trackingDrv.migrationContexts)
 
 	trackingDrv.migrationContexts = nil
 	err = db.Rollback()
@@ -1306,4 +1333,17 @@ func TestDriverMigrationContextLifecycle(t *testing.T) {
 	err = db.Rollback()
 	require.NoError(t, err)
 	require.Empty(t, trackingDrv.migrationContexts)
+
+	// Errors returned from SetMigrationContext are propagated
+	trackingDrv.contextErr = errors.New("simulated context failure")
+	err = db.Migrate()
+	require.EqualError(t, err, "simulated context failure")
+
+	// Rollback also propagates error from SetMigrationContext
+	trackingDrv.contextErr = nil
+	err = db.Migrate()
+	require.NoError(t, err)
+	trackingDrv.contextErr = errors.New("simulated rollback context failure")
+	err = db.Rollback()
+	require.EqualError(t, err, "simulated rollback context failure")
 }
