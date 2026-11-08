@@ -720,6 +720,23 @@ drop table if exists users;
 
 Both up and down migrations are stored in the same file, for ease of editing. Both up and down directives are required, even if you choose not to implement the down migration.
 
+Migration files are sent to the database byte for byte, without converting their character encoding, so save them in the encoding your database connection uses (normally UTF-8). A UTF-8 byte order mark at the start of a file is ignored. UTF-16 and UTF-32 files are not supported, and dbmate's error message says when a migration looks like one. Windows PowerShell 5.1 writes UTF-16 with `>` and `Out-File` by default, so use `Out-File -Encoding UTF8` there instead.
+
+To convert a file that starts with a byte order mark to UTF-8, replacing it in place:
+
+```sh
+# Linux and macOS: use -f UTF-16 or -f UTF-32, matching dbmate's error message
+iconv -f UTF-16 -t UTF-8 db/migrations/20240101000000_example.sql > example.sql && mv example.sql db/migrations/20240101000000_example.sql
+```
+
+```powershell
+# Windows PowerShell: UTF-16 and UTF-32 are detected from the byte order mark
+$file = "$PWD/db/migrations/20240101000000_example.sql"
+[IO.File]::WriteAllText($file, [IO.File]::ReadAllText($file))
+```
+
+For a file without a byte order mark, name the encoding from dbmate's error message, for example `iconv -f UTF-16LE`, or `[IO.File]::ReadAllText($file, [Text.Encoding]::Unicode)` for UTF-16LE in PowerShell.
+
 When you apply a migration dbmate only stores the version number, not the contents, so you should always rollback a migration before modifying its contents. For this reason, you can safely rename a migration file without affecting its applied status, as long as you keep the version number intact.
 
 ### Schema file

@@ -2,6 +2,7 @@ package dbmate
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"regexp"
@@ -34,7 +35,15 @@ func (m *Migration) Parse() ([]*ParsedMigration, error) {
 		return nil, err
 	}
 
-	return parseMigrationContents(contents)
+	parsed, err := parseMigrationContents(contents)
+	if err != nil {
+		if encoding := detectUnsupportedEncoding(contents); encoding != "" {
+			return nil, fmt.Errorf("%w (file appears to be %s, convert it to UTF-8)", err, encoding)
+		}
+		return nil, err
+	}
+
+	return parsed, nil
 }
 
 // ParsedMigration contains the migration contents and options
