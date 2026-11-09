@@ -228,6 +228,11 @@ func NewApp() *cli.App {
 					Name:  "quiet",
 					Usage: "don't output any text (implies --exit-code)",
 				},
+				&cli.BoolFlag{
+					Name:    "strict",
+					EnvVars: []string{"DBMATE_STRICT"},
+					Usage:   "fail if an applied migration file is missing",
+				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
 				db.Strict = c.Bool("strict")
