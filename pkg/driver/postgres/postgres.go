@@ -650,3 +650,20 @@ func (drv *Driver) OpenWithMigrationLock(timeout time.Duration) (*sql.DB, error)
 
 	return db, nil
 }
+
+// SetMigrationContext sets application_name on the transaction
+// to reflect the running migration version.
+func (drv *Driver) SetMigrationContext(tx dbutil.Transaction, version string) error {
+	switch drv.databaseURL.Scheme {
+	case "spanner-postgres", "redshift":
+		return nil
+	}
+
+	if _, isDB := tx.(*sql.DB); isDB {
+		return nil
+	}
+
+	_, err := tx.Exec(`select set_config('application_name',
+		coalesce(nullif(current_setting('application_name'), ''), 'dbmate') || '[' || $1 || ']', true)`, version)
+	return err
+}

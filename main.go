@@ -118,6 +118,11 @@ func NewApp() *cli.App {
 			Usage:   "maximum time to wait for the migration lock, 0 to wait indefinitely",
 			Value:   defaultDB.MigrationLockTimeout,
 		},
+		&cli.BoolFlag{
+			Name:    "migration-application-name",
+			EnvVars: []string{"DBMATE_MIGRATION_APPLICATION_NAME"},
+			Usage:   "record migration version in application_name during execution (postgres only)",
+		},
 	}
 
 	app.Commands = []*cli.Command{
@@ -347,6 +352,7 @@ func configureDB(c *cli.Context) (*dbmate.DB, error) {
 	}
 	db.UseMigrationLock = c.Bool("migration-lock")
 	db.MigrationLockTimeout = c.Duration("migration-lock-timeout")
+	db.MigrationApplicationName = c.Bool("migration-application-name")
 
 	return db, nil
 }
