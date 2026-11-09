@@ -3,6 +3,7 @@
   "type": "module",
   "packageManager": "npm@11.13.0",
   "scripts": {
+    "test:cli": "tsx --test cli.test.ts",
     "clean": "rimraf dist packages/dbmate/dist",
     "lint": "eslint --report-unused-disable-directives --fix .",
     "lint:ci": "eslint --report-unused-disable-directives .",
