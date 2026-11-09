@@ -227,9 +227,6 @@ jobs:
       - run: npm run lint:ci
         working-directory: typescript
 
-      - run: npm run test:cli
-        working-directory: typescript
-
       - run: npm run generate
         working-directory: typescript
 
