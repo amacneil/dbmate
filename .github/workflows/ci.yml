@@ -11,20 +11,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # The Linux binaries are statically linked with glibc, so they're pinned
+        # to Ubuntu 24.04: ubuntu-latest (26.04) produced a glibc startup that
+        # needs AVX and crashed with SIGILL on older x86-64 CPUs (#886).
         include:
           - os: linux
-            image: ubuntu-latest
+            image: ubuntu-24.04
             arch: 386
             setup: sudo apt-get update && sudo apt-get install -qq gcc-i686-linux-gnu
             env:
               CC: i686-linux-gnu-gcc
               CXX: i686-linux-gnu-g++
           - os: linux
-            image: ubuntu-latest
+            image: ubuntu-24.04
             arch: amd64
             env: {}
           - os: linux
-            image: ubuntu-latest
+            image: ubuntu-24.04
             arch: arm
             setup: sudo apt-get update && sudo apt-get install -qq gcc-arm-linux-gnueabi
             env:
@@ -32,7 +35,7 @@ jobs:
               CXX: arm-linux-gnueabi-g++
               GOARM: 6
           - os: linux
-            image: ubuntu-latest
+            image: ubuntu-24.04
             arch: arm64
             setup: sudo apt-get update && sudo apt-get install -qq gcc-aarch64-linux-gnu
             env:
@@ -83,6 +86,14 @@ jobs:
 
       - run: dist/dbmate-${{ matrix.os }}-${{ matrix.arch }} --help
         if: ${{ matrix.arch == 'amd64' }}
+
+      # Run the binary on an emulated Nehalem CPU (x86-64-v2, no AVX), so a
+      # build that needs AVX or AVX2 fails here instead of for users (#886).
+      - name: Check binary runs without AVX
+        if: ${{ matrix.os == 'linux' && matrix.arch == 'amd64' }}
+        run: |
+          sudo apt-get update && sudo apt-get install -qq qemu-user
+          qemu-x86_64 -cpu Nehalem dist/dbmate-linux-amd64 --version
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
