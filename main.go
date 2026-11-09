@@ -199,6 +199,11 @@ func NewApp() *cli.App {
 			Usage:   "Rollback the most recent migration",
 			Flags: []cli.Flag{
 				&cli.BoolFlag{
+					Name:    "strict",
+					EnvVars: []string{"DBMATE_STRICT"},
+					Usage:   "fail if the most recently applied migration file is missing",
+				},
+				&cli.BoolFlag{
 					Name:    "verbose",
 					Aliases: []string{"v"},
 					EnvVars: []string{"DBMATE_VERBOSE"},
@@ -206,6 +211,7 @@ func NewApp() *cli.App {
 				},
 			},
 			Action: action(func(db *dbmate.DB, c *cli.Context) error {
+				db.Strict = c.Bool("strict")
 				db.Verbose = c.Bool("verbose")
 				return db.Rollback()
 			}),

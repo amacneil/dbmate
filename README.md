@@ -140,7 +140,7 @@ The following options are available with all commands. You must use command line
 - `--migrations-table "schema_migrations"` - database table to record migrations in. _(env: `DBMATE_MIGRATIONS_TABLE`)_
 - `--schema-file, -s "./db/schema.sql"` - a path to keep the schema.sql file. _(env: `DBMATE_SCHEMA_FILE`)_
 - `--no-dump-schema` - don't auto-update the schema.sql file on migrate/rollback _(env: `DBMATE_NO_DUMP_SCHEMA`)_
-- `--strict` - fail if migrations would be applied out of order _(env: `DBMATE_STRICT`)_
+- `--strict` - fail if migrations would be applied out of order, or (on `rollback`) if the most recently applied migration file is missing _(env: `DBMATE_STRICT`)_
 - `--wait` - wait for the db to become available before executing the subsequent command _(env: `DBMATE_WAIT`)_
 - `--wait-timeout 60s` - timeout for --wait flag _(env: `DBMATE_WAIT_TIMEOUT`)_
 - `--wait-interval 1s` - time to wait between connection attempts for --wait flag _(env: `DBMATE_WAIT_INTERVAL`)_
@@ -170,7 +170,7 @@ Most dbmate settings can be configured with environment variables in addition to
 | Migration lock | `DBMATE_MIGRATION_LOCK` | Corresponds to `--migration-lock`. |
 | Migration lock timeout | `DBMATE_MIGRATION_LOCK_TIMEOUT` | Corresponds to `--migration-lock-timeout`. |
 | Migration application name | `DBMATE_MIGRATION_APPLICATION_NAME` | Corresponds to `--migration-application-name`. |
-| Strict migrations | `DBMATE_STRICT` | Corresponds to `--strict` on `up` / `migrate`. |
+| Strict migrations | `DBMATE_STRICT` | Corresponds to `--strict` on `up` / `migrate` / `rollback`. |
 | Verbose SQL output | `DBMATE_VERBOSE` | Corresponds to `--verbose` / `-v` on `up` / `migrate` / `rollback`. |
 
 `--env` and `--env-file` are CLI-only options (they are not themselves read from environment variables).
