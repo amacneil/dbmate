@@ -1002,6 +1002,78 @@ func TestRollbackMissingLatestMigrationFile(t *testing.T) {
 	})
 }
 
+func TestStatusMissingMigrationFile(t *testing.T) {
+	emptyMigration := []byte("-- migrate:up\n-- migrate:down")
+
+	setup := func(t *testing.T) (*dbmate.DB, *bytes.Buffer) {
+		t.Helper()
+		db := newTestDB(t, sqliteTestURL(t))
+		require.NoError(t, db.Drop())
+		require.NoError(t, db.Create())
+		db.FS = fstest.MapFS{
+			"db/migrations/001_test_migration_a.sql": {Data: emptyMigration},
+			"db/migrations/010_test_migration_b.sql": {Data: emptyMigration},
+			"db/migrations/020_test_migration_c.sql": {Data: emptyMigration},
+		}
+		require.NoError(t, db.Migrate())
+		db.FS = fstest.MapFS{
+			"db/migrations/001_test_migration_a.sql": {Data: emptyMigration},
+			"db/migrations/020_test_migration_c.sql": {Data: emptyMigration},
+			"db/migrations/030_test_migration_d.sql": {Data: emptyMigration},
+		}
+		var logBuf bytes.Buffer
+		db.Log = &logBuf
+		return db, &logBuf
+	}
+
+	expected := "[X] 001_test_migration_a.sql\n" +
+		"[?] 010 (file not found)\n" +
+		"[X] 020_test_migration_c.sql\n" +
+		"[ ] 030_test_migration_d.sql\n" +
+		"\n" +
+		"Applied: 3\n" +
+		"Pending: 1\n"
+
+	t.Run("default", func(t *testing.T) {
+		db, logBuf := setup(t)
+
+		pending, err := db.Status(false)
+		require.NoError(t, err)
+		require.Equal(t, 1, pending)
+		require.Equal(t, expected, logBuf.String())
+	})
+
+	t.Run("strict", func(t *testing.T) {
+		db, logBuf := setup(t)
+		db.Strict = true
+
+		pending, err := db.Status(false)
+		require.ErrorIs(t, err, dbmate.ErrMigrationNotFound)
+		require.ErrorContains(t, err, "010")
+		require.Equal(t, 1, pending)
+		require.Equal(t, expected, logBuf.String())
+	})
+}
+
+func TestStatusStrictWithoutMissingFiles(t *testing.T) {
+	db := newTestDB(t, sqliteTestURL(t))
+	require.NoError(t, db.Drop())
+	require.NoError(t, db.Create())
+	db.FS = fstest.MapFS{
+		"db/migrations/001_test_migration_a.sql": {Data: []byte("-- migrate:up\n-- migrate:down")},
+	}
+	db.Strict = true
+
+	pending, err := db.Status(true)
+	require.NoError(t, err)
+	require.Equal(t, 1, pending)
+
+	require.NoError(t, db.Migrate())
+	pending, err = db.Status(true)
+	require.NoError(t, err)
+	require.Equal(t, 0, pending)
+}
+
 func TestMigrateQueryErrorMessage(t *testing.T) {
 	db := newTestDB(t, sqliteTestURL(t))
 

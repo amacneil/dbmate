@@ -29,6 +29,7 @@ For a comparison between dbmate and other popular database schema migration tool
   - [Creating Migrations](#creating-migrations)
   - [Running Migrations](#running-migrations)
   - [Rolling Back Migrations](#rolling-back-migrations)
+  - [Checking Migration Status](#checking-migration-status)
   - [Migration Options](#migration-options)
   - [Waiting For The Database](#waiting-for-the-database)
   - [Exporting Schema File](#exporting-schema-file)
@@ -121,7 +122,7 @@ dbmate drop           # drop the database
 dbmate migrate        # run any pending migrations
 dbmate rollback       # roll back the most recent migration
 dbmate down           # alias for rollback
-dbmate status         # show the status of all migrations (supports --exit-code and --quiet)
+dbmate status         # show the status of all migrations (supports --exit-code, --quiet and --strict)
 dbmate dump           # write the database schema.sql file
 dbmate dump -- [...]  # optionally pass additional arguments directly to mysqldump or pg_dump
 dbmate load           # load schema.sql file to the database
@@ -140,7 +141,7 @@ The following options are available with all commands. You must use command line
 - `--migrations-table "schema_migrations"` - database table to record migrations in. _(env: `DBMATE_MIGRATIONS_TABLE`)_
 - `--schema-file, -s "./db/schema.sql"` - a path to keep the schema.sql file. _(env: `DBMATE_SCHEMA_FILE`)_
 - `--no-dump-schema` - don't auto-update the schema.sql file on migrate/rollback _(env: `DBMATE_NO_DUMP_SCHEMA`)_
-- `--strict` - fail if migrations would be applied out of order, or (on `rollback`) if the most recently applied migration file is missing _(env: `DBMATE_STRICT`)_
+- `--strict` - fail if migrations would be applied out of order, or (on `rollback`) if the most recently applied migration file is missing, or (on `status`) if any applied migration file is missing _(env: `DBMATE_STRICT`)_
 - `--wait` - wait for the db to become available before executing the subsequent command _(env: `DBMATE_WAIT`)_
 - `--wait-timeout 60s` - timeout for --wait flag _(env: `DBMATE_WAIT_TIMEOUT`)_
 - `--wait-interval 1s` - time to wait between connection attempts for --wait flag _(env: `DBMATE_WAIT_INTERVAL`)_
@@ -170,7 +171,7 @@ Most dbmate settings can be configured with environment variables in addition to
 | Migration lock | `DBMATE_MIGRATION_LOCK` | Corresponds to `--migration-lock`. |
 | Migration lock timeout | `DBMATE_MIGRATION_LOCK_TIMEOUT` | Corresponds to `--migration-lock-timeout`. |
 | Migration application name | `DBMATE_MIGRATION_APPLICATION_NAME` | Corresponds to `--migration-application-name`. |
-| Strict migrations | `DBMATE_STRICT` | Corresponds to `--strict` on `up` / `migrate` / `rollback`. |
+| Strict migrations | `DBMATE_STRICT` | Corresponds to `--strict` on `up` / `migrate` / `rollback` / `status`. |
 | Verbose SQL output | `DBMATE_VERBOSE` | Corresponds to `--verbose` / `-v` on `up` / `migrate` / `rollback`. |
 
 `--env` and `--env-file` are CLI-only options (they are not themselves read from environment variables).
@@ -546,6 +547,22 @@ Rolling back: 20151127184807_create_users_table.sql
 Rolled back: 20151127184807_create_users_table.sql in 123µs
 Writing: ./db/schema.sql
 ```
+
+### Checking Migration Status
+
+Run `dbmate status` to list applied (`[X]`) and pending (`[ ]`) migrations. A migration that is recorded as applied but has no file (for example, after deploying an older release) is shown as `[?] <version> (file not found)` and is still counted in `Applied:`:
+
+```sh
+$ dbmate status
+[X] 20151127184807_create_users_table.sql
+[?] 20151130120000 (file not found)
+[ ] 20151201093000_create_posts_table.sql
+
+Applied: 2
+Pending: 1
+```
+
+`--exit-code` returns 1 only when there are pending migrations. Pass `--strict` to also fail when an applied migration file is missing.
 
 ### Migration Options
 

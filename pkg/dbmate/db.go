@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/amacneil/dbmate/v2/pkg/dbutil"
@@ -724,32 +725,96 @@ func (db *DB) Rollback() error {
 
 // Status shows the status of all migrations
 func (db *DB) Status(quiet bool) (int, error) {
-	results, err := db.FindMigrations()
+	drv, err := db.Driver()
 	if err != nil {
 		return -1, err
 	}
 
-	var totalApplied int
-	var line string
+	sqlDB, err := drv.Open()
+	if err != nil {
+		return -1, err
+	}
+	defer dbutil.MustClose(sqlDB)
 
-	for _, res := range results {
-		if res.Applied {
-			line = fmt.Sprintf("[X] %s", res.FileName)
-			totalApplied++
-		} else {
-			line = fmt.Sprintf("[ ] %s", res.FileName)
-		}
-		if !quiet {
-			fmt.Fprintln(db.Log, line)
-		}
+	results, err := db.findMigrations(drv, sqlDB)
+	if err != nil {
+		return -1, err
 	}
 
-	totalPending := len(results) - totalApplied
+	missing, err := appliedMigrationsWithoutFile(drv, sqlDB, results)
+	if err != nil {
+		return -1, err
+	}
+
+	type statusLine struct {
+		version string
+		text    string
+	}
+	lines := make([]statusLine, 0, len(results)+len(missing))
+
+	var totalApplied, totalPending int
+	for _, res := range results {
+		if res.Applied {
+			lines = append(lines, statusLine{res.Version, fmt.Sprintf("[X] %s", res.FileName)})
+			totalApplied++
+		} else {
+			lines = append(lines, statusLine{res.Version, fmt.Sprintf("[ ] %s", res.FileName)})
+			totalPending++
+		}
+	}
+	for _, version := range missing {
+		lines = append(lines, statusLine{version, fmt.Sprintf("[?] %s (file not found)", version)})
+		totalApplied++
+	}
+	sort.SliceStable(lines, func(i, j int) bool { return lines[i].version < lines[j].version })
+
 	if !quiet {
+		for _, line := range lines {
+			fmt.Fprintln(db.Log, line.text)
+		}
 		fmt.Fprintln(db.Log)
 		fmt.Fprintf(db.Log, "Applied: %d\n", totalApplied)
 		fmt.Fprintf(db.Log, "Pending: %d\n", totalPending)
 	}
 
+	if db.Strict && len(missing) > 0 {
+		noun := "migration"
+		if len(missing) > 1 {
+			noun = "migrations"
+		}
+		return totalPending, fmt.Errorf(
+			"%w for applied %s `%s` in --strict mode",
+			ErrMigrationNotFound,
+			noun,
+			strings.Join(missing, "`, `"),
+		)
+	}
+
 	return totalPending, nil
+}
+
+// appliedMigrationsWithoutFile returns the sorted versions recorded in the
+// migrations table that have no matching migration file
+func appliedMigrationsWithoutFile(drv Driver, sqlDB *sql.DB, migrations []Migration) ([]string, error) {
+	exists, err := drv.MigrationsTableExists(sqlDB)
+	if err != nil || !exists {
+		return nil, err
+	}
+
+	applied, err := drv.SelectMigrations(sqlDB, -1)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, migration := range migrations {
+		delete(applied, migration.Version)
+	}
+
+	missing := make([]string, 0, len(applied))
+	for version := range applied {
+		missing = append(missing, version)
+	}
+	sort.Strings(missing)
+
+	return missing, nil
 }
