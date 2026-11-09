@@ -1097,3 +1097,113 @@ func TestPostgresMigrationLock(t *testing.T) {
 		}
 	})
 }
+
+type mockTx struct {
+	executedQueries []string
+	executedArgs    [][]interface{}
+	execErr         error
+}
+
+func (m *mockTx) Exec(query string, args ...interface{}) (sql.Result, error) {
+	m.executedQueries = append(m.executedQueries, query)
+	m.executedArgs = append(m.executedArgs, args)
+	return nil, m.execErr
+}
+
+func (m *mockTx) Query(_ string, _ ...interface{}) (*sql.Rows, error) {
+	return nil, nil
+}
+
+func (m *mockTx) QueryRow(_ string, _ ...interface{}) *sql.Row {
+	return nil
+}
+
+func TestPostgresSetMigrationContext(t *testing.T) {
+	t.Run("sets application_name on transaction", func(t *testing.T) {
+		u := dbtest.MustParseURL(t, "postgres://localhost/db")
+		drv := NewDriver(dbmate.DriverConfig{DatabaseURL: u}).(*Driver)
+
+		tx := &mockTx{}
+		err := drv.SetMigrationContext(tx, "20251111103123")
+		require.NoError(t, err)
+		require.Len(t, tx.executedQueries, 1)
+		require.Contains(t, tx.executedQueries[0], "set_config('application_name'")
+		require.Equal(t, [][]interface{}{{"20251111103123"}}, tx.executedArgs)
+	})
+
+	t.Run("spanner-postgres skips setting application_name", func(t *testing.T) {
+		u := dbtest.MustParseURL(t, "spanner-postgres://localhost/db")
+		drv := NewDriver(dbmate.DriverConfig{DatabaseURL: u}).(*Driver)
+
+		tx := &mockTx{}
+		err := drv.SetMigrationContext(tx, "20251111103123")
+		require.NoError(t, err)
+		require.Empty(t, tx.executedQueries)
+	})
+
+	t.Run("redshift skips setting application_name", func(t *testing.T) {
+		u := dbtest.MustParseURL(t, "redshift://localhost/db")
+		drv := NewDriver(dbmate.DriverConfig{DatabaseURL: u}).(*Driver)
+
+		tx := &mockTx{}
+		err := drv.SetMigrationContext(tx, "20251111103123")
+		require.NoError(t, err)
+		require.Empty(t, tx.executedQueries)
+	})
+
+	t.Run("skips setting application_name on unbound *sql.DB", func(t *testing.T) {
+		u := dbtest.MustParseURL(t, "postgres://localhost/db")
+		drv := NewDriver(dbmate.DriverConfig{DatabaseURL: u}).(*Driver)
+
+		err := drv.SetMigrationContext(&sql.DB{}, "20251111103123")
+		require.NoError(t, err)
+	})
+
+	t.Run("returns error from set_config", func(t *testing.T) {
+		u := dbtest.MustParseURL(t, "postgres://localhost/db")
+		drv := NewDriver(dbmate.DriverConfig{DatabaseURL: u}).(*Driver)
+
+		tx := &mockTx{execErr: errors.New("unrecognized configuration parameter")}
+		err := drv.SetMigrationContext(tx, "20251111103123")
+		require.EqualError(t, err, "unrecognized configuration parameter")
+		require.Len(t, tx.executedQueries, 1)
+	})
+}
+
+func TestPostgresSetMigrationContext_Integration(t *testing.T) {
+	db := prepTestPostgresDB(t)
+	defer dbutil.MustClose(db)
+
+	drv := testPostgresDriver(t)
+
+	var initialAppName string
+	err := db.QueryRow("show application_name").Scan(&initialAppName)
+	require.NoError(t, err)
+
+	tx, err := db.Begin()
+	require.NoError(t, err)
+	defer func() { _ = tx.Rollback() }()
+
+	err = drv.SetMigrationContext(tx, "20251111103123")
+	require.NoError(t, err)
+
+	var appName string
+	err = tx.QueryRow("show application_name").Scan(&appName)
+	require.NoError(t, err)
+
+	expectedAppName := initialAppName
+	if expectedAppName == "" {
+		expectedAppName = "dbmate"
+	}
+	expectedAppName = expectedAppName + "[20251111103123]"
+	require.Equal(t, expectedAppName, appName)
+
+	err = tx.Commit()
+	require.NoError(t, err)
+
+	// After commit, application_name automatically reverts to initial session value
+	var restoredAppName string
+	err = db.QueryRow("show application_name").Scan(&restoredAppName)
+	require.NoError(t, err)
+	require.Equal(t, initialAppName, restoredAppName)
+}

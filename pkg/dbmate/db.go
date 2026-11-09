@@ -19,17 +19,18 @@ import (
 
 // Error codes
 var (
-	ErrNoMigrationFiles         = errors.New("no migration files found")
-	ErrInvalidURL               = errors.New("invalid url, have you set your --url flag or DATABASE_URL environment variable?")
-	ErrNoRollback               = errors.New("can't rollback: no migrations have been applied")
-	ErrCantConnect              = errors.New("unable to connect to database")
-	ErrUnsupportedDriver        = errors.New("unsupported driver")
-	ErrNoMigrationName          = errors.New("please specify a name for the new migration")
-	ErrMigrationAlreadyExist    = errors.New("file already exists")
-	ErrMigrationDirNotFound     = errors.New("could not find migrations directory")
-	ErrMigrationNotFound        = errors.New("can't find migration file")
-	ErrCreateDirectory          = errors.New("unable to create directory")
-	ErrMigrationLockUnsupported = errors.New("driver does not support the migration lock")
+	ErrNoMigrationFiles                    = errors.New("no migration files found")
+	ErrInvalidURL                          = errors.New("invalid url, have you set your --url flag or DATABASE_URL environment variable?")
+	ErrNoRollback                          = errors.New("can't rollback: no migrations have been applied")
+	ErrCantConnect                         = errors.New("unable to connect to database")
+	ErrUnsupportedDriver                   = errors.New("unsupported driver")
+	ErrNoMigrationName                     = errors.New("please specify a name for the new migration")
+	ErrMigrationAlreadyExist               = errors.New("file already exists")
+	ErrMigrationDirNotFound                = errors.New("could not find migrations directory")
+	ErrMigrationNotFound                   = errors.New("can't find migration file")
+	ErrCreateDirectory                     = errors.New("unable to create directory")
+	ErrMigrationLockUnsupported            = errors.New("driver does not support the migration lock")
+	ErrMigrationApplicationNameUnsupported = errors.New("driver does not support migration application_name")
 )
 
 // migrationFileRegexp pattern for valid migration files
@@ -70,6 +71,8 @@ type DB struct {
 	UseMigrationLock bool
 	// MigrationLockTimeout specifies maximum time to wait for the migration lock
 	MigrationLockTimeout time.Duration
+	// MigrationApplicationName records the migration version in application_name during execution (PostgreSQL only)
+	MigrationApplicationName bool
 }
 
 // StatusResult represents an available migration status
@@ -81,21 +84,22 @@ type StatusResult struct {
 // New initializes a new dbmate database
 func New(databaseURL *url.URL) *DB {
 	return &DB{
-		AutoDumpSchema:       true,
-		DatabaseURL:          databaseURL,
-		FS:                   nil,
-		Log:                  os.Stdout,
-		MigrationsDir:        []string{"./db/migrations"},
-		MigrationsTableName:  "schema_migrations",
-		SchemaFile:           "./db/schema.sql",
-		Strict:               false,
-		Verbose:              false,
-		WaitBefore:           false,
-		WaitInterval:         time.Second,
-		WaitTimeout:          60 * time.Second,
-		Args:                 []string{},
-		UseMigrationLock:     false,
-		MigrationLockTimeout: 5 * time.Minute,
+		AutoDumpSchema:           true,
+		DatabaseURL:              databaseURL,
+		FS:                       nil,
+		Log:                      os.Stdout,
+		MigrationsDir:            []string{"./db/migrations"},
+		MigrationsTableName:      "schema_migrations",
+		SchemaFile:               "./db/schema.sql",
+		Strict:                   false,
+		Verbose:                  false,
+		WaitBefore:               false,
+		WaitInterval:             time.Second,
+		WaitTimeout:              60 * time.Second,
+		Args:                     []string{},
+		UseMigrationLock:         false,
+		MigrationLockTimeout:     5 * time.Minute,
+		MigrationApplicationName: false,
 	}
 }
 
@@ -363,6 +367,12 @@ func (db *DB) Migrate() error {
 		return err
 	}
 
+	if db.MigrationApplicationName {
+		if _, ok := drv.(DriverMigrationContext); !ok {
+			return ErrMigrationApplicationNameUnsupported
+		}
+	}
+
 	var sqlDB *sql.DB
 	if db.UseMigrationLock {
 		drvLock, ok := drv.(DriverMigrationLock)
@@ -449,7 +459,17 @@ func (db *DB) Migrate() error {
 
 			if migrationSection.UpOptions.Transaction() {
 				// begin transaction
-				err = doTransaction(sqlDB, execMigration)
+				err = doTransaction(sqlDB, func(tx dbutil.Transaction) error {
+					if db.MigrationApplicationName {
+						if ctxDrv, ok := drv.(DriverMigrationContext); ok {
+							if err := ctxDrv.SetMigrationContext(tx, migration.Version); err != nil {
+								return err
+							}
+						}
+					}
+
+					return execMigration(tx)
+				})
 			} else {
 				// run outside of transaction
 				err = execMigration(sqlDB)
@@ -599,6 +619,12 @@ func (db *DB) Rollback() error {
 		return err
 	}
 
+	if db.MigrationApplicationName {
+		if _, ok := drv.(DriverMigrationContext); !ok {
+			return ErrMigrationApplicationNameUnsupported
+		}
+	}
+
 	sqlDB, err := db.openDatabaseForMigration(drv)
 	if err != nil {
 		return err
@@ -664,7 +690,17 @@ func (db *DB) Rollback() error {
 
 		if migrationSection.DownOptions.Transaction() {
 			// begin transaction
-			err = doTransaction(sqlDB, execMigration)
+			err = doTransaction(sqlDB, func(tx dbutil.Transaction) error {
+				if db.MigrationApplicationName {
+					if ctxDrv, ok := drv.(DriverMigrationContext); ok {
+						if err := ctxDrv.SetMigrationContext(tx, latest.Version); err != nil {
+							return err
+						}
+					}
+				}
+
+				return execMigration(tx)
+			})
 		} else {
 			// run outside of transaction
 			err = execMigration(sqlDB)

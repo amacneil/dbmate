@@ -41,6 +41,12 @@ type DriverMigrationLock interface {
 	OpenWithMigrationLock(timeout time.Duration) (*sql.DB, error)
 }
 
+// DriverMigrationContext is implemented by drivers that configure connection or
+// session state (such as application_name) for the duration of a migration.
+type DriverMigrationContext interface {
+	SetMigrationContext(dbutil.Transaction, string) error
+}
+
 // DriverConfig holds configuration passed to driver constructors
 type DriverConfig struct {
 	DatabaseURL         *url.URL

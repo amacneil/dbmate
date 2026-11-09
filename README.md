@@ -146,6 +146,7 @@ The following options are available with all commands. You must use command line
 - `--wait-interval 1s` - time to wait between connection attempts for --wait flag _(env: `DBMATE_WAIT_INTERVAL`)_
 - `--migration-lock` - hold a database lock while migrating so that concurrent dbmate instances wait for each other (PostgreSQL only) _(env: `DBMATE_MIGRATION_LOCK`)_
 - `--migration-lock-timeout 5m` - maximum time to wait for the migration lock, 0 to wait indefinitely _(env: `DBMATE_MIGRATION_LOCK_TIMEOUT`)_
+- `--migration-application-name` - record the migration version in application_name during execution (PostgreSQL only) _(env: `DBMATE_MIGRATION_APPLICATION_NAME`)_
 
 ## Usage
 
@@ -168,6 +169,7 @@ Most dbmate settings can be configured with environment variables in addition to
 | Wait interval | `DBMATE_WAIT_INTERVAL` | Corresponds to `--wait-interval`. |
 | Migration lock | `DBMATE_MIGRATION_LOCK` | Corresponds to `--migration-lock`. |
 | Migration lock timeout | `DBMATE_MIGRATION_LOCK_TIMEOUT` | Corresponds to `--migration-lock-timeout`. |
+| Migration application name | `DBMATE_MIGRATION_APPLICATION_NAME` | Corresponds to `--migration-application-name`. |
 | Strict migrations | `DBMATE_STRICT` | Corresponds to `--strict` on `up` / `migrate` / `rollback`. |
 | Verbose SQL output | `DBMATE_VERBOSE` | Corresponds to `--verbose` / `-v` on `up` / `migrate` / `rollback`. |
 
@@ -517,6 +519,8 @@ A few limitations are worth knowing about:
 - The lock is held for the duration of a session, so it needs a direct connection or a session-pooling proxy. A transaction-pooling proxy such as PgBouncer in transaction mode will not hold it.
 - The lock covers migrations only. Concurrent instances creating the database itself (`dbmate up` where the database does not exist yet) can still race, with or without this flag.
 - The lock is released when the server sees the connection close. A host failure or a network partition can leave it held until the server detects the dead connection, so other instances keep waiting, and may reach `--migration-lock-timeout` before it is released.
+
+Pass `--migration-application-name` to update PostgreSQL's `application_name` session setting with the version of the running migration (for example, in `pg_stat_activity`). The setting takes the format `<application_name>[<version>]`, or `dbmate[<version>]` if no application name was configured on the connection. Because this is set locally within the transaction, it only applies to migrations run inside a transaction; migrations configured with `transaction:false` (such as `CREATE INDEX CONCURRENTLY`) keep the normal name. This option is supported for PostgreSQL only, and is skipped on Redshift and `spanner-postgres`.
 
 ### Rolling Back Migrations
 
