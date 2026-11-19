@@ -39,6 +39,50 @@ func TestTrimLeadingSQLComments(t *testing.T) {
 	require.Equal(t, "real stuff\n-- end\n", string(out))
 }
 
+func TestTrimLeadingSQLCommentsWhitespace(t *testing.T) {
+	tests := []struct {
+		name, in, want string
+	}{
+		{
+			name: "whitespace before comments",
+			in:   " \t\n-- client version\n\t \r\nSELECT 1;\n",
+			want: "SELECT 1;\n",
+		},
+		{
+			name: "whitespace between comments",
+			in:   "-- client version\n \t\n-- server version\n\nCREATE TABLE test (id int);\n",
+			want: "CREATE TABLE test (id int);\n",
+		},
+		{
+			name: "whitespace only at EOF",
+			in:   " \t\n\t ",
+			want: "",
+		},
+		{
+			name: "empty input",
+			in:   "",
+			want: "",
+		},
+		{
+			name: "preserves SQL indentation",
+			in:   " \t\n-- client version\n  SELECT 1;\t ",
+			want: "  SELECT 1;\n",
+		},
+		{
+			name: "preserves lines after SQL",
+			in:   " \t\nSELECT 1;\t \n \t\n-- retained comment \t\n\tSELECT 2;\t\n",
+			want: "SELECT 1;\n\n-- retained comment\n\tSELECT 2;\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out, err := dbutil.TrimLeadingSQLComments([]byte(tt.in))
+			require.NoError(t, err)
+			require.Equal(t, tt.want, string(out))
+		})
+	}
+}
+
 func TestTrimLeadingSQLCommentsShortLineAtEOF(t *testing.T) {
 	// >4KB of leading comments forces bufio.Scanner to slide its buffer,
 	// leaving stale bytes just past the final token; a one-byte last line

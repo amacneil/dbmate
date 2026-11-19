@@ -73,6 +73,9 @@ func TrimLeadingSQLComments(data []byte) ([]byte, error) {
 		// we read bytes directly for premature performance optimization
 		line := scanner.Bytes()
 
+		// trim trailing whitespace
+		line = bytes.TrimRightFunc(line, unicode.IsSpace)
+
 		if preamble && (len(line) == 0 || bytes.HasPrefix(line, []byte("--"))) {
 			// header section, skip this line in output buffer
 			continue
@@ -80,9 +83,6 @@ func TrimLeadingSQLComments(data []byte) ([]byte, error) {
 
 		// header section is over
 		preamble = false
-
-		// trim trailing whitespace
-		line = bytes.TrimRightFunc(line, unicode.IsSpace)
 
 		// copy bytes to output buffer
 		if _, err := out.Write(line); err != nil {
