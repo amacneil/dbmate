@@ -189,7 +189,7 @@ func (drv *Driver) CreateDatabase() error {
 	if err != nil {
 		return err
 	}
-	defer dbutil.MustClose(db)
+	defer dbutil.CloseOrWarn(db)
 
 	q := fmt.Sprintf("CREATE DATABASE %s%s", databaseName, drv.onClusterClause())
 
@@ -207,7 +207,7 @@ func (drv *Driver) DropDatabase() error {
 	if err != nil {
 		return err
 	}
-	defer dbutil.MustClose(db)
+	defer dbutil.CloseOrWarn(db)
 
 	q := fmt.Sprintf("DROP DATABASE IF EXISTS %s%s", databaseName, drv.onClusterClause())
 
@@ -293,7 +293,7 @@ func (drv *Driver) DatabaseExists() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer dbutil.MustClose(db)
+	defer dbutil.CloseOrWarn(db)
 
 	exists := false
 	err = db.QueryRow("SELECT 1 FROM system.databases where name = ?", name).
@@ -368,7 +368,7 @@ func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, err
 		return nil, err
 	}
 
-	defer dbutil.MustClose(rows)
+	defer dbutil.CloseOrWarn(rows)
 
 	migrations := map[string]bool{}
 	for rows.Next() {
@@ -414,7 +414,7 @@ func (drv *Driver) Ping() error {
 	if err != nil {
 		return err
 	}
-	defer dbutil.MustClose(db)
+	defer dbutil.CloseOrWarn(db)
 
 	err = db.Ping()
 	if err == nil {

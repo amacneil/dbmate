@@ -43,7 +43,7 @@ func (drv *Driver) CreateDatabase() error {
 	if err != nil {
 		return err
 	}
-	defer dbutil.MustClose(db)
+	defer dbutil.CloseOrWarn(db)
 
 	exists, err := drv.DatabaseExists()
 	if err != nil {
@@ -107,7 +107,7 @@ func (drv *Driver) DatabaseExists() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer dbutil.MustClose(db)
+	defer dbutil.CloseOrWarn(db)
 
 	ctx := context.Background()
 	conn, err := db.Conn(ctx)
@@ -146,7 +146,7 @@ func (drv *Driver) DropDatabase() error {
 	if err != nil {
 		return err
 	}
-	defer dbutil.MustClose(db)
+	defer dbutil.CloseOrWarn(db)
 
 	exists, err := drv.DatabaseExists()
 	if err != nil {
@@ -201,7 +201,7 @@ func (drv *Driver) schemaDump(db *sql.DB) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error querying objects: %v", err)
 	}
-	defer dbutil.MustClose(rows)
+	defer dbutil.CloseOrWarn(rows)
 
 	// Iterate over the results and generate DDL for each object
 	for rows.Next() {
@@ -288,7 +288,7 @@ func (drv *Driver) DeleteMigration(tx dbutil.Transaction, version string) error 
 	if err != nil {
 		return err
 	}
-	defer dbutil.MustClose(db)
+	defer dbutil.CloseOrWarn(db)
 
 	config, err := drv.getConfig(db)
 	if err != nil {
@@ -309,7 +309,7 @@ func (drv *Driver) InsertMigration(tx dbutil.Transaction, version string) error 
 	if err != nil {
 		return err
 	}
-	defer dbutil.MustClose(db)
+	defer dbutil.CloseOrWarn(db)
 
 	config, err := drv.getConfig(db)
 	if err != nil {
@@ -334,7 +334,7 @@ func (drv *Driver) Ping() error {
 	if err != nil {
 		return err
 	}
-	defer dbutil.MustClose(db)
+	defer dbutil.CloseOrWarn(db)
 
 	return db.Ping()
 }
@@ -357,7 +357,7 @@ func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, err
 	if err != nil {
 		return nil, err
 	}
-	defer dbutil.MustClose(rows)
+	defer dbutil.CloseOrWarn(rows)
 
 	migrations := map[string]bool{}
 	for rows.Next() {

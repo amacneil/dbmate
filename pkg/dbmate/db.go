@@ -226,7 +226,7 @@ func (db *DB) DumpSchema() error {
 	if err != nil {
 		return err
 	}
-	defer dbutil.MustClose(sqlDB)
+	defer dbutil.CloseOrWarn(sqlDB)
 
 	schema, err := drv.DumpSchema(sqlDB, db.Args...)
 	if err != nil {
@@ -255,7 +255,7 @@ func (db *DB) LoadSchema() error {
 	if err != nil {
 		return err
 	}
-	defer dbutil.MustClose(sqlDB)
+	defer dbutil.CloseOrWarn(sqlDB)
 
 	_, err = os.Stat(db.SchemaFile)
 	if err != nil {
@@ -320,14 +320,7 @@ func (db *DB) NewMigration(name string) error {
 	}
 
 	// write new migration
-	file, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-
-	defer dbutil.MustClose(file)
-	_, err = file.WriteString(migrationTemplate)
-	return err
+	return os.WriteFile(path, []byte(migrationTemplate), 0o666)
 }
 
 func doTransaction(sqlDB *sql.DB, txFunc func(dbutil.Transaction) error) error {
@@ -354,7 +347,7 @@ func (db *DB) openDatabaseForMigration(drv Driver) (*sql.DB, error) {
 	}
 
 	if err := drv.CreateMigrationsTable(sqlDB); err != nil {
-		dbutil.MustClose(sqlDB)
+		dbutil.CloseOrWarn(sqlDB)
 		return nil, err
 	}
 
@@ -390,7 +383,7 @@ func (db *DB) Migrate() error {
 	if err != nil {
 		return err
 	}
-	defer dbutil.MustClose(sqlDB)
+	defer dbutil.CloseOrWarn(sqlDB)
 
 	// applied migrations must be read after the lock is acquired, otherwise an
 	// instance that waited for the lock would re-apply what the holder just did
@@ -528,7 +521,7 @@ func (db *DB) FindMigrations() ([]Migration, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer dbutil.MustClose(sqlDB)
+	defer dbutil.CloseOrWarn(sqlDB)
 
 	return db.findMigrations(drv, sqlDB)
 }
@@ -630,7 +623,7 @@ func (db *DB) Rollback() error {
 	if err != nil {
 		return err
 	}
-	defer dbutil.MustClose(sqlDB)
+	defer dbutil.CloseOrWarn(sqlDB)
 
 	// find last applied migration
 	var latest *Migration
@@ -734,7 +727,7 @@ func (db *DB) Status(quiet bool) (int, error) {
 	if err != nil {
 		return -1, err
 	}
-	defer dbutil.MustClose(sqlDB)
+	defer dbutil.CloseOrWarn(sqlDB)
 
 	results, err := db.findMigrations(drv, sqlDB)
 	if err != nil {
