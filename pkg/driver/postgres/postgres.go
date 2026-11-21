@@ -227,7 +227,7 @@ func (drv *Driver) CreateDatabase() error {
 	if err != nil {
 		return err
 	}
-	defer dbutil.MustClose(db)
+	defer dbutil.CloseOrWarn(db)
 
 	_, err = db.Exec(fmt.Sprintf("create database %s",
 		pq.QuoteIdentifier(name)))
@@ -244,7 +244,7 @@ func (drv *Driver) DropDatabase() error {
 	if err != nil {
 		return err
 	}
-	defer dbutil.MustClose(db)
+	defer dbutil.CloseOrWarn(db)
 
 	_, err = db.Exec(fmt.Sprintf("drop database if exists %s",
 		pq.QuoteIdentifier(name)))
@@ -314,7 +314,7 @@ func (drv *Driver) DatabaseExists() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer dbutil.MustClose(db)
+	defer dbutil.CloseOrWarn(db)
 
 	exists := false
 	err = db.QueryRow("select true from pg_database where datname = $1", name).
@@ -401,7 +401,7 @@ func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, err
 		return nil, err
 	}
 
-	defer dbutil.MustClose(rows)
+	defer dbutil.CloseOrWarn(rows)
 
 	migrations := map[string]bool{}
 	for rows.Next() {
@@ -454,7 +454,7 @@ func (drv *Driver) Ping() error {
 	if err != nil {
 		return err
 	}
-	defer dbutil.MustClose(db)
+	defer dbutil.CloseOrWarn(db)
 
 	err = db.Ping()
 	if err == nil {
@@ -635,7 +635,7 @@ func (drv *Driver) OpenWithMigrationLock(timeout time.Duration) (*sql.DB, error)
 	// connect eagerly, so that acquiring the lock fails here rather than part way
 	// through the migration run
 	if err := db.Ping(); err != nil {
-		dbutil.MustClose(db)
+		dbutil.CloseOrWarn(db)
 
 		// lock_not_available: another session held the lock for longer than the timeout
 		var pqErr *pq.Error

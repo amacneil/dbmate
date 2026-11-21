@@ -114,7 +114,7 @@ func (drv *Driver) CreateDatabase() error {
 	if err != nil {
 		return err
 	}
-	defer dbutil.MustClose(db)
+	defer dbutil.CloseOrWarn(db)
 
 	return db.Ping()
 }
@@ -224,7 +224,7 @@ func (drv *Driver) SelectMigrations(db *sql.DB, limit int) (map[string]bool, err
 		return nil, err
 	}
 
-	defer dbutil.MustClose(rows)
+	defer dbutil.CloseOrWarn(rows)
 
 	migrations := map[string]bool{}
 	for rows.Next() {
@@ -269,7 +269,7 @@ func (drv *Driver) Ping() error {
 	if err != nil {
 		return err
 	}
-	defer dbutil.MustClose(db)
+	defer dbutil.CloseOrWarn(db)
 
 	return db.Ping()
 }

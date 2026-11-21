@@ -5,8 +5,10 @@ import (
 	"bytes"
 	"database/sql"
 	"errors"
+	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"os/exec"
 	"strings"
 	"unicode"
@@ -29,10 +31,19 @@ func DatabaseName(u *url.URL) string {
 	return name
 }
 
-// MustClose ensures a stream is closed
+// MustClose ensures a stream is closed, and panics if closing fails
 func MustClose(c io.Closer) {
 	if err := c.Close(); err != nil {
 		panic(err)
+	}
+}
+
+var warnOutput io.Writer = os.Stderr
+
+// CloseOrWarn closes c, and prints a warning if closing fails.
+func CloseOrWarn(c io.Closer) {
+	if err := c.Close(); err != nil {
+		_, _ = fmt.Fprintf(warnOutput, "Warning: %v\n", err)
 	}
 }
 
@@ -151,7 +162,7 @@ func QueryColumn(db Transaction, query string, args ...interface{}) ([]string, e
 	if err != nil {
 		return nil, err
 	}
-	defer MustClose(rows)
+	defer CloseOrWarn(rows)
 
 	// read into slice
 	var result []string
