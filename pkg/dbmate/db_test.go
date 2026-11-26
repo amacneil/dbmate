@@ -947,7 +947,7 @@ func TestMigrateStrictOrder(t *testing.T) {
 	}
 
 	err = db.Migrate()
-	require.Error(t, err)
+	require.ErrorContains(t, err, "applied migration `100` in --strict mode")
 }
 
 func appliedVersions(t *testing.T, db *dbmate.DB) map[string]bool {
@@ -989,7 +989,7 @@ func TestMigrateStrictOrderMissingAppliedFile(t *testing.T) {
 
 		err := db.Migrate()
 		require.ErrorContains(t, err, "migration `005` is out of order")
-		require.ErrorContains(t, err, "applied migration `010`")
+		require.ErrorContains(t, err, "applied migration `010` (file not found) in --strict mode")
 		require.Equal(t, map[string]bool{"001": true, "010": true}, appliedVersions(t, db))
 	})
 
