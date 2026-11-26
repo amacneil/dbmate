@@ -408,11 +408,25 @@ func (db *DB) Migrate() error {
 		}
 	}
 
+	// an applied migration whose file is missing still sets the order
+	highestAppliedNote := ""
+	if db.Strict && len(pendingMigrations) > 0 {
+		missing, err := appliedMigrationsWithoutFile(drv, sqlDB, migrations)
+		if err != nil {
+			return err
+		}
+		if n := len(missing); n > 0 && missing[n-1] > highestAppliedMigrationVersion {
+			highestAppliedMigrationVersion = missing[n-1]
+			highestAppliedNote = " (file not found)"
+		}
+	}
+
 	if len(pendingMigrations) > 0 && db.Strict && pendingMigrations[0].Version <= highestAppliedMigrationVersion {
 		return fmt.Errorf(
-			"migration `%s` is out of order with already applied migrations, the version number has to be higher than the applied migration `%s` in --strict mode",
+			"migration `%s` is out of order with already applied migrations, the version number has to be higher than the applied migration `%s`%s in --strict mode",
 			pendingMigrations[0].Version,
 			highestAppliedMigrationVersion,
+			highestAppliedNote,
 		)
 	}
 

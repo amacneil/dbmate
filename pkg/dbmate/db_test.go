@@ -947,7 +947,66 @@ func TestMigrateStrictOrder(t *testing.T) {
 	}
 
 	err = db.Migrate()
-	require.Error(t, err)
+	require.ErrorContains(t, err, "applied migration `100` in --strict mode")
+}
+
+func appliedVersions(t *testing.T, db *dbmate.DB) map[string]bool {
+	t.Helper()
+	drv, err := db.Driver()
+	require.NoError(t, err)
+	sqlDB, err := drv.Open()
+	require.NoError(t, err)
+	defer dbutil.MustClose(sqlDB)
+	applied, err := drv.SelectMigrations(sqlDB, -1)
+	require.NoError(t, err)
+	return applied
+}
+
+func TestMigrateStrictOrderMissingAppliedFile(t *testing.T) {
+	emptyMigration := []byte("-- migrate:up\n-- migrate:down")
+
+	// 010 is applied, then its file disappears (e.g. it came from another branch)
+	setup := func(t *testing.T, pending string) *dbmate.DB {
+		t.Helper()
+		db := newTestDB(t, sqliteTestURL(t))
+		require.NoError(t, db.Drop())
+		require.NoError(t, db.Create())
+		db.FS = fstest.MapFS{
+			"db/migrations/001_test_migration_a.sql": {Data: emptyMigration},
+			"db/migrations/010_test_migration_b.sql": {Data: emptyMigration},
+		}
+		require.NoError(t, db.Migrate())
+		db.FS = fstest.MapFS{
+			"db/migrations/001_test_migration_a.sql": {Data: emptyMigration},
+			"db/migrations/" + pending:               {Data: emptyMigration},
+		}
+		return db
+	}
+
+	t.Run("strict rejects a migration older than the missing one", func(t *testing.T) {
+		db := setup(t, "005_test_migration_c.sql")
+		db.Strict = true
+
+		err := db.Migrate()
+		require.ErrorContains(t, err, "migration `005` is out of order")
+		require.ErrorContains(t, err, "applied migration `010` (file not found) in --strict mode")
+		require.Equal(t, map[string]bool{"001": true, "010": true}, appliedVersions(t, db))
+	})
+
+	t.Run("strict applies a migration newer than the missing one", func(t *testing.T) {
+		db := setup(t, "020_test_migration_c.sql")
+		db.Strict = true
+
+		require.NoError(t, db.Migrate())
+		require.Equal(t, map[string]bool{"001": true, "010": true, "020": true}, appliedVersions(t, db))
+	})
+
+	t.Run("without strict keeps the current behavior", func(t *testing.T) {
+		db := setup(t, "005_test_migration_c.sql")
+
+		require.NoError(t, db.Migrate())
+		require.Equal(t, map[string]bool{"001": true, "005": true, "010": true}, appliedVersions(t, db))
+	})
 }
 
 func TestRollbackMissingLatestMigrationFile(t *testing.T) {
@@ -969,18 +1028,6 @@ func TestRollbackMissingLatestMigrationFile(t *testing.T) {
 		require.NoError(t, db.Migrate())
 		db.FS = onlyFirstFile
 		return db
-	}
-
-	appliedVersions := func(t *testing.T, db *dbmate.DB) map[string]bool {
-		t.Helper()
-		drv, err := db.Driver()
-		require.NoError(t, err)
-		sqlDB, err := drv.Open()
-		require.NoError(t, err)
-		defer dbutil.MustClose(sqlDB)
-		applied, err := drv.SelectMigrations(sqlDB, -1)
-		require.NoError(t, err)
-		return applied
 	}
 
 	t.Run("strict", func(t *testing.T) {
