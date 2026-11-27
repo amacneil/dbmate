@@ -512,6 +512,8 @@ Writing: ./db/schema.sql
 
 Pending migrations are always applied in numerical order. However, dbmate does not prevent migrations from being applied out of order if they are committed independently (for example: if a developer has been working on a branch for a long time, and commits a migration which has a lower version number than other already-applied migrations, dbmate will simply apply the pending migration). See [#159](https://github.com/amacneil/dbmate/issues/159) for a more detailed explanation.
 
+Dbmate can reuse a database connection across migrations within a single run. Session state such as MySQL user-defined variables can then carry over to later migrations, even across transactions. Initialize session state in each migration that relies on it, and reset state that should be local to a single migration.
+
 If several instances of your application may run `dbmate up` at the same time (for example, replicas starting simultaneously), pass `--migration-lock` to hold an exclusive lock for the duration of the run. Concurrent instances then wait for the lock, and find nothing left to apply once they acquire it, instead of racing to apply the same migrations. The wait is bounded by `--migration-lock-timeout` (default 5 minutes). The lock is released automatically when the holding connection closes, so a crashed or killed instance never leaves a stale lock behind. If that connection is lost mid-run, the run fails rather than carrying on without the lock.
 
 A few limitations are worth knowing about:
